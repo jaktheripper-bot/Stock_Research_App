@@ -33,7 +33,7 @@ from core.db.distributed_lock import job_lease, prune_zombie_leases
 from core.logging_config import flush_betterstack_logs, setup_logging
 
 IST = ZoneInfo("Asia/Kolkata")
-DAILY_LEASE_TTL_SECONDS = 72000  # 20 hours: coordinates cloud + failover workers on the same IST edition
+DAILY_LEASE_TTL_SECONDS = 28800  # 8 hours: coordinates cloud + failover workers without locking same-day post-close runs
 
 logging.basicConfig(
     level=logging.INFO,
@@ -346,6 +346,26 @@ def run_evening_harvest_pipeline(
         res = ingest_daily_stock_cohort(edition_date=date_str, count=15, skip_gemini=False)
         ingested_n = res.get("ingested_count", len(res.get("ingested_tickers") or res.get("ingested_stocks") or []))
         logger.info(f"Evening Phase 6: {res.get('status')} ({ingested_n} equities).")
+
+        # If any candidate equities were deferred to the pending queue under fail-closed integrity,
+        # automatically trigger the batch synthesis worker to compile them immediately.
+        if res.get("pending_count", 0) > 0 or ingested_n == 0:
+            try:
+                from scripts.synthesize_pending_equities import synthesize_pending_cohort
+                logger.info("Compiling pending equities queue for edition %s...", date_str)
+                synth_count = synthesize_pending_cohort(
+                    limit=15,
+                    tickers=res.get("pending_tickers") or None,
+                )
+                logger.info("Compiled %d pending equities for edition %s.", synth_count, date_str)
+                if isinstance(res, dict) and synth_count > 0:
+                    res["compiled_from_pending"] = synth_count
+                    res["ingested_count"] = ingested_n + synth_count
+                    if res.get("status") == "pending_synthesis":
+                        res["status"] = "success"
+            except Exception as synth_err:
+                logger.warning("Pending synthesis pass notice: %s", synth_err)
+
         return res
 
     _run_leased_phase(
@@ -402,6 +422,26 @@ def run_morning_pipeline(
         res = ingest_daily_stock_cohort(edition_date=date_str, count=15, skip_gemini=False)
         ingested_n = res.get("ingested_count", len(res.get("ingested_tickers") or res.get("ingested_stocks") or []))
         logger.info(f"Phase 1 result: {res.get('status')} ({ingested_n} equities).")
+
+        # If any candidate equities were deferred to the pending queue under fail-closed integrity,
+        # automatically trigger the batch synthesis worker to compile them immediately.
+        if res.get("pending_count", 0) > 0 or ingested_n == 0:
+            try:
+                from scripts.synthesize_pending_equities import synthesize_pending_cohort
+                logger.info("Compiling pending equities queue for edition %s...", date_str)
+                synth_count = synthesize_pending_cohort(
+                    limit=15,
+                    tickers=res.get("pending_tickers") or None,
+                )
+                logger.info("Compiled %d pending equities for edition %s.", synth_count, date_str)
+                if isinstance(res, dict) and synth_count > 0:
+                    res["compiled_from_pending"] = synth_count
+                    res["ingested_count"] = ingested_n + synth_count
+                    if res.get("status") == "pending_synthesis":
+                        res["status"] = "success"
+            except Exception as synth_err:
+                logger.warning("Pending synthesis pass notice: %s", synth_err)
+
         return res
 
     _run_leased_phase(
@@ -501,8 +541,41 @@ def run_nightly_pipeline(
     else:
         def _amfi_sync():
             from core.ingestion.amfi import ingest_amfi_daily_feed
+            from core.analysis.asset_scanner import scan_mutual_funds, record_scan_start, record_scan_complete
+            from core.db.mutual_funds import get_active_mutual_funds
 
-            return ingest_amfi_daily_feed(limit=None, direct_growth_only=True)
+            is_test_mock_mode = (
+                os.environ.get("TESTING") == "1"
+                and os.environ.get("ALLOW_AMFI_DIFF_SCAN_IN_TEST") != "1"
+            )
+            pre_snapshot = (
+                None
+                if is_test_mock_mode
+                else {s["scheme_code"]: s for s in get_active_mutual_funds(limit=20000)}
+            )
+            res = ingest_amfi_daily_feed(limit=None, direct_growth_only=True)
+            if is_test_mock_mode:
+                return res
+
+            scan_id = record_scan_start("MUTUAL_FUNDS", triggered_by="scheduled_nightly")
+            try:
+                summary = scan_mutual_funds(
+                    limit=None,
+                    pre_snapshot=pre_snapshot,
+                    skip_upsert=True,
+                )
+                record_scan_complete(
+                    scan_id=scan_id,
+                    status="completed",
+                    items_scanned=summary.get("scanned", 0),
+                    items_added=summary.get("new", 0),
+                    items_updated=summary.get("changed", 0),
+                    details=summary,
+                )
+            except Exception as scan_err:
+                logger.warning("AMFI nightly differential scan failed (%s): %s", scan_id, scan_err)
+                record_scan_complete(scan_id=scan_id, status="failed", error_message=str(scan_err))
+            return res
 
         _run_leased_phase(
             results,

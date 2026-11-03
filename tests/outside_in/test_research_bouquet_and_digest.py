@@ -66,6 +66,65 @@ class TestResearchBouquetAndDigest(unittest.TestCase):
         cur.close()
         conn.close()
 
+        # Ensure cold-container hermeticity when test_reports.db starts completely empty
+        from core.db.discovery import get_active_discovery_reel, save_discovery_reel
+        from core.db.reports import get_report_by_ticker_sync, save_report_to_archive
+        from core.db.sovereign import get_sovereign_curve_analytics, refresh_daily_sovereign_benchmarks
+        from core.db.debt import get_active_debt_securities, seed_default_debt_securities
+        from core.db.mutual_funds import get_active_mutual_funds, seed_default_mutual_funds
+        from core.msme.seed import seed_default_msme_firms
+
+        if not get_report_by_ticker_sync("TRITURBINE"):
+            save_report_to_archive(
+                {
+                    "ticker": "TRITURBINE",
+                    "short_name": "Triveni Turbine Limited",
+                    "current_price": 685.0,
+                    "pe_ratio": "52.4",
+                    "market_cap": 218_000_000_000.0,
+                },
+                (
+                    "### Health Matrix\n- Macro: Stable\n- Moat: Wide\n- Governance: Clean\n"
+                    "- Diagnostic: Neutral\n- Valuation: Fair\n- Balance Sheet: Debt-Free\n"
+                    "- Capital Allocation: Disciplined\n\n"
+                    + ("Triveni Turbine Limited (TRITURBINE) industrial steam turbine aftermarket franchise dossier. " * 12)
+                ),
+                revision_trigger="Hermetic Bouquet Test Seed",
+            )
+        if not get_active_discovery_reel(edition_date="2026-10-30", exclude_tests=True, allow_fallback=True):
+            save_discovery_reel(
+                [
+                    {
+                        "ticker": "TRITURBINE",
+                        "company_name": "Triveni Turbine Limited",
+                        "sector": "Capital Goods",
+                        "market_cap_tier": "Mid-Cap",
+                        "current_price": 685.0,
+                        "pe_ratio": "52.4",
+                        "roce_pct": 34.2,
+                        "debt_to_equity": 0.0,
+                        "sales_growth_3y": 28.5,
+                        "ria_thesis": "High-margin aftermarket steam turbine servicing franchise with zero debt and 34.2% ROCE.",
+                        "catalyst_headline": "Export Aftermarket Backlog Expansion",
+                        "key_metrics": {"roce": "34.2%", "debt_to_equity": "0.00x", "pe": "52.4"},
+                    }
+                ],
+                edition_date="2026-10-30",
+            )
+        if not (get_sovereign_curve_analytics() or {}).get("benchmark_10y_gsec"):
+            refresh_daily_sovereign_benchmarks("2026-10-30")
+        if not get_active_debt_securities():
+            seed_default_debt_securities()
+        if not get_active_mutual_funds(limit=1):
+            seed_default_mutual_funds()
+        seed_default_msme_firms()
+        from core.db.sovereign import get_etf_matrix
+        from core.analysis.sm_reit_invit_engine import audit_reit_portfolio
+        from core.analysis.sgb_engine import evaluate_sgb_market
+        get_etf_matrix(limit=5)
+        audit_reit_portfolio()
+        evaluate_sgb_market()
+
     @classmethod
     def tearDownClass(cls):
         conn = get_db_connection()

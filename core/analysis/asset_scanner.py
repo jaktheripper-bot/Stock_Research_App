@@ -87,13 +87,17 @@ def record_scan_complete(
         conn.close()
 
 
-def scan_mutual_funds(limit: Optional[int] = None) -> Dict[str, Any]:
+def scan_mutual_funds(
+    limit: Optional[int] = None,
+    pre_snapshot: Optional[Dict[str, Dict[str, Any]]] = None,
+    skip_upsert: bool = False,
+) -> Dict[str, Any]:
     """
     Executes live AMFI diff scan:
     - Fetches fresh AMFI NAV feed
-    - Compares against existing database records
+    - Compares against existing database records (or `pre_snapshot` if captured prior to ingestion)
     - Classifies diffs: NEW, CHANGED (NAV/Date drift), or UNCHANGED
-    - Upserts updates into the mutual_fund_schemes table
+    - Upserts updates into the mutual_fund_schemes table unless `skip_upsert=True`
     """
     raw_text = fetch_amfi_nav_raw(force_refresh=False)
     live_schemes = parse_amfi_nav_feed(raw_text, direct_growth_only=True)
@@ -101,8 +105,12 @@ def scan_mutual_funds(limit: Optional[int] = None) -> Dict[str, Any]:
     if limit and limit > 0:
         live_schemes = live_schemes[:limit]
 
-    # Query current active schemes from database
-    existing = {s["scheme_code"]: s for s in get_active_mutual_funds(limit=20000)}
+    # Query current active schemes from database unless caller supplied pre-ingestion snapshot
+    existing = (
+        pre_snapshot
+        if pre_snapshot is not None
+        else {s["scheme_code"]: s for s in get_active_mutual_funds(limit=20000)}
+    )
 
     new_count = 0
     changed_count = 0
@@ -135,7 +143,7 @@ def scan_mutual_funds(limit: Optional[int] = None) -> Dict[str, Any]:
             else:
                 unchanged_count += 1
 
-    if to_upsert:
+    if to_upsert and not skip_upsert:
         saved_batch = save_mutual_fund_schemes_batch(to_upsert)
         if saved_batch == 0:
             for item in to_upsert:

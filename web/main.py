@@ -474,7 +474,13 @@ async def run_daily_amfi_scheduler():
                 recent_scans = get_asset_scan_runs(limit=10)
                 nightly_scans = [
                     s for s in recent_scans
-                    if s.get("status") == "completed" and s.get("triggered_by") in ("nightly_cron", "nightly_pipeline", "evening_harvest", "catch_up_boot")
+                    if s.get("status") == "completed" and s.get("triggered_by") in (
+                        "nightly_cron",
+                        "nightly_pipeline",
+                        "scheduled_nightly",
+                        "evening_harvest",
+                        "catch_up_boot",
+                    )
                 ]
                 last_nightly_date = str(nightly_scans[0].get("started_at", ""))[:10] if nightly_scans else ""
                 target_session_date = (

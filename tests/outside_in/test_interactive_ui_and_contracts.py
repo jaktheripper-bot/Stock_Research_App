@@ -44,27 +44,58 @@ from fastapi.testclient import TestClient
 from web.main import app
 
 
+def _seed_hermetic_equity_fixtures() -> None:
+    """Seeds canonical equity dossiers (INFY, TCS, ETERNAL) when test_reports.db starts empty."""
+    from core.db.connection import init_db
+    from core.db import get_report_by_ticker_sync, save_report_to_archive, save_cached_fundamentals
+
+    init_db()
+
+    for sym, sname, px, pe in (
+        ("INFY", "Infosys Ltd", 1520.0, 25.0),
+        ("TCS", "Tata Consultancy Services Ltd", 3850.0, 28.0),
+        ("ETERNAL", "Eternal Ltd", 330.05, 722.92),
+    ):
+        if not get_report_by_ticker_sync(sym):
+            save_report_to_archive(
+                stock_data={
+                    "ticker": sym,
+                    "short_name": sname,
+                    "current_price": px,
+                    "pe_ratio": str(pe),
+                    "market_cap": 6000000000000.0,
+                },
+                report_text=(
+                    "### 7-Pillar Qualitative Health Matrix:\n"
+                    "- Macro: Stable\n- Moat: Strong\n- Management: Stable\n"
+                    "- Diagnostic: Clean\n- Valuation: Fair\n- Balance Sheet: Resilient\n"
+                    "- Capital Allocation: Disciplined\n\n"
+                    "## Pillar 1: Macro\n[VERIFIED FACT: Exchange filing verified across statutory disclosures.]\n\n"
+                    "## Pillar 3: Promoter Quality & Forensic Health\n"
+                    "Clean balance sheet with audited statutory working capital conversion and zero pledge risk.\n\n"
+                    "## Pillar 5: Valuation & Margin of Safety\n"
+                    "Fair value sensitivity evaluated against historical cash-flow yields and implied growth parameters.\n\n"
+                    + (f"{sname} ({sym}) statutory filing evaluation and 7-pillar operational review. " * 6)
+                ),
+                announcement="Quarterly exchange filing.",
+            )
+            save_cached_fundamentals(
+                sym,
+                {
+                    "current_price": px,
+                    "pe_ratio": pe,
+                    "roce": 32.0,
+                    "debt_to_equity": 0.08,
+                    "operating_margin": 21.5,
+                },
+            )
+
+
 class TestInteractiveUiAndDomContracts(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        from core.db import get_report_by_ticker_sync, save_report_to_archive, save_cached_fundamentals
-        for sym, sname, px, pe in (
-            ("INFY", "Infosys Ltd", 1520.0, 25.0),
-            ("TCS", "Tata Consultancy Services Ltd", 3850.0, 28.0),
-            ("ETERNAL", "Eternal Ltd", 330.05, 722.92),
-        ):
-            if not get_report_by_ticker_sync(sym):
-                save_report_to_archive(
-                    stock_data={"ticker": sym, "short_name": sname, "current_price": px, "pe_ratio": str(pe), "market_cap": 6000000000000.0},
-                    report_text=(
-                        "### 7-Pillar Qualitative Health Matrix:\n- Moat: Strong\n- Management: Stable\n\n"
-                        "## Pillar 1: Macro\n[VERIFIED FACT: Exchange filing verified.]\n\n"
-                        "## Pillar 3: Promoter Quality & Forensic Health\nClean balance sheet.\n\n"
-                        "## Pillar 5: Valuation & Margin of Safety\nFair value sensitivity.\n"
-                    ),
-                    announcement="Quarterly exchange filing.",
-                )
-                save_cached_fundamentals(sym, {"current_price": px, "pe_ratio": pe, "roce": 32.0, "debt_to_equity": 0.08, "operating_margin": 21.5})
+        init_db()
+        _seed_hermetic_equity_fixtures()
 
         cls.client = TestClient(app)
         cls.project_root = Path(__file__).resolve().parent.parent.parent
@@ -1051,6 +1082,7 @@ class TestCompetitiveEnhancements(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         init_db()
+        _seed_hermetic_equity_fixtures()
         seed_default_mutual_funds()
         seed_default_debt_securities()
         cls._cm = TestClient(app)
@@ -1388,6 +1420,25 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         5. Zero unrendered Jinja tags ({{ or {%) leak into markup.
         """
         from bs4 import BeautifulSoup
+        from core.db.reports import get_report_by_ticker_sync, save_report_to_archive
+
+        if not get_report_by_ticker_sync("INFY"):
+            save_report_to_archive(
+                {
+                    "ticker": "INFY",
+                    "short_name": "Infosys Limited",
+                    "current_price": 1540.0,
+                    "pe_ratio": "24.5",
+                    "market_cap": 640_000_000_000.0,
+                },
+                (
+                    "### Health Matrix\n- Macro: Stable\n- Moat: Wide\n- Governance: Clean\n"
+                    "- Diagnostic: Neutral\n- Valuation: Fair\n- Balance Sheet: Debt-Free\n"
+                    "- Capital Allocation: Disciplined\n\n"
+                    + ("Infosys Limited (NSE: INFY) global digital engineering and enterprise cloud services dossier. " * 12)
+                ),
+                revision_trigger="Unit Test Fixture Seed",
+            )
         resp = self.client.get("/dossier/INFY")
         self.assertEqual(resp.status_code, 200)
 

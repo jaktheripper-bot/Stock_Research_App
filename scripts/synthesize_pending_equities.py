@@ -354,9 +354,60 @@ def fetch_prioritized_pending_equities() -> List[Tuple[str, str, str]]:
 
 
 def _has_live_llm_credentials() -> bool:
-    gemini_key = (os.environ.get("GEMINI_API_KEY") or get_secret("GEMINI_API_KEY") or "").strip()
-    pplx_key = (os.environ.get("PERPLEXITY_API_KEY") or get_secret("PERPLEXITY_API_KEY") or "").strip()
+    gemini_key = (
+        os.environ["GEMINI_API_KEY"]
+        if "GEMINI_API_KEY" in os.environ
+        else (get_secret("GEMINI_API_KEY") or "")
+    ).strip()
+    pplx_key = (
+        os.environ["PERPLEXITY_API_KEY"]
+        if "PERPLEXITY_API_KEY" in os.environ
+        else (get_secret("PERPLEXITY_API_KEY") or "")
+    ).strip()
     return bool(gemini_key or pplx_key)
+
+
+def _build_synthesis_queue(tickers: Optional[List[str]] = None) -> List[Tuple[str, str, str]]:
+    """Builds the ordered pending queue, supporting unarchived deferred tickers not yet in `reports`."""
+    queue = fetch_prioritized_pending_equities()
+    if not tickers:
+        return queue
+
+    from web.common import resolve_non_equity_dossier_redirect
+
+    wanted_ordered: List[str] = []
+    seen_wanted: Set[str] = set()
+    for raw_t in tickers:
+        clean_t = (raw_t or "").strip().upper()
+        if not clean_t or clean_t in seen_wanted or is_synthetic_test_symbol(clean_t):
+            continue
+        if resolve_non_equity_dossier_redirect(clean_t):
+            logger.info("Skipping non-equity identifier %s in equity synthesis queue.", clean_t)
+            continue
+        seen_wanted.add(clean_t)
+        wanted_ordered.append(clean_t)
+
+    wanted_set = set(wanted_ordered)
+    filtered: List[Tuple[str, str, str]] = []
+    seen_canon: Set[str] = set()
+    for sym, sname, bucket in queue:
+        canon = _resolve_target_symbol(sym)
+        if sym in wanted_set or canon in wanted_set:
+            if canon not in seen_canon:
+                filtered.append((sym, sname, bucket))
+                seen_canon.add(canon)
+
+    for sym in wanted_ordered:
+        canon = _resolve_target_symbol(sym)
+        if canon in seen_canon:
+            continue
+        archived = get_report_by_ticker_sync(canon) or get_report_by_ticker_sync(sym)
+        if archived and len((archived.get("report_text") or "").strip()) >= 500:
+            continue
+        filtered.append((canon, canon, "DEFERRED_COHORT"))
+        seen_canon.add(canon)
+
+    return filtered
 
 
 def synthesize_pending_batch(
@@ -364,23 +415,25 @@ def synthesize_pending_batch(
     tickers: Optional[List[str]] = None,
     delay: float = 3.0,
     max_retries: int = 2,
-) -> Dict[str, int]:
+) -> Dict[str, Any]:
     """Compiles pending equity reports via `generate_stock_report` with strict fail-closed validation."""
     from core.analysis.dossier_report_synthesis import generate_stock_report
+    from core.db.fundamentals import extract_fundamentals_from_report_text, save_cached_fundamentals
 
-    if not _has_live_llm_credentials():
-        logger.error("Fail-closed abort: Neither GEMINI_API_KEY nor PERPLEXITY_API_KEY is configured. Zero rows modified.")
-        return {"compiled": 0, "failed": 0, "aborted_no_credentials": 1}
-
-    queue = fetch_prioritized_pending_equities()
-    if tickers:
-        wanted = {t.strip().upper() for t in tickers if t.strip()}
-        queue = [item for item in queue if item[0] in wanted]
+    queue = _build_synthesis_queue(tickers=tickers)
     if limit is not None and limit > 0:
         queue = queue[:limit]
 
+    if not queue:
+        return {"compiled": 0, "failed": 0, "aborted_no_credentials": 0, "compiled_tickers": []}
+
+    if not _has_live_llm_credentials():
+        logger.error("Fail-closed abort: Neither GEMINI_API_KEY nor PERPLEXITY_API_KEY is configured. Zero rows modified.")
+        return {"compiled": 0, "failed": 0, "aborted_no_credentials": 1, "compiled_tickers": []}
+
     compiled = 0
     failed = 0
+    compiled_tickers: List[str] = []
     total = len(queue)
     logger.info("Starting fail-closed 7-pillar synthesis for %d pending equities...", total)
 
@@ -400,9 +453,24 @@ def synthesize_pending_batch(
                 if is_valid:
                     archived = get_report_by_ticker_sync(canon) or get_report_by_ticker_sync(sym)
                     if archived and len((archived.get("report_text") or "").strip()) >= 1500:
+                        try:
+                            extracted = extract_fundamentals_from_report_text(
+                                archived["report_text"],
+                                fallback_data={
+                                    "ticker": canon,
+                                    "company_name": archived.get("short_name") or sname,
+                                    "current_price": archived.get("baseline_price"),
+                                    "pe_ratio": archived.get("baseline_pe"),
+                                    "market_cap": archived.get("baseline_mcap"),
+                                },
+                            )
+                            save_cached_fundamentals(canon, extracted)
+                        except Exception as cf_err:
+                            logger.debug("Cached fundamentals sync notice for %s: %s", canon, cf_err)
                         compiled += 1
+                        compiled_tickers.append(canon)
                         ok = True
-                        logger.info("  -> Compiled & verified %s (%d chars).", sym, len(text))
+                        logger.info("  -> Compiled & verified %s (%d chars).", canon, len(text))
                         break
                 logger.warning("  -> Attempt %d/%d substance check failed for %s (len=%d).", attempt, max_retries, sym, len(text))
             except Exception as err:
@@ -412,13 +480,50 @@ def synthesize_pending_batch(
 
         if not ok:
             failed += 1
-            logger.error("  -> Fail-closed: %s remains in PENDING queue (report_text=NULL).", sym)
+            logger.error("  -> Fail-closed: %s remains in PENDING queue (unarchived).", sym)
 
         if idx < total and delay > 0:
             time.sleep(delay)
 
     _clear_report_caches()
-    return {"compiled": compiled, "failed": failed, "aborted_no_credentials": 0}
+    return {
+        "compiled": compiled,
+        "failed": failed,
+        "aborted_no_credentials": 0,
+        "compiled_tickers": compiled_tickers,
+    }
+
+
+def synthesize_pending_cohort(
+    limit: int = 15,
+    tickers: Optional[List[str]] = None,
+    delay: float = 2.0,
+    max_retries: int = 2,
+) -> int:
+    """Compiles deferred/pending equity candidates, re-audits affected MFs, and returns compiled count."""
+    if os.environ.get("TESTING") == "1" and os.environ.get("ALLOW_PENDING_SYNTH_IN_TEST") != "1":
+        logger.debug("Skipping live synthesize_pending_cohort in TESTING=1 runtime.")
+        return 0
+
+    batch_res = synthesize_pending_batch(
+        limit=limit,
+        tickers=tickers,
+        delay=delay,
+        max_retries=max_retries,
+    )
+    compiled_n = int(batch_res.get("compiled", 0) or 0)
+    compiled_syms = batch_res.get("compiled_tickers") or []
+    if compiled_syms:
+        try:
+            from core.analysis.daily_stock_ingestion import recalculate_affected_mutual_funds
+            recalculate_affected_mutual_funds(compiled_syms)
+        except Exception as mf_err:
+            logger.warning("Affected MF re-audit notice after pending synthesis: %s", mf_err)
+        try:
+            reconcile_pg_sqlite_drift()
+        except Exception as drift_err:
+            logger.debug("PG<->SQLite drift sync notice after pending synthesis: %s", drift_err)
+    return compiled_n
 
 
 def main() -> None:

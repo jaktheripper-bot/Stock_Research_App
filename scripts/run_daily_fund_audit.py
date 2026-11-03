@@ -59,6 +59,7 @@ def list_fund_audit_status(limit: int = 500):
             FROM mutual_fund_schemes s
             LEFT JOIN fund_forensic_dossiers d ON s.scheme_code = d.scheme_code
             WHERE s.broad_category IN ('EQUITY', 'HYBRID')
+              AND EXISTS (SELECT 1 FROM mutual_fund_holdings h WHERE h.scheme_code = s.scheme_code)
             ORDER BY s.aum_crores DESC, s.scheme_name ASC
             LIMIT %s
             """
@@ -73,6 +74,7 @@ def list_fund_audit_status(limit: int = 500):
             FROM mutual_fund_schemes s
             LEFT JOIN fund_forensic_dossiers d ON s.scheme_code = d.scheme_code
             WHERE s.broad_category IN ('EQUITY', 'HYBRID')
+              AND EXISTS (SELECT 1 FROM mutual_fund_holdings h WHERE h.scheme_code = s.scheme_code)
             ORDER BY s.aum_crores DESC, s.scheme_name ASC
             LIMIT ?
             """,

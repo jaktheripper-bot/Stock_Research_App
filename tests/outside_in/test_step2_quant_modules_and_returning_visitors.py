@@ -45,12 +45,14 @@ def _ensure_seed_equity(ticker: str, short_name: str, report_md: str, price: flo
     existing = get_report_by_ticker_sync(ticker)
     if not existing:
         save_report_to_archive(
-            ticker=ticker,
-            short_name=short_name,
-            report_text=report_md,
-            baseline_price=price,
-            baseline_pe="24.5",
-            baseline_mcap=640_000_000_000.0,
+            {
+                "ticker": ticker,
+                "short_name": short_name,
+                "current_price": price,
+                "pe_ratio": "24.5",
+                "market_cap": 640_000_000_000.0,
+            },
+            report_md,
             revision_trigger="Initial Statutory Filing Audit",
         )
 

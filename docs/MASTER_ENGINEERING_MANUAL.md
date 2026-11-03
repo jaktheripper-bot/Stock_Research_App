@@ -1,6 +1,6 @@
 # Master Engineering Manual & Architecture Specification
 **Stock Research App — Institutional Multi-Asset Research Platform**  
-*Document Version: 2.9.10 | Target Branch: `main` | Last Updated: 2026-11-03*
+*Document Version: 2.9.11 | Target Branch: `main` | Last Updated: 2026-11-03*
 
 ---
 

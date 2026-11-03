@@ -440,6 +440,110 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
         self.assertEqual(results["morning_bouquet"], "SKIPPED_LOCAL_GUARD")
         self.assertEqual(leased_names, [])
 
+    @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
+    @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
+    @patch("scripts.run_discovery_worker.run_discovery_pipeline", return_value=True)
+    @patch("core.msme.daily_ingest.ingest_daily_msme_cohort", return_value=15)
+    @patch("core.db.digest.has_edition_been_dispatched", return_value=True)
+    @patch("scripts.synthesize_pending_equities.synthesize_pending_cohort", return_value=2)
+    def test_morning_and_evening_trigger_synthesize_pending_cohort_when_deferred(
+        self,
+        mock_synth_cohort,
+        mock_has_dispatched,
+        mock_msme,
+        mock_disc,
+        mock_record_event,
+        mock_prune,
+    ):
+        """Deferred Rule-4 candidates in morning or evening stock ingestion must invoke synthesize_pending_cohort."""
+        from scripts.run_scheduled_pipeline import run_evening_harvest_pipeline
+
+        deferred_payload = {
+            "status": "pending_synthesis",
+            "ingested_count": 0,
+            "ingested_tickers": [],
+            "pending_count": 2,
+            "pending_tickers": ["UNARCHIVED_ONE", "UNARCHIVED_TWO"],
+        }
+        with patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease), \
+             patch("core.analysis.daily_stock_ingestion.ingest_daily_stock_cohort", side_effect=[dict(deferred_payload), dict(deferred_payload)]):
+            m_res = run_morning_pipeline("2026-11-02", force=False)
+            e_res = run_evening_harvest_pipeline("2026-11-01", force=False, respect_market_calendar=True)
+
+        self.assertEqual(mock_synth_cohort.call_count, 2)
+        mock_synth_cohort.assert_called_with(limit=15, tickers=["UNARCHIVED_ONE", "UNARCHIVED_TWO"])
+        self.assertEqual(m_res["stock_ingestion"]["compiled_from_pending"], 2)
+        self.assertEqual(m_res["stock_ingestion"]["ingested_count"], 2)
+        self.assertEqual(m_res["stock_ingestion"]["status"], "success")
+        self.assertEqual(e_res["stock_ingestion"]["compiled_from_pending"], 2)
+        self.assertEqual(e_res["stock_ingestion"]["status"], "success")
+
+    @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
+    @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
+    @patch("core.ingestion.etf_ingest.ingest_all_amfi_etfs", return_value={"persisted_to_db": 5})
+    @patch("core.db.sovereign.refresh_daily_sovereign_benchmarks", return_value={"benchmarks_updated": 16})
+    @patch("core.analysis.asset_scanner.run_comprehensive_asset_scan", return_value={"status": "OK"})
+    @patch(
+        "core.analysis.fund_overlap_auditor.audit_single_fund_daily",
+        return_value={
+            "scheme_code": "122639",
+            "scheme_name": "Parag Parikh Flexi Cap Fund",
+            "composite_health_score": 85.0,
+            "weighted_moat_score": 88.0,
+            "accounting_risk_index": 12.0,
+            "margin_of_safety_pct": 24.5,
+        },
+    )
+    def test_nightly_amfi_sync_logs_real_pre_snapshot_differential_scan(
+        self,
+        mock_fund_audit,
+        mock_comp_scan,
+        mock_sov,
+        mock_etf,
+        mock_record_event,
+        mock_prune,
+    ):
+        """_amfi_sync must snapshot prior NAVs before ingest_amfi_daily_feed and log real diffs to asset_scan_runs."""
+        import os
+        from core.analysis.asset_scanner import get_asset_scan_runs
+
+        sample_feed = (
+            "Open Ended Schemes(Equity Scheme - Flexi Cap Fund)\n"
+            "PPFAS Mutual Fund\n"
+            "122639;INF879O01027;-;Parag Parikh Flexi Cap Fund - Direct Plan - Growth;84.5000;02-Nov-2026\n"
+            "999888;INF000TEST01;-;New Direct Growth Test Scheme - Direct Plan - Growth;12.3400;02-Nov-2026\n"
+        )
+        # Simulate DB state BEFORE ingest_amfi_daily_feed runs (old NAV=82.10), then mutated by ingest_amfi_daily_feed
+        state = {"schemes": [{"scheme_code": "122639", "scheme_name": "PPFAS Flexi Cap", "nav": 82.10}]}
+
+        def _fake_get_active(limit=20000):
+            return list(state["schemes"])
+
+        def _fake_ingest_amfi(limit=None, direct_growth_only=True):
+            # Overwrite in-memory DB state just like real ingest_amfi_daily_feed does
+            state["schemes"] = [
+                {"scheme_code": "122639", "scheme_name": "PPFAS Flexi Cap", "nav": 84.50},
+                {"scheme_code": "999888", "scheme_name": "New Direct Growth Test Scheme", "nav": 12.34},
+            ]
+            return {"status": "success", "upserted": 2, "errors": 0}
+
+        with patch.dict(os.environ, {"TESTING": "1", "ALLOW_AMFI_DIFF_SCAN_IN_TEST": "1"}, clear=False), \
+             patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease), \
+             patch("core.db.mutual_funds.get_active_mutual_funds", side_effect=_fake_get_active), \
+             patch("core.ingestion.amfi.ingest_amfi_daily_feed", side_effect=_fake_ingest_amfi), \
+             patch("core.analysis.asset_scanner.fetch_amfi_nav_raw", return_value=sample_feed):
+            res = run_nightly_pipeline("2026-11-02", force=False)
+
+        self.assertEqual(res["amfi_sync"]["upserted"], 2)
+        runs = [r for r in get_asset_scan_runs(limit=10) if r["triggered_by"] == "scheduled_nightly"]
+        self.assertGreaterEqual(len(runs), 1)
+        latest = runs[0]
+        self.assertEqual(latest["scan_type"], "MUTUAL_FUNDS")
+        self.assertEqual(latest["status"], "completed")
+        self.assertEqual(latest["items_scanned"], 2)
+        self.assertEqual(latest["items_added"], 1)    # 999888 detected as NEW despite ingest running first
+        self.assertEqual(latest["items_updated"], 1)  # 122639 detected as CHANGED (82.10 -> 84.50)
+
 
 if __name__ == "__main__":
     unittest.main()
