@@ -4645,9 +4645,9 @@ if (document.readyState === "loading") {
 }
 
 // ==============================================================================
-// Clean Post-Synthesis ?_fresh= Cache-Bust Parameter & Wire Epistemic Micro-Anchors
+// Clean Post-Synthesis ?_fresh= Cache-Bust Parameter
 // ==============================================================================
-(function initEpistemicMicroAnchorsAndUrlCleanup() {
+(function initFreshUrlCleanup() {
   function stripFreshCacheBustParam() {
     try {
       if (!window.location.search || !window.location.search.includes("_fresh=")) return;
@@ -4657,149 +4657,6 @@ if (document.readyState === "loading") {
       window.history.replaceState(window.history.state, "", nextHref);
     } catch (_) {}
   }
-
-  let activeAnchor = null;
-  let tooltipEl = null;
-  let hideTimer = null;
-
-  function ensureTooltipElement() {
-    if (tooltipEl && document.body.contains(tooltipEl)) return tooltipEl;
-    tooltipEl = document.createElement("div");
-    tooltipEl.id = "epistemicAnchorTooltip";
-    tooltipEl.className = "epistemic-tooltip-popover";
-    tooltipEl.setAttribute("role", "tooltip");
-    tooltipEl.setAttribute("aria-hidden", "true");
-    tooltipEl.addEventListener("mouseenter", () => {
-      if (hideTimer) {
-        clearTimeout(hideTimer);
-        hideTimer = null;
-      }
-    });
-    tooltipEl.addEventListener("mouseleave", () => {
-      scheduleHideTooltip();
-    });
-    document.body.appendChild(tooltipEl);
-    return tooltipEl;
-  }
-
-  function positionTooltip(anchor) {
-    if (!tooltipEl || !anchor) return;
-    const rect = anchor.getBoundingClientRect();
-    const tipRect = tooltipEl.getBoundingClientRect();
-    const margin = 10;
-    let top = rect.top - tipRect.height - 8;
-    if (top < margin) {
-      top = rect.bottom + 8;
-    }
-    let left = rect.left + (rect.width / 2) - (tipRect.width / 2);
-    left = Math.max(margin, Math.min(left, window.innerWidth - tipRect.width - margin));
-    tooltipEl.style.top = `${Math.round(top)}px`;
-    tooltipEl.style.left = `${Math.round(left)}px`;
-  }
-
-  function showTooltipForAnchor(anchor) {
-    const tipText = anchor && anchor.getAttribute("data-epistemic-tooltip");
-    if (!tipText) return;
-    if (hideTimer) {
-      clearTimeout(hideTimer);
-      hideTimer = null;
-    }
-    const el = ensureTooltipElement();
-    activeAnchor = anchor;
-    el.textContent = "";
-    const bodySpan = document.createElement("span");
-    bodySpan.textContent = tipText;
-    const hintSpan = document.createElement("span");
-    hintSpan.className = "epistemic-tooltip-hint";
-    hintSpan.textContent = "Click to inspect Methodology & Source Passages ↓";
-    el.appendChild(bodySpan);
-    el.appendChild(hintSpan);
-    el.setAttribute("aria-hidden", "false");
-    anchor.setAttribute("aria-describedby", "epistemicAnchorTooltip");
-    positionTooltip(anchor);
-    el.classList.add("is-visible");
-  }
-
-  function hideTooltipImmediate() {
-    if (hideTimer) {
-      clearTimeout(hideTimer);
-      hideTimer = null;
-    }
-    if (activeAnchor) {
-      activeAnchor.removeAttribute("aria-describedby");
-      activeAnchor = null;
-    }
-    if (tooltipEl) {
-      tooltipEl.classList.remove("is-visible");
-      tooltipEl.setAttribute("aria-hidden", "true");
-    }
-  }
-
-  function scheduleHideTooltip() {
-    if (hideTimer) clearTimeout(hideTimer);
-    hideTimer = setTimeout(hideTooltipImmediate, 120);
-  }
-
-  document.addEventListener("pointerover", (e) => {
-    const anchor = e.target && e.target.closest ? e.target.closest("a.epistemic-anchor") : null;
-    if (anchor) {
-      showTooltipForAnchor(anchor);
-    }
-  });
-
-  document.addEventListener("pointerout", (e) => {
-    const anchor = e.target && e.target.closest ? e.target.closest("a.epistemic-anchor") : null;
-    if (anchor) {
-      const related = e.relatedTarget;
-      if (related && (anchor.contains(related) || (tooltipEl && tooltipEl.contains(related)))) {
-        return;
-      }
-      scheduleHideTooltip();
-    }
-  });
-
-  document.addEventListener("focusin", (e) => {
-    const anchor = e.target && e.target.closest ? e.target.closest("a.epistemic-anchor") : null;
-    if (anchor) {
-      showTooltipForAnchor(anchor);
-    }
-  });
-
-  document.addEventListener("focusout", (e) => {
-    const anchor = e.target && e.target.closest ? e.target.closest("a.epistemic-anchor") : null;
-    if (anchor) {
-      scheduleHideTooltip();
-    }
-  });
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && tooltipEl && tooltipEl.classList.contains("is-visible")) {
-      e.stopPropagation();
-      hideTooltipImmediate();
-    }
-  });
-
-  window.addEventListener("scroll", () => {
-    if (activeAnchor && tooltipEl && tooltipEl.classList.contains("is-visible")) {
-      positionTooltip(activeAnchor);
-    }
-  }, { passive: true });
-
-  document.addEventListener("click", (e) => {
-    const anchor = e.target && e.target.closest ? e.target.closest("a.epistemic-anchor") : null;
-    if (!anchor) return;
-    hideTooltipImmediate();
-    const drawer = document.getElementById("methodologyGroundingDrawer");
-    const ledgerCard = document.getElementById("epistemicFalsificationCard");
-    if (drawer || ledgerCard) {
-      e.preventDefault();
-      if (drawer && "open" in drawer) {
-        drawer.open = true;
-      }
-      const scrollTarget = drawer || ledgerCard;
-      scrollTarget.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  });
 
   stripFreshCacheBustParam();
   if (document.readyState === "loading") {

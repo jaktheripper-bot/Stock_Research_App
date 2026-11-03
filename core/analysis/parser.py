@@ -122,20 +122,46 @@ _EPISTEMIC_VENDOR_SCRUB_RULES = (
 )
 
 _EPISTEMIC_TIER_META = {
-    "VERIFIED FACT": ("VF", "fact", "✓", "background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);"),
-    "CALCULATED METRIC": ("CM", "calc", "∑", "background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);"),
-    "MODEL INTERPRETATION": ("MI", "interp", "◈", "background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);"),
-    "UNRESOLVED UNCERTAINTY": ("UU", "uncert", "!", "background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);"),
+    "VERIFIED FACT": (
+        "VF",
+        "fact",
+        "✓ VERIFIED FACT",
+        "background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-size:10px;font-weight:700;line-height:1.2;padding:1.5px 6px;border-radius:4px;",
+    ),
+    "CALCULATED METRIC": (
+        "CM",
+        "calc",
+        "∑ CALCULATED METRIC",
+        "background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:10px;font-weight:700;line-height:1.2;padding:1.5px 6px;border-radius:4px;",
+    ),
+    "MODEL INTERPRETATION": (
+        "MI",
+        "interp",
+        '<svg class="glyph" style="width:10px;height:10px;vertical-align:-1px;margin-right:3px;"><use href="#icon-insights"></use></svg> MODEL INTERPRETATION',
+        "background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:10px;font-weight:700;line-height:1.2;padding:1.5px 6px;border-radius:4px;",
+    ),
+    "MODEL INFERENCE": (
+        "MI",
+        "interp",
+        '<svg class="glyph" style="width:10px;height:10px;vertical-align:-1px;margin-right:3px;"><use href="#icon-insights"></use></svg> MODEL INTERPRETATION',
+        "background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:10px;font-weight:700;line-height:1.2;padding:1.5px 6px;border-radius:4px;",
+    ),
+    "UNRESOLVED UNCERTAINTY": (
+        "UU",
+        "uncert",
+        '<svg class="glyph" style="width:10px;height:10px;vertical-align:-1px;margin-right:3px;"><use href="#glyph-alert"></use></svg> UNRESOLVED UNCERTAINTY',
+        "background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);font-size:10px;font-weight:700;line-height:1.2;padding:1.5px 6px;border-radius:4px;",
+    ),
 }
 
 _BARE_MI_TAG_RE = re.compile(
-    r"[ \t]*\[MODEL\s+INTERPRETATION\s*\](?P<punct>[ \t]*[.,;:])?",
+    r"[ \t]*\[MODEL\s+(?:INTERPRETATION|INFERENCE)\s*\](?P<punct>[ \t]*[.,;:])?",
     re.IGNORECASE,
 )
 
 _INLINE_EPISTEMIC_TAG_RE = re.compile(
-    r"(?P<lead_ws>[ \t]*)\[(?P<tier>VERIFIED\s+FACT|CALCULATED\s+METRIC|MODEL\s+INTERPRETATION|UNRESOLVED\s+UNCERTAINTY)"
-    r"(?P<detail>(?:(?!</(?:p|li|div|h[1-6]|blockquote|table|ul|ol)>)[^\[\]]){0,900})\](?P<punct>[ \t]*[.,;:])?",
+    r"(?P<lead_ws>[ \t]*)\[(?P<tier>VERIFIED\s+FACT|CALCULATED\s+METRIC|MODEL\s+INTERPRETATION|MODEL\s+INFERENCE|UNRESOLVED\s+UNCERTAINTY)"
+    r"(?P<detail>(?:(?!</(?:p|li|div|h[1-6]|blockquote|table|ul|ol|td|th)>)[^\[\]]){0,1500})(?:\]|(?=</(?:p|li|blockquote|td)>))(?P<punct>[ \t]*[.,;:])?",
     re.IGNORECASE,
 )
 
@@ -152,19 +178,19 @@ def _render_full_epistemic_pills(fragment: str) -> str:
     replacements = [
         (
             r"\[VERIFIED\s+FACT([^\]]*)\]",
-            r'<span class="badge epistemic-badge epistemic-badge-fact" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">✓ VERIFIED FACT\1</span>',
+            r'<span class="badge epistemic-badge epistemic-badge-fact" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-right:4px;">✓ VERIFIED FACT\1</span>',
         ),
         (
             r"\[CALCULATED\s+METRIC([^\]]*)\]",
-            r'<span class="badge epistemic-badge epistemic-badge-calc" style="background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">∑ CALCULATED METRIC\1</span>',
+            r'<span class="badge epistemic-badge epistemic-badge-calc" style="background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-right:4px;">∑ CALCULATED METRIC\1</span>',
         ),
         (
-            r"\[MODEL\s+INTERPRETATION([^\]]*)\]",
-            r'<span class="badge epistemic-badge epistemic-badge-interp" style="background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;"><svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#icon-insights"></use></svg> MODEL INTERPRETATION\1</span>',
+            r"\[MODEL\s+(?:INTERPRETATION|INFERENCE)([^\]]*)\]",
+            r'<span class="badge epistemic-badge epistemic-badge-interp" style="background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-right:4px;"><svg class="glyph" style="width:10px;height:10px;vertical-align:-1px;margin-right:3px;"><use href="#icon-insights"></use></svg> MODEL INTERPRETATION\1</span>',
         ),
         (
             r"\[UNRESOLVED\s+UNCERTAINTY([^\]]*)\]",
-            r'<span class="badge epistemic-badge epistemic-badge-uncert" style="background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;"><svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#glyph-alert"></use></svg> UNRESOLVED UNCERTAINTY\1</span>',
+            r'<span class="badge epistemic-badge epistemic-badge-uncert" style="background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-right:4px;"><svg class="glyph" style="width:10px;height:10px;vertical-align:-1px;margin-right:3px;"><use href="#glyph-alert"></use></svg> UNRESOLVED UNCERTAINTY\1</span>',
         ),
     ]
     out = fragment
@@ -199,96 +225,131 @@ def _dedupe_bare_mi_in_blocks(fragment: str) -> str:
     return block_re.sub(_clean_block, fragment)
 
 
-def _render_compact_epistemic_anchors(fragment: str) -> str:
-    """Converts inline prose epistemic tags into compact superscript micro-anchors (VF, CM, MI, UU) tucked after punctuation."""
-    import html as html_lib
-
-    # 1. Unwrap Markdown backtick-wrapped epistemic tags (`[VERIFIED FACT ...]` or `[MODEL INTERPRETATION:` detail])
+def _render_inline_epistemic_badges_with_descriptors(fragment: str) -> str:
+    """Renders small inline epistemic badges while keeping their descriptors visibly readable in the report prose."""
+    # 1a. Repair half-wrapped Markdown code tags like `<li><code>[MODEL INTERPRETATION:</code> detail`</li>`
     out = re.sub(
-        r"<code>\s*(\[(?:VERIFIED\s+FACT|CALCULATED\s+METRIC|MODEL\s+INTERPRETATION|UNRESOLVED\s+UNCERTAINTY)[^<]{0,900})\s*</code>",
-        r"\1",
+        r"<code>\s*\[(?P<tier>VERIFIED\s+FACT|CALCULATED\s+METRIC|MODEL\s+INTERPRETATION|MODEL\s+INFERENCE|UNRESOLVED\s+UNCERTAINTY)\s*(?P<sep>[:—–\-])\s*</code>(?P<rest>(?:(?!</(?:li|p|blockquote|td)>)[\s\S]){1,1200}?)(?:`(?=\s*</(?:li|p|blockquote|td)>)|(?=</(?:li|p|blockquote|td)>))",
+        r"[\g<tier>\g<sep> \g<rest>]",
         fragment,
+        flags=re.IGNORECASE,
+    )
+
+    # 1b. Unwrap full Markdown backtick-wrapped epistemic tags (`[VERIFIED FACT: ...]`)
+    out = re.sub(
+        r"<code>\s*(\[(?:VERIFIED\s+FACT|CALCULATED\s+METRIC|MODEL\s+INTERPRETATION|MODEL\s+INFERENCE|UNRESOLVED\s+UNCERTAINTY)[\s\S]{0,1500}?\])\s*</code>",
+        r"\1",
+        out,
         flags=re.IGNORECASE,
     )
 
     # 2. Collapse redundant bare [MODEL INTERPRETATION] tags within the same paragraph / list item
     out = _dedupe_bare_mi_in_blocks(out)
 
-    # 3. Convert tags to superscript micro-anchors with punctuation tucked before the anchor (2-pass for nested tags)
     current_out = out
+
+    def _preceding_block_plain_text(src: str, pos: int) -> str:
+        window = src[max(0, pos - 600):pos]
+        last_block = None
+        for bm in re.finditer(r"<(?:p|li|blockquote|td|th|div|h[1-6])\b[^>]*>", window, re.IGNORECASE):
+            last_block = bm
+        sub = window[last_block.end():] if last_block else window
+        return re.sub(r"<[^>]+>", "", sub).strip()
 
     def _replace_tag(m: re.Match) -> str:
         tier_norm = re.sub(r"\s+", " ", m.group("tier").strip().upper())
-        abbr, cls_suffix, sym, inline_color_css = _EPISTEMIC_TIER_META.get(
+        abbr, cls_suffix, badge_inner, inline_color_css = _EPISTEMIC_TIER_META.get(
             tier_norm,
-            ("VF", "fact", "✓", "background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);"),
+            _EPISTEMIC_TIER_META["VERIFIED FACT"],
         )
-        raw_detail = _scrub_epistemic_vendor_tokens(m.group("detail") or "")
-        # Strip any inline HTML tags (e.g. <br />, <em>, <strong>, or inner <a>) from tooltip text
-        plain_detail = re.sub(r"<[^>]+>", " ", raw_detail)
-        unescaped_detail = re.sub(r"\s+", " ", html_lib.unescape(plain_detail)).strip()
-        if unescaped_detail:
-            if unescaped_detail[0] in ("—", "–", "-", ":", "("):
-                sep_detail = f" {unescaped_detail}" if unescaped_detail[0] != ":" else unescaped_detail
-            else:
-                sep_detail = f" — {unescaped_detail}"
-        else:
-            sep_detail = ""
-        full_tooltip = f"{sym} {tier_norm}{sep_detail}"
-        escaped_tip = html_lib.escape(full_tooltip, quote=True)
+        badge_html = (
+            f'<span class="badge epistemic-badge epistemic-inline-badge epistemic-badge-{cls_suffix}" '
+            f'data-epistemic-tier="{abbr}" style="{inline_color_css}">{badge_inner}</span>'
+        )
 
-        punct = (m.group("punct") or "").strip()
+        lead_ws = m.group("lead_ws") or ""
         start_idx = m.start()
         prev_char = current_out[start_idx - 1] if start_idx > 0 else ""
+        if lead_ws:
+            lead = " "
+        elif prev_char and prev_char not in (" ", "\n", "\t", ">", "(", "["):
+            lead = " "
+        else:
+            lead = ""
 
-        prefix = ""
-        if punct:
-            # Avoid double punctuation when sentence already ended with punctuation right before [TAG]
-            prefix = "" if prev_char in (".", ",", ";", ":", "!", "?") else punct
+        raw_detail = _scrub_epistemic_vendor_tokens(m.group("detail") or "").strip()
+        punct = (m.group("punct") or "").strip()
 
-        return (
-            f'{prefix}<a href="#epistemicFalsificationCard" '
-            f'class="badge epistemic-badge epistemic-anchor epistemic-badge-{cls_suffix}" '
-            f'style="{inline_color_css}" '
-            f'data-epistemic-tier="{abbr}" '
-            f'data-epistemic-tooltip="{escaped_tip}" '
-            f'aria-label="{escaped_tip}">{abbr}</a>'
-        )
+        if not raw_detail:
+            before_plain = _preceding_block_plain_text(current_out, start_idx)
+            if punct in (".", ",", ";") and before_plain:
+                prefix = "" if prev_char in (".", ",", ";", ":", "!", "?") else punct
+                return f"{prefix}{lead or ' '}{badge_html}"
+            final_punct = "" if (punct and prev_char in (".", ",", ";", ":", "!", "?")) else punct
+            return f"{lead}{badge_html}{final_punct}"
 
-    for _ in range(2):
+        before_plain = _preceding_block_plain_text(current_out, start_idx)
+        starts_fresh = (not before_plain) or (before_plain[-1] in (":", ".", "!", "?", ";", "—", "–"))
+
+        if raw_detail.startswith(":"):
+            body = raw_detail[1:].strip()
+            visible_tail = body
+            plain_tail = re.sub(r"<[^>]+>", "", visible_tail).strip()
+            final_punct = "" if (punct == "." and plain_tail.endswith((".", "!", "?"))) else punct
+            if starts_fresh:
+                desc_html = f'<span class="epistemic-descriptor">{body}{final_punct}</span>'
+            else:
+                desc_html = f'<span class="epistemic-descriptor epistemic-descriptor-inline">— {body}{final_punct}</span>'
+        elif raw_detail[0] in ("—", "–", "-"):
+            after_dash = re.sub(r"^[—–\-]+\s*", "", raw_detail).strip()
+            if ":" in after_dash:
+                src_label, claim_body = after_dash.split(":", 1)
+                src_clean = src_label.strip()
+                claim_clean = claim_body.strip()
+                plain_tail = re.sub(r"<[^>]+>", "", claim_clean).strip()
+                final_punct = "" if (punct == "." and plain_tail.endswith((".", "!", "?"))) else punct
+                if starts_fresh:
+                    desc_html = (
+                        f'<span class="epistemic-descriptor">'
+                        f'<strong class="epistemic-source-label">{src_clean}:</strong> {claim_clean}{final_punct}</span>'
+                    )
+                else:
+                    desc_html = (
+                        f'<span class="epistemic-descriptor epistemic-descriptor-inline">'
+                        f'— <strong class="epistemic-source-label">{src_clean}:</strong> {claim_clean}{final_punct}</span>'
+                    )
+            else:
+                plain_tail = re.sub(r"<[^>]+>", "", after_dash).strip()
+                final_punct = "" if (punct == "." and plain_tail.endswith((".", "!", "?"))) else punct
+                if starts_fresh:
+                    desc_html = f'<span class="epistemic-descriptor">{after_dash}{final_punct}</span>'
+                else:
+                    desc_html = f'<span class="epistemic-descriptor epistemic-descriptor-cite">— {after_dash}{final_punct}</span>'
+        else:
+            plain_tail = re.sub(r"<[^>]+>", "", raw_detail).strip()
+            final_punct = "" if (punct == "." and plain_tail.endswith((".", "!", "?"))) else punct
+            desc_html = f'<span class="epistemic-descriptor epistemic-descriptor-cite">{raw_detail}{final_punct}</span>'
+
+        return f"{lead}{badge_html} {desc_html}"
+
+    for _ in range(3):
         next_out = _INLINE_EPISTEMIC_TAG_RE.sub(_replace_tag, current_out)
         if next_out == current_out:
             break
         current_out = next_out
-    rendered = current_out
 
-    # 4. Tuck any punctuation caught between or immediately after consecutive micro-anchors
-    cluster_punct_re = re.compile(
-        r'(?P<prev>.?)(?P<cluster>(?:<a href="#epistemicFalsificationCard"[^>]*>[A-Z]{2}</a>[ \t]*)+)(?P<punct>[.,;:])'
-    )
-    while cluster_punct_re.search(rendered):
-        def _tuck_cluster(cm: re.Match) -> str:
-            prev_c = cm.group("prev")
-            cluster = re.sub(r'</a>[ \t]+<a ', '</a><a ', cm.group("cluster").strip())
-            p_ch = cm.group("punct")
-            if prev_c in (".", ",", ";", ":", "!", "?"):
-                return f"{prev_c}{cluster}"
-            return f"{prev_c}{p_ch}{cluster}"
-        rendered = cluster_punct_re.sub(_tuck_cluster, rendered)
-
-    return rendered
+    return current_out
 
 
 def render_epistemic_badges_html(html_text: str, compact_inline: bool = True) -> str:
     """
     Converts [VERIFIED FACT], [CALCULATED METRIC], [MODEL INTERPRETATION], and [UNRESOLVED UNCERTAINTY]
-    tags into compact superscript micro-anchors (VF, CM, MI, UU) in narrative prose (or full pills
-    when compact_inline=False).
+    tags into small styled badges while keeping descriptors visibly rendered in narrative prose.
     """
     if not html_text:
         return html_text
 
-    out = _render_compact_epistemic_anchors(html_text) if compact_inline else _render_full_epistemic_pills(html_text)
+    out = _render_inline_epistemic_badges_with_descriptors(html_text) if compact_inline else _render_full_epistemic_pills(html_text)
 
     # Transform technical/jargon-heavy falsification headings to approachable plain language
     out = re.sub(
