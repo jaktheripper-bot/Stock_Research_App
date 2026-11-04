@@ -37,17 +37,21 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+logger = logging.getLogger("equity_research.scripts.subscription_reminder")
+try:
+    os.chdir(ROOT_DIR)
+except OSError as exc:
+    logger.warning("Could not change working directory to %s: %s", ROOT_DIR, exc)
+
 from core.config import get_secret
 from core.db.connection import get_connection, get_placeholder, is_postgres_connection
-from core.db.locks import ensure_lock_table_exists, job_lease, prune_zombie_leases
+from core.db.locks import ensure_lock_table_exists, job_lease, prune_zombie_leases, release_job_lease
 from core.notify import (
     _dispatch_via_resend,
     _dispatch_via_smtp,
     _is_live_email_dispatch_allowed,
     get_admin_notification_email,
 )
-
-logger = logging.getLogger("equity_research.scripts.subscription_reminder")
 
 IST = timezone(timedelta(hours=5, minutes=30))
 DEFAULT_REGISTRY_PATH = ROOT_DIR / "data" / "vendor_subscriptions.json"
@@ -554,7 +558,10 @@ def dispatch_subscription_reminder_email(
                 "delivered": False,
                 "edition_date": edition_date,
             }
-        return _send_payload()
+        outcome = _send_payload()
+        if outcome.get("status") != "SENT":
+            release_job_lease(lease_name)
+        return outcome
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -575,6 +582,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Dispatch email to ADMIN_ALERT_EMAIL (guarded by 20h distributed daily job lease).",
     )
     parser.add_argument(
+        "--live-email",
+        action="store_true",
+        help="Enable live email dispatch outside CI (sets ENABLE_LIVE_EMAIL_DISPATCH=1; still guarded by daily job lease unless --force is passed).",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Bypass the daily distributed job lease when --send-email is set.",
@@ -585,6 +597,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Skip querying live DB/LLM quota metrics (offline registry-only mode).",
     )
     args = parser.parse_args(argv)
+
+    if args.live_email:
+        os.environ["ENABLE_LIVE_EMAIL_DISPATCH"] = "1"
 
     ref_date = _parse_iso_date(args.date) if args.date else datetime.now(IST).date()
     if args.date and ref_date is None:

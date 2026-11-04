@@ -95,6 +95,42 @@ class TestSubscriptionReminder(unittest.TestCase):
                 os.environ,
                 {
                     "DB_PATH": sandbox_db,
+                    "TEST_DB_PATH": sandbox_db,
+                    "FORCE_LOCAL_SQLITE": "1",
+                    "SUPABASE_DB_URL": "",
+                    "RESEND_API_KEY": "re_test_key",
+                    "ADMIN_ALERT_EMAIL": "ops@moatnomics.com",
+                },
+                clear=False,
+            ), patch(
+                "scripts.send_subscription_reminder.get_secret",
+                side_effect=lambda k, default=None: "re_test_key" if k == "RESEND_API_KEY" else default,
+            ), patch(
+                "scripts.send_subscription_reminder._is_live_email_dispatch_allowed",
+                return_value=True,
+            ), patch(
+                "scripts.send_subscription_reminder._dispatch_via_resend",
+                return_value=True,
+            ) as mock_resend:
+                first = dispatch_subscription_reminder_email(report, force=False)
+                second = dispatch_subscription_reminder_email(report, force=False)
+
+                self.assertEqual(first["status"], "SENT")
+                self.assertTrue(first["delivered"])
+                self.assertEqual(second["status"], "SKIPPED_ALREADY_SENT")
+                self.assertFalse(second["delivered"])
+                self.assertEqual(mock_resend.call_count, 1)
+
+    def test_sandbox_logged_dispatch_releases_lease_for_subsequent_live_send(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox_db = os.path.join(tmpdir, "lease_sandbox_test.db")
+            report = build_reminder_report(ref_date=date(2026, 11, 4), include_live_metrics=False)
+
+            with patch.dict(
+                os.environ,
+                {
+                    "DB_PATH": sandbox_db,
+                    "TEST_DB_PATH": sandbox_db,
                     "FORCE_LOCAL_SQLITE": "1",
                     "SUPABASE_DB_URL": "",
                     "RESEND_API_KEY": "re_test_key",
@@ -108,13 +144,20 @@ class TestSubscriptionReminder(unittest.TestCase):
                 "scripts.send_subscription_reminder._dispatch_via_resend",
                 return_value=True,
             ) as mock_resend:
-                first = dispatch_subscription_reminder_email(report, force=False)
-                second = dispatch_subscription_reminder_email(report, force=False)
+                with patch(
+                    "scripts.send_subscription_reminder._is_live_email_dispatch_allowed",
+                    return_value=False,
+                ):
+                    sandbox_run = dispatch_subscription_reminder_email(report, force=False)
+                self.assertEqual(sandbox_run["status"], "SANDBOX_LOGGED")
 
-                self.assertTrue(first["delivered"])
-                self.assertEqual(second["status"], "SKIPPED_ALREADY_SENT")
-                self.assertFalse(second["delivered"])
-                self.assertEqual(mock_resend.call_count, 1)
+                with patch(
+                    "scripts.send_subscription_reminder._is_live_email_dispatch_allowed",
+                    return_value=True,
+                ):
+                    live_run = dispatch_subscription_reminder_email(report, force=False)
+                self.assertEqual(live_run["status"], "SENT")
+                self.assertEqual(mock_resend.call_count, 2)
 
 
 if __name__ == "__main__":
