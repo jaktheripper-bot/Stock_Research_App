@@ -41,7 +41,7 @@ SYNC_TABLE_SPECS: List[Tuple[str, Tuple[str, ...], Optional[str], str]] = [
     ("cached_fundamentals", ("ticker",), "updated_at", "upsert"),
     ("discovery_reel", ("edition_date", "ticker"), "created_at", "edition_cohort"),
     ("mutual_fund_schemes", ("scheme_code",), "last_updated", "upsert"),
-    ("mutual_fund_holdings", ("scheme_code", "holding_type", "identifier"), "created_at", "upsert"),
+    ("mutual_fund_holdings", ("scheme_code", "holding_type", "identifier"), "created_at", "scheme_cohort"),
     ("fund_forensic_dossiers", ("scheme_code",), "last_audited_at", "upsert"),
     ("corporate_debt_securities", ("isin",), "last_updated", "upsert"),
     ("sovereign_benchmarks", ("tenor_label",), "updated_at", "upsert"),
@@ -333,6 +333,80 @@ def sync_via_postgresql_pull(
                                     sq_cur.execute(
                                         f"DELETE FROM {table_name} WHERE substr(edition_date, 1, 10) = ?",
                                         (ed_key,),
+                                    )
+                                    sq_cur.executemany(
+                                        ins_sql,
+                                        [tuple(item[c] for c in write_cols) for item in r_cohort],
+                                    )
+                                stats["updated"] += len(r_cohort)
+                            else:
+                                stats["skipped_fresh"] += len(r_cohort)
+
+                        if not dry_run:
+                            sqlite_conn.commit()
+                        summary[table_name] = stats
+                        logger.info(
+                            "Table %-27s | remote=%4d | inserted=%4d | updated=%4d | unchanged=%4d%s",
+                            table_name,
+                            stats["remote_rows"],
+                            stats["inserted"],
+                            stats["updated"],
+                            stats["skipped_fresh"],
+                            " (DRY-RUN)" if dry_run else "",
+                        )
+                        continue
+
+                    if mode == "scheme_cohort":
+                        remote_by_sc: Dict[str, Dict[Tuple[Any, ...], Dict[str, Any]]] = {}
+                        for raw_remote in remote_rows:
+                            inc = {c: normalize_pg_value_for_sqlite(raw_remote.get(c)) for c in write_cols}
+                            sc_key = str(inc.get("scheme_code") or "").strip()
+                            if sc_key:
+                                remote_by_sc.setdefault(sc_key, {})[_canonical_key(table_name, key_cols, inc)] = inc
+
+                        local_by_sc: Dict[str, List[Dict[str, Any]]] = {}
+                        for lr in local_rows:
+                            sc_key = str(lr.get("scheme_code") or "").strip()
+                            if sc_key:
+                                local_by_sc.setdefault(sc_key, []).append(lr)
+
+                        cols_sql = ", ".join(write_cols)
+                        placeholders = ", ".join(["?"] * len(write_cols))
+                        ins_sql = f"INSERT INTO {table_name} ({cols_sql}) VALUES ({placeholders})"
+
+                        for sc_key, r_cohort_map in remote_by_sc.items():
+                            r_cohort = list(r_cohort_map.values())
+                            l_cohort = local_by_sc.get(sc_key)
+                            if not l_cohort:
+                                if not dry_run:
+                                    sq_cur.executemany(
+                                        ins_sql,
+                                        [tuple(item[c] for c in write_cols) for item in r_cohort],
+                                    )
+                                stats["inserted"] += len(r_cohort)
+                                continue
+
+                            r_keys = {_canonical_key(table_name, key_cols, x) for x in r_cohort}
+                            l_keys = {_canonical_key(table_name, key_cols, x) for x in l_cohort}
+                            r_max_dt = max(
+                                (_coerce_datetime(x.get("created_at")) for x in r_cohort if _coerce_datetime(x.get("created_at"))),
+                                default=None,
+                            )
+                            l_max_dt = max(
+                                (_coerce_datetime(x.get("created_at")) for x in l_cohort if _coerce_datetime(x.get("created_at"))),
+                                default=None,
+                            )
+                            is_remote_newer = force or (
+                                r_max_dt is not None and (l_max_dt is None or (r_max_dt - l_max_dt).total_seconds() > 1.0)
+                            )
+                            if r_keys == l_keys and len(r_cohort) == len(l_cohort) and not is_remote_newer and not force:
+                                stats["skipped_fresh"] += len(r_cohort)
+                                continue
+                            if is_remote_newer:
+                                if not dry_run:
+                                    sq_cur.execute(
+                                        f"DELETE FROM {table_name} WHERE scheme_code = ?",
+                                        (sc_key,),
                                     )
                                     sq_cur.executemany(
                                         ins_sql,

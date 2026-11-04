@@ -80,6 +80,12 @@ def fetch_scheme_aaum_raw(force_refresh: bool = False) -> List[Dict[str, Any]]:
     return []
 
 
+_NON_GROWTH_PAYOUT_RE = re.compile(
+    r"\b(?:idcw|bonus)\b|\bdividend\b(?!\s+(?:yield|opportunities|leaders|power)\b)",
+    re.IGNORECASE,
+)
+
+
 def rank_funds_by_aum(
     aaum_data: Optional[List[Dict[str, Any]]] = None,
     broad_categories: Optional[set] = None,
@@ -104,7 +110,7 @@ def rank_funds_by_aum(
             low = name.lower()
             if "direct" not in low or "growth" not in low:
                 continue
-            if "idcw" in low or "dividend" in low or "bonus" in low:
+            if _NON_GROWTH_PAYOUT_RE.search(low):
                 continue
             code = str(s.get("AMFI_Code", "")).strip()
             if not code or code in seen_codes:
@@ -127,3 +133,79 @@ def rank_funds_by_aum(
     for i, r in enumerate(ranked, start=1):
         r["aum_rank"] = i
     return ranked
+
+
+def extract_all_scheme_aaum_map(
+    aaum_data: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, float]:
+    """Extracts `{amfi_code: aum_crores}` across ALL categories in AMFI's official AAUM feed."""
+    if aaum_data is None:
+        aaum_data = fetch_scheme_aaum_raw()
+    aum_by_code: Dict[str, float] = {}
+    for block in aaum_data or []:
+        for s in block.get("schemes", []) or []:
+            code = str(s.get("AMFI_Code") or "").strip()
+            if not code:
+                continue
+            lakhs = (
+                (s.get("AverageAumForTheMonth") or {}).get(
+                    "ExcludingFundOfFundsDomesticButIncludingFundOfFundsOverseas"
+                )
+            ) or 0.0
+            cr = round(float(lakhs) / LAKHS_PER_CRORE, 2)
+            if cr > 0 and cr > aum_by_code.get(code, 0.0):
+                aum_by_code[code] = cr
+    return aum_by_code
+
+
+def backfill_scheme_aaum_to_db(
+    aaum_data: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, int]:
+    """Backfills official AMFI scheme-wise AAUM (`aum_crores`) onto `mutual_fund_schemes` rows."""
+    from core.db.connection import IST, get_db_connection, get_placeholder
+    from core.db.mutual_funds import clean_dict_row, resolve_legacy_slug_twins
+
+    aum_map = extract_all_scheme_aaum_map(aaum_data)
+    if not aum_map:
+        return {"numeric_updated": 0, "slug_twins_updated": 0}
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    p = get_placeholder()
+    now_ist = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S+05:30")
+    numeric_updated = 0
+    slug_updated = 0
+    try:
+        cur.execute("SELECT scheme_code, scheme_name, fund_house, aum_crores, nav FROM mutual_fund_schemes")
+        rows = [clean_dict_row(cur, r) for r in cur.fetchall()]
+
+        for r in rows:
+            code = str(r.get("scheme_code") or "").strip()
+            if code.isdigit() and code in aum_map:
+                new_aum = aum_map[code]
+                if abs(float(r.get("aum_crores") or 0.0) - new_aum) >= 0.01:
+                    cur.execute(
+                        f"UPDATE mutual_fund_schemes SET aum_crores = {p}, last_updated = {p} WHERE scheme_code = {p}",
+                        (new_aum, now_ist, code),
+                    )
+                    r["aum_crores"] = new_aum
+                    numeric_updated += 1
+
+        # Propagate official AAUM to legacy slug twins when the numeric twin carries live AAUM
+        slug_to_num = resolve_legacy_slug_twins(rows)
+        row_by_code = {str(r.get("scheme_code") or "").strip(): r for r in rows}
+        for slug_code, num_code in slug_to_num.items():
+            num_aum = float((row_by_code.get(num_code) or {}).get("aum_crores") or 0.0)
+            slug_row = row_by_code.get(slug_code) or {}
+            if num_aum > 0 and float(slug_row.get("aum_crores") or 0.0) <= 0:
+                cur.execute(
+                    f"UPDATE mutual_fund_schemes SET aum_crores = {p}, last_updated = {p} WHERE scheme_code = {p}",
+                    (num_aum, now_ist, slug_code),
+                )
+                slug_updated += 1
+
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+    return {"numeric_updated": numeric_updated, "slug_twins_updated": slug_updated}

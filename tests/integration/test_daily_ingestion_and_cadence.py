@@ -79,27 +79,26 @@ class TestDailyStockIngestionAndMFCoverage(unittest.TestCase):
             pass
 
     def test_uncovered_mutual_fund_queue_ranking(self):
-        """Verifies that the queue ranks uncovered MF holdings by scheme count and weight."""
+        """Verifies that the queue ranks uncovered MF holdings by composite priority_score (Rupee-AUM + Fund-Unlock + User-Inquiry) and filters raw ISINs."""
         queue = get_uncovered_mutual_fund_holdings_queue(limit=10)
         self.assertGreaterEqual(len(queue), 5)
 
-        prev_scnt = 99999
-        prev_wt = 999999.0
+        prev_priority = float("inf")
         for item in queue:
             self.assertIn("ticker", item)
             self.assertIn("company_name", item)
             self.assertIn("scheme_count", item)
             self.assertIn("total_weight_pct", item)
-            scnt = item["scheme_count"]
-            wt = item["total_weight_pct"]
+            self.assertIn("priority_score", item)
+            self.assertNotRegex(item["ticker"], r"^IN[A-Z0-9]{10}$")
+            prio = float(item["priority_score"])
 
-            # Must be ordered by scheme_count DESC, then weight DESC
-            self.assertTrue(
-                scnt < prev_scnt or (scnt == prev_scnt and wt <= prev_wt) or (scnt == 0 and prev_scnt == 0),
-                f"Queue ordering violation: {scnt} schemes vs {prev_scnt}"
+            self.assertLessEqual(
+                prio,
+                prev_priority,
+                f"Queue priority_score ordering violation: {prio} vs {prev_priority}",
             )
-            prev_scnt = scnt
-            prev_wt = wt
+            prev_priority = prio
 
     def test_ingestion_progress_stats_metrics(self):
         """Verifies that progress stats reflect mathematical consistency and countdown."""

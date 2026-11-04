@@ -196,6 +196,63 @@ class TestPipelineSyncAndTimeouts(unittest.TestCase):
             self.assertEqual(rows[0][2], 1)
             self.assertTrue(rows[0][3].endswith("+05:30"))
 
+            # End-to-end scheme-atomic mutual_fund_holdings pull prunes exited positions
+            conn = sqlite3.connect(tmp_db)
+            conn.execute(
+                """
+                CREATE TABLE mutual_fund_holdings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    scheme_code TEXT,
+                    holding_type TEXT,
+                    identifier TEXT,
+                    holding_name TEXT,
+                    weight_pct REAL,
+                    created_at TEXT
+                )
+                """
+            )
+            conn.execute(
+                "INSERT INTO mutual_fund_holdings (scheme_code, holding_type, identifier, holding_name, weight_pct, created_at) "
+                "VALUES ('119727', 'EQUITY', 'EXITED_STOCK', 'Exited Co', 35.0, '2026-10-01 08:00:00+05:30')"
+            )
+            conn.commit()
+            conn.close()
+
+            fake_pg_cur.fetchall.return_value = [
+                {
+                    "id": 501,
+                    "scheme_code": "119727",
+                    "holding_type": "EQUITY",
+                    "identifier": "HDFCBANK",
+                    "holding_name": "HDFC Bank Ltd",
+                    "weight_pct": Decimal("9.50"),
+                    "created_at": datetime(2026, 11, 4, 4, 0, 0, tzinfo=timezone.utc),
+                },
+                {
+                    "id": 502,
+                    "scheme_code": "119727",
+                    "holding_type": "EQUITY",
+                    "identifier": "ICICIBANK",
+                    "holding_name": "ICICI Bank Ltd",
+                    "weight_pct": Decimal("8.75"),
+                    "created_at": datetime(2026, 11, 4, 4, 0, 0, tzinfo=timezone.utc),
+                },
+            ]
+            with patch("scripts.sync_from_supabase.connect_supabase_pg", return_value=fake_pg_conn), \
+                 patch("scripts.sync_from_supabase._ensure_local_sqlite_schema"):
+                mf_summary = sync_via_postgresql_pull(
+                    sqlite_path=tmp_db,
+                    db_url="postgresql://mock",
+                    selected_tables=["mutual_fund_holdings"],
+                )
+            self.assertEqual(mf_summary["mutual_fund_holdings"]["updated"], 2)
+            vconn = sqlite3.connect(tmp_db)
+            mf_rows = vconn.execute(
+                "SELECT identifier, weight_pct FROM mutual_fund_holdings WHERE scheme_code = '119727' ORDER BY identifier"
+            ).fetchall()
+            vconn.close()
+            self.assertEqual(mf_rows, [("HDFCBANK", 9.5), ("ICICIBANK", 8.75)])
+
     def test_cloud_vertex_secret_self_heal_promotes_aq_key_over_stale_aiza_env(self):
         """When GOOGLE_GENAI_USE_VERTEXAI=true and host env holds stale AIza* key, synced AQ.* DB key wins."""
         import core.config as cfg

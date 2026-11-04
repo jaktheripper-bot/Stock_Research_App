@@ -613,7 +613,7 @@ def ensure_scheme_and_holdings_exist(scheme_code: str) -> Optional[Dict[str, Any
                 payload["data"] = payload["data"][:1]
 
             meta = payload.get("meta", {}) if isinstance(payload, dict) else {}
-            if meta:
+            if meta and str(meta.get("scheme_name") or "").strip():
                 raw_nav_data = payload.get("data", [{}])
                 latest_nav = 10.0
                 if raw_nav_data and isinstance(raw_nav_data, list) and isinstance(raw_nav_data[0], dict):
@@ -646,7 +646,15 @@ def ensure_scheme_and_holdings_exist(scheme_code: str) -> Optional[Dict[str, Any
             logger.warning(f"Could not fetch from mfapi for {clean_code}: {e}")
 
     if not scheme:
-        # Create a fallback scheme master so the audit pipeline never crashes
+        is_testing = os.environ.get("TESTING") == "1" or bool(os.environ.get("PYTEST_CURRENT_TEST"))
+        if not is_testing:
+            logger.warning(
+                "Scheme %s absent from DB and unresolvable via AMFI/mfapi; failing closed without synthetic fallback master.",
+                clean_code,
+            )
+            return None
+
+        # Isolated test-only fallback scheme master so synthetic unit test codes can exercise look-through math
         fallback_scheme = {
             "scheme_code": clean_code,
             "scheme_name": f"AMFI Scheme {clean_code}",
@@ -663,7 +671,7 @@ def ensure_scheme_and_holdings_exist(scheme_code: str) -> Optional[Dict[str, Any
             "risk_grade": "Very High",
             "fund_manager": "Senior Fund Manager",
             "last_portfolio_date": datetime.now(IST).strftime("%Y-%m-%d"),
-            "metadata": {"source": "on_demand_generic"}
+            "metadata": {"source": "on_demand_generic_test"}
         }
         save_mutual_fund_scheme(fallback_scheme)
         scheme = get_mutual_fund_scheme(clean_code)
@@ -711,7 +719,12 @@ def calculate_deep_dive_credit_cost(scheme_code: str) -> Dict[str, Any]:
             "sector": h.get("sector_or_rating", "General")
         }
 
-        if rep:
+        has_full_dossier = bool(
+            rep
+            and rep.get("report_text")
+            and len(str(rep.get("report_text") or "").strip()) >= 500
+        )
+        if has_full_dossier:
             cached_stocks.append(item)
             cached_weight += w
         else:
@@ -869,13 +882,79 @@ def create_async_fund_audit_task(scheme_code: str, allow_deep_dive: bool = False
     return task_id
 
 
-def run_async_fund_audit_job(task_id: str, scheme_code: str, allow_deep_dive: bool = False):
+def _refund_unarchived_deep_dive_credits(user_id: str, scheme_code: str, refund_credits: float) -> None:
+    """Refunds unused Layer-2 constituent credits when live synthesis fails closed to pending."""
+    if not user_id or refund_credits <= 0:
+        return
+    try:
+        from core.db.connection import get_db_connection, get_placeholder, now_ist_iso
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        p = get_placeholder()
+        clean_uid = str(user_id).strip()
+        amt = round(float(refund_credits), 2)
+        try:
+            cur.execute(
+                f"UPDATE user_accounts SET credits_balance = ROUND(credits_balance + {p}, 2), updated_at = {p} WHERE id = {p};",
+                (amt, now_ist_iso(), clean_uid),
+            )
+            cur.execute(f"SELECT credits_balance FROM user_accounts WHERE id = {p};", (clean_uid,))
+            row = cur.fetchone()
+            bal_after = float(row[0] or 0.0) if row else 0.0
+            cur.execute(
+                f"""
+                INSERT INTO credit_usage_ledger (user_id, ticker, action_type, credits_consumed, balance_after)
+                VALUES ({p}, {p}, 'REFUND_UNARCHIVED_CONSTITUENT', {p}, {p});
+                """,
+                (clean_uid, f"FUND:{scheme_code}", -amt, bal_after),
+            )
+            conn.commit()
+            logger.info("Refunded %.2f unarchived constituent credit(s) to %s for FUND:%s", amt, clean_uid, scheme_code)
+        finally:
+            cur.close()
+            conn.close()
+    except Exception as ref_err:
+        logger.error("Failed refunding %.2f constituent credits to %s: %s", refund_credits, user_id, ref_err)
+
+
+def _record_constituent_unlock_for_user(user_id: Optional[str], ticker: str) -> None:
+    """Grants dossier unlock entitlement on a constituent equity paid for during a Layer-2 fund deep dive."""
+    if not user_id or not ticker:
+        return
+    try:
+        from core.db.connection import get_db_connection, get_placeholder
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        p = get_placeholder()
+        try:
+            cur.execute(
+                f"INSERT INTO user_unlocked_dossiers (user_id, ticker) VALUES ({p}, {p}) ON CONFLICT (user_id, ticker) DO NOTHING;",
+                (str(user_id).strip(), str(ticker).strip().upper()),
+            )
+            conn.commit()
+        finally:
+            cur.close()
+            conn.close()
+    except Exception as ul_err:
+        logger.debug("Constituent unlock grant notice for %s on %s: %s", user_id, ticker, ul_err)
+
+
+def run_async_fund_audit_job(
+    task_id: str,
+    scheme_code: str,
+    allow_deep_dive: bool = False,
+    billing_user_id: Optional[str] = None,
+    layer2_charged: float = 0.0,
+):
     """Executes the look-through audit in background thread, updating progress with representative duration."""
     clean_code = scheme_code.strip().upper()
     if task_id not in FUND_AUDIT_TASKS:
         return
 
     is_testing = os.environ.get("TESTING") == "1" or bool(os.environ.get("PYTEST_CURRENT_TEST"))
+    archived_constituents = 0
 
     try:
         FUND_AUDIT_TASKS[task_id]["status"] = "PROCESSING"
@@ -929,14 +1008,28 @@ def run_async_fund_audit_job(task_id: str, scheme_code: str, allow_deep_dive: bo
                     if not is_testing:
                         time.sleep(1.2)
 
-                    # Phase 3: Archive constituent
-                    audit_and_archive_constituent_stock(ticker, holding_name=holding_name, sector=sector)
+                    # Phase 3: Archive constituent (fail-closed: refund unused credit if unarchived)
+                    archived_ok = audit_and_archive_constituent_stock(ticker, holding_name=holding_name, sector=sector)
                     pct_archived = 10 + int(((i + 1) / total_uncached) * 75)
                     FUND_AUDIT_TASKS[task_id]["progress_pct"] = pct_archived
                     FUND_AUDIT_TASKS[task_id]["completed_stocks"] = i + 1
-                    FUND_AUDIT_TASKS[task_id]["stage"] = "CONSTITUENT_ARCHIVED"
-                    FUND_AUDIT_TASKS[task_id]["stage_title"] = f"Constituent Archived [{i+1}/{total_uncached}]"
-                    FUND_AUDIT_TASKS[task_id]["message"] = f"Archived 7-pillar report for {ticker} ({i+1}/{total_uncached})."
+                    if archived_ok:
+                        archived_constituents += 1
+                        _record_constituent_unlock_for_user(billing_user_id, ticker)
+                        FUND_AUDIT_TASKS[task_id]["stage"] = "CONSTITUENT_ARCHIVED"
+                        FUND_AUDIT_TASKS[task_id]["stage_title"] = f"Constituent Archived [{i+1}/{total_uncached}]"
+                        FUND_AUDIT_TASKS[task_id]["message"] = f"Archived 7-pillar report for {ticker} ({i+1}/{total_uncached})."
+                    else:
+                        FUND_AUDIT_TASKS[task_id]["stage"] = "CONSTITUENT_DEFERRED"
+                        FUND_AUDIT_TASKS[task_id]["stage_title"] = f"Deferred to Pending Queue [{i+1}/{total_uncached}]"
+                        FUND_AUDIT_TASKS[task_id]["message"] = f"Deferred {ticker} to pending synthesis queue ({i+1}/{total_uncached})."
+
+            if billing_user_id and layer2_charged > archived_constituents:
+                _refund_unarchived_deep_dive_credits(
+                    billing_user_id,
+                    clean_code,
+                    layer2_charged - float(archived_constituents),
+                )
 
             # Look-through aggregation stage
             FUND_AUDIT_TASKS[task_id]["progress_pct"] = 88
@@ -991,6 +1084,12 @@ def run_async_fund_audit_job(task_id: str, scheme_code: str, allow_deep_dive: bo
 
     except Exception as e:
         logger.error(f"Error in async fund audit {task_id}: {e}", exc_info=True)
+        if billing_user_id and layer2_charged > archived_constituents:
+            _refund_unarchived_deep_dive_credits(
+                billing_user_id,
+                clean_code,
+                layer2_charged - float(archived_constituents),
+            )
         FUND_AUDIT_TASKS[task_id]["status"] = "FAILED"
         FUND_AUDIT_TASKS[task_id]["error"] = str(e)
         FUND_AUDIT_TASKS[task_id]["message"] = f"Audit failed: {str(e)}"

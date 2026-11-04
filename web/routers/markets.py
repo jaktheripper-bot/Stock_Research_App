@@ -389,12 +389,27 @@ async def api_post_on_demand_fund_audit(
     background_tasks: BackgroundTasks,
     payload: Dict[str, Any] = Body(default={})
 ):
-    """Enqueues an asynchronous look-through accounting check for any AMFI scheme."""
+    """Enqueues an asynchronous look-through accounting check for any AMFI scheme with idempotent credit gating."""
     init_db()
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
-    if os.environ.get("TESTING") != "1" and not _get_current_web_user(request) and not _is_admin_authenticated(request):
+
+    from web.common import _get_override_fn
+    from core.db import (
+        deduct_user_credits,
+        get_user_credits_balance,
+        is_ticker_unlocked_for_user,
+        unlock_ticker_for_user,
+    )
+
+    get_user_fn = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
+    web_user = get_user_fn(request)
+    is_admin = _is_admin_authenticated(request)
+    is_test_anon = os.environ.get("TESTING") == "1" and not web_user and not is_admin
+
+    if not web_user and not is_admin and not is_test_anon:
         raise HTTPException(status_code=401, detail="Authentication required to trigger an on-demand fund audit.")
+
     scheme_code = (payload.get("scheme_code") or "").strip().upper()
     if not scheme_code:
         raise HTTPException(status_code=400, detail="Missing required 'scheme_code' in payload.")
@@ -402,10 +417,77 @@ async def api_post_on_demand_fund_audit(
         raise HTTPException(status_code=400, detail="Invalid 'scheme_code' format.")
     allow_deep_dive = bool(payload.get("allow_deep_dive", False))
 
-    task_id = create_async_fund_audit_task(scheme_code, allow_deep_dive=allow_deep_dive)
-    background_tasks.add_task(run_async_fund_audit_job, task_id, scheme_code, allow_deep_dive)
-
     scheme_info = get_mutual_fund_scheme(scheme_code) or ensure_scheme_and_holdings_exist(scheme_code)
+    if not scheme_info:
+        raise HTTPException(status_code=404, detail=f"Mutual fund scheme '{scheme_code}' not found.")
+
+    billing_user_id: Optional[str] = None
+    layer2_charged = 0.0
+    credits_charged = 0.0
+
+    if web_user and not is_admin:
+        uid = str(web_user.get("id") or "").strip()
+        if not uid:
+            raise HTTPException(status_code=401, detail="Invalid user session.")
+        quote = calculate_deep_dive_credit_cost(scheme_code)
+        if int(quote.get("total_holdings_count") or 0) == 0:
+            raise HTTPException(
+                status_code=409,
+                detail="Monthly statutory portfolio holdings are pending sync for this scheme. Zero credits charged.",
+            )
+
+        unlock_key = f"FUND:{scheme_code}"
+        already_unlocked = is_ticker_unlocked_for_user(uid, unlock_key)
+        layer1_due = 0.0 if already_unlocked else 1.0
+        layer2_due = float(quote.get("layer2_deep_dive_credits") or 0) if allow_deep_dive else 0.0
+        total_due = layer1_due + layer2_due
+
+        if total_due > 0:
+            bal = get_user_credits_balance(uid)
+            if bal < total_due:
+                raise HTTPException(
+                    status_code=402,
+                    detail=(
+                        f"Insufficient research credits ({bal:.1f} available, {total_due:.1f} required "
+                        f"for this look-through audit). Please top up credits to proceed."
+                    ),
+                )
+
+        if not already_unlocked:
+            unlock_fn = _get_override_fn("web.main", "unlock_ticker_for_user", unlock_ticker_for_user)
+            ok1, _, msg1 = unlock_fn(user_id=uid, ticker=unlock_key, amount=1.0)
+            if not ok1:
+                raise HTTPException(status_code=402, detail=msg1)
+            credits_charged += 1.0
+
+        if layer2_due > 0:
+            deduct_fn = _get_override_fn("web.main", "deduct_user_credits", deduct_user_credits)
+            ok2, _, msg2 = deduct_fn(
+                user_id=uid,
+                ticker=unlock_key,
+                action_type="FUND_CONSTITUENT_DEEP_DIVE",
+                amount=layer2_due,
+            )
+            if not ok2:
+                raise HTTPException(status_code=402, detail=msg2)
+            layer2_charged = layer2_due
+            credits_charged += layer2_due
+
+        billing_user_id = uid
+
+    task_id = create_async_fund_audit_task(scheme_code, allow_deep_dive=allow_deep_dive)
+    if billing_user_id or layer2_charged > 0:
+        background_tasks.add_task(
+            run_async_fund_audit_job,
+            task_id,
+            scheme_code,
+            allow_deep_dive,
+            billing_user_id=billing_user_id,
+            layer2_charged=layer2_charged,
+        )
+    else:
+        background_tasks.add_task(run_async_fund_audit_job, task_id, scheme_code, allow_deep_dive)
+
     scheme_name = scheme_info.get("scheme_name") if scheme_info else None
 
     return {
@@ -413,6 +495,7 @@ async def api_post_on_demand_fund_audit(
         "task_id": task_id,
         "scheme_code": scheme_code,
         "scheme_name": scheme_name,
+        "credits_charged": credits_charged,
         "status": "QUEUED",
         "message": f"Accounting check enqueued for {scheme_code}."
     }
@@ -459,7 +542,13 @@ def api_get_mutual_fund_schemes(
 ):
     """Public API: List all tracked mutual fund schemes with look-through health scores."""
     init_db()
-    schemes = get_active_mutual_funds(category=category, broad_category=broad_category, audited_only=True)
+    schemes = get_active_mutual_funds(
+        category=category,
+        broad_category=broad_category,
+        limit=None,
+        audited_only=True,
+        dedupe_twins=True,
+    )
     scheme_codes = [s["scheme_code"] for s in schemes if s.get("scheme_code")]
     holdings_by_scheme = get_holdings_for_schemes_batch(scheme_codes)
     researched_tickers = get_researched_tickers_set()

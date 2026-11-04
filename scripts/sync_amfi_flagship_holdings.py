@@ -29,11 +29,40 @@ def _norm_scheme_stem(name: str) -> str:
     return normalize_scheme_stem(name)
 
 
+VERIFIED_HOLDINGS_SOURCES = frozenset({
+    "sebi_monthly_disclosure",
+    "mfforecast_api",
+    "manual_inbox",
+})
+
+
+def _load_verified_numeric_codes(cur) -> set:
+    """Returns numeric AMFI scheme codes whose metadata_json explicitly attests verified statutory holdings."""
+    import json
+
+    cur.execute("SELECT scheme_code, metadata_json FROM mutual_fund_schemes")
+    verified = set()
+    for sc, meta_raw in cur.fetchall():
+        code = str(sc or "").strip()
+        if not code.isdigit() or not meta_raw:
+            continue
+        try:
+            meta = json.loads(meta_raw) if isinstance(meta_raw, str) else dict(meta_raw)
+        except Exception:
+            meta = {}
+        if str(meta.get("holdings_source") or "").strip().lower() in VERIFIED_HOLDINGS_SOURCES:
+            verified.add(code)
+    return verified
+
+
 def _purge_seeded_clones_on_cursor(
     cur, ph: str, is_pg: bool = False, apply: bool = False, verbose: bool = True
 ) -> Dict[str, int]:
     """Detects and removes static-seed-cloned numeric AMFI holdings/dossiers and duplicate holding rows."""
-    # 1. Identify numeric AMFI schemes whose exact holding vector matches a non-numeric seeded slug scheme
+    verified_numeric_codes = _load_verified_numeric_codes(cur)
+
+    # 1. Identify numeric AMFI schemes whose exact holding vector matches a non-numeric seeded slug scheme,
+    #    excluding numeric schemes that hold verified SEBI / statutory disclosures (L1 guard).
     cur.execute(
         """
         SELECT DISTINCT scheme_code, holding_type, identifier, weight_pct
@@ -47,7 +76,9 @@ def _purge_seeded_clones_on_cursor(
 
     slug_fingerprints = {tuple(v): sc for sc, v in vecs.items() if v and not sc.isdigit()}
     cloned_numeric_codes = sorted(
-        sc for sc, v in vecs.items() if sc.isdigit() and tuple(v) in slug_fingerprints
+        sc
+        for sc, v in vecs.items()
+        if sc.isdigit() and sc not in verified_numeric_codes and tuple(v) in slug_fingerprints
     )
 
     # 2. Identify numeric AMFI forensic dossiers whose text was cloned verbatim from a slug dossier
@@ -79,7 +110,9 @@ def _purge_seeded_clones_on_cursor(
             ORDER BY d.scheme_code
             """
         )
-    cloned_dossier_codes = [str(r[0]) for r in cur.fetchall()]
+    cloned_dossier_codes = [
+        str(r[0]) for r in cur.fetchall() if str(r[0]) not in verified_numeric_codes
+    ]
 
     # 3. Count excess duplicate holding rows (stale portfolio_date or duplicate holding_type+identifier)
     cur.execute(

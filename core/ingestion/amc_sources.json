@@ -1,36 +1,199 @@
 {
-  "_comment": "Registry of AMC portfolio-disclosure sources. 'url_template' entries are enabled ONLY after the URL pattern was verified to return the real workbook (see 'verified_on'). AMCs with url_template=null have no verified automated source yet: drop their downloaded monthly workbooks into data/amc_portfolios/<key>/ and the same pipeline ingests them. Template tokens: {dd} {mon} {Mon} {yy} {yyyy} {mm} are filled from the month-end date.",
+  "_comment": "Registry of public SEBI statutory AMC portfolio-disclosure sources. Every automated entry uses strictly open, unauthenticated statutory endpoints verified over certifi TLS (zero login walls, CAPTCHAs, or WAF circumvention). AMCs behind WAF/encryption fall back cleanly to data/amc_portfolios/<key>/ manual drops or optional sanctioned MFFORECAST_RAPIDAPI_KEY.",
   "amcs": {
     "nippon": {
       "mf_names": ["Nippon India Mutual Fund"],
+      "adapter": "url_template",
       "url_template": "https://mf.nipponindiaim.com/InvestorServices/FactsheetsDocuments/NIMF-MONTHLY-PORTFOLIO-{dd}-{Mon}-{yy}.xls",
-      "layout": "one consolidated workbook, one sheet per scheme",
-      "verified_on": "2026-10-08",
+      "layout": "consolidated workbook, one sheet per scheme",
+      "verified_on": "2026-11-04",
       "disclosure_page": "https://mf.nipponindiaim.com/investor-services/downloads/factsheets-portfolio-disclosures"
     },
-    "sbi": {"mf_names": ["SBI Mutual Fund"], "url_template": null, "disclosure_page": "https://www.sbimf.com/portfolios", "notes": "Token + encrypted API behind the page; no static file URL verified."},
-    "hdfc": {"mf_names": ["HDFC Mutual Fund"], "url_template": null, "disclosure_page": "https://www.hdfcfund.com/statutory-disclosure/monthly-portfolio", "notes": "Returns HTTP 403 to non-browser clients."},
-    "icici": {"mf_names": ["ICICI Prudential Mutual Fund"], "url_template": null, "disclosure_page": "https://archive.icicipruamc.com/downloads/portfolio-disclosures", "notes": "Main domain redirects to archive site; file URLs not verified."},
-    "kotak": {"mf_names": ["Kotak Mahindra Mutual Fund"], "url_template": null, "disclosure_page": "https://www.kotakmf.com/Information/forms-and-downloads"},
-    "absl": {"mf_names": ["Aditya Birla Sun Life Mutual Fund"], "url_template": null, "disclosure_page": "https://mutualfund.adityabirlacapital.com/forms-and-downloads/portfolio"},
-    "axis": {"mf_names": ["Axis Mutual Fund"], "url_template": null, "disclosure_page": "https://www.axismf.com/statutory-disclosures"},
-    "uti": {"mf_names": ["UTI Mutual Fund"], "url_template": null, "disclosure_page": "https://www.utimf.com/downloads/"},
-    "bandhan": {"mf_names": ["Bandhan Mutual Fund"], "url_template": null},
-    "mirae": {"mf_names": ["Mirae Asset Mutual Fund"], "url_template": null},
-    "tata": {"mf_names": ["Tata Mutual Fund"], "url_template": null},
-    "invesco": {"mf_names": ["Invesco Mutual Fund"], "url_template": null},
-    "motilal": {"mf_names": ["Motilal Oswal Mutual Fund"], "url_template": null},
-    "dsp": {"mf_names": ["DSP Mutual Fund"], "url_template": null},
-    "edelweiss": {"mf_names": ["Edelweiss Mutual Fund"], "url_template": null},
-    "canara": {"mf_names": ["Canara Robeco Mutual Fund"], "url_template": null},
-    "ppfas": {"mf_names": ["PPFAS Mutual Fund"], "url_template": null},
-    "quant": {"mf_names": ["quant Mutual Fund"], "url_template": null},
-    "hsbc": {"mf_names": ["HSBC Mutual Fund"], "url_template": null},
-    "lic": {"mf_names": ["LIC Mutual Fund"], "url_template": null},
-    "baroda_bnp": {"mf_names": ["Baroda BNP Paribas Mutual Fund"], "url_template": null},
-    "jio_blackrock": {"mf_names": ["Jio BlackRock Mutual Fund"], "url_template": null},
-    "sundaram": {"mf_names": ["Sundaram Mutual Fund"], "url_template": null},
-    "bajaj_finserv": {"mf_names": ["Bajaj Finserv Mutual Fund"], "url_template": null},
-    "union": {"mf_names": ["Union Mutual Fund"], "url_template": null}
+    "sbi": {
+      "mf_names": ["SBI Mutual Fund"],
+      "adapter": "sbi_cms",
+      "url_template": null,
+      "layout": "consolidated all-schemes monthly portfolio xlsx via public CMS endpoint",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://www.sbimf.com/portfolios"
+    },
+    "icici": {
+      "mf_names": ["ICICI Prudential Mutual Fund"],
+      "adapter": "icici_nms",
+      "url_template": null,
+      "layout": "monthly portfolio zip bundle via public NMS downloads API",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://www.icicipruamc.com/downloads/other-downloads/monthly-portfolio-disclosures"
+    },
+    "hdfc": {
+      "mf_names": ["HDFC Mutual Fund"],
+      "adapter": "hdfc_cms",
+      "url_template": null,
+      "layout": "per-scheme monthly xlsx files via public cms.hdfcfund.com API",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://www.hdfcfund.com/statutory-disclosure/portfolio/monthly-portfolio"
+    },
+    "uti": {
+      "mf_names": ["UTI Mutual Fund"],
+      "adapter": "uti_api",
+      "url_template": null,
+      "layout": "consolidated monthly zip bundle via public utimf.com API",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://www.utimf.com/downloads/portfolio-disclosure"
+    },
+    "absl": {
+      "mf_names": ["Aditya Birla Sun Life Mutual Fund"],
+      "adapter": "absl_api",
+      "url_template": null,
+      "layout": "monthly portfolio zip bundle via public FactsheetAccordionById API",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://mutualfund.adityabirlacapital.com/forms-and-downloads/portfolio"
+    },
+    "axis": {
+      "mf_names": ["Axis Mutual Fund"],
+      "adapter": "axis_cms",
+      "url_template": null,
+      "layout": "consolidated monthly xlsx via public axismf.com CMS API",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://www.axismf.com/statutory-disclosures"
+    },
+    "dsp": {
+      "mf_names": ["DSP Mutual Fund"],
+      "adapter": "dsp_html",
+      "url_template": null,
+      "layout": "monthend portfolio zip bundle from mandatory-disclosures page",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://www.dspim.com/mandatory-disclosures/portfolio-disclosures"
+    },
+    "tata": {
+      "mf_names": ["Tata Mutual Fund"],
+      "adapter": "tata_html",
+      "url_template": null,
+      "layout": "consolidated monthly portfolio xlsx from schemes-related/portfolio page",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://www.tatamutualfund.com/schemes-related/portfolio"
+    },
+    "bandhan": {
+      "mf_names": ["Bandhan Mutual Fund"],
+      "adapter": "bandhan_wp",
+      "url_template": null,
+      "layout": "per-scheme monthly xlsx files via public wp-json finance-api",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://bandhanmutual.com/downloads/disclosures"
+    },
+    "ppfas": {
+      "mf_names": ["PPFAS Mutual Fund"],
+      "adapter": "ppfas_html",
+      "url_template": null,
+      "layout": "per-scheme monthly xls files from amc.ppfas.com/downloads/portfolio-disclosure/",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://amc.ppfas.com/downloads/portfolio-disclosure/"
+    },
+    "franklin": {
+      "mf_names": ["Franklin Templeton Mutual Fund"],
+      "adapter": "franklin_api",
+      "url_template": null,
+      "layout": "consolidated monthly portfolio xlsx via responseLitJson?type=report",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://www.franklintempletonindia.com/investor/reports"
+    },
+    "motilal": {
+      "mf_names": ["Motilal Oswal Mutual Fund"],
+      "adapter": "motilal_api",
+      "url_template": null,
+      "layout": "consolidated monthly portfolio xlsx via search-documents.json",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://www.motilaloswalmf.com/download/month-end-portfolio"
+    },
+    "groww": {
+      "mf_names": ["Groww Mutual Fund"],
+      "adapter": "groww_next",
+      "url_template": null,
+      "layout": "consolidated monthly portfolio xlsx via statutory-disclosure/portfolio __NEXT_DATA__",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://www.growwmf.in/statutory-disclosure/portfolio"
+    },
+    "baroda_bnp": {
+      "mf_names": ["Baroda BNP Paribas Mutual Fund"],
+      "adapter": "baroda_html",
+      "url_template": null,
+      "layout": "consolidated monthly portfolio xls from downloads/monthly-portfolio-scheme",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://www.barodabnpparibasmf.in/downloads/monthly-portfolio-scheme"
+    },
+    "invesco": {
+      "mf_names": ["Invesco Mutual Fund"],
+      "adapter": "invesco_api",
+      "url_template": null,
+      "layout": "monthly portfolio workbooks via CompleteMonthlyHoldings API",
+      "verified_on": "2026-11-04",
+      "disclosure_page": "https://invescomutualfund.com/literature-and-form?tab=Complete"
+    },
+    "kotak": {
+      "mf_names": ["Kotak Mahindra Mutual Fund"],
+      "adapter": null,
+      "url_template": null,
+      "disclosure_page": "https://www.kotakmf.com/Information/forms-and-downloads",
+      "notes": "WAF-gated; use data/amc_portfolios/kotak/ manual drop or MFFORECAST_RAPIDAPI_KEY."
+    },
+    "mirae": {
+      "mf_names": ["Mirae Asset Mutual Fund"],
+      "adapter": null,
+      "url_template": null,
+      "disclosure_page": "https://www.miraeassetmf.co.in/downloads/portfolio",
+      "notes": "WAF-gated; use data/amc_portfolios/mirae/ manual drop or MFFORECAST_RAPIDAPI_KEY."
+    },
+    "edelweiss": {
+      "mf_names": ["Edelweiss Mutual Fund"],
+      "adapter": null,
+      "url_template": null,
+      "disclosure_page": "https://www.edelweissmf.com/downloads/Monthly-Portfolio-Of-Schemes",
+      "notes": "Encrypted payload; use data/amc_portfolios/edelweiss/ manual drop or MFFORECAST_RAPIDAPI_KEY."
+    },
+    "canara": {
+      "mf_names": ["Canara Robeco Mutual Fund"],
+      "adapter": null,
+      "url_template": null,
+      "disclosure_page": "https://www.canararobeco.com/documents/statutory-disclosures/scheme-dashboard/scheme-monthly-portfolio/"
+    },
+    "quant": {
+      "mf_names": ["quant Mutual Fund"],
+      "adapter": null,
+      "url_template": null,
+      "disclosure_page": "https://quantmutual.com/statutory-disclosures"
+    },
+    "hsbc": {
+      "mf_names": ["HSBC Mutual Fund"],
+      "adapter": null,
+      "url_template": null,
+      "disclosure_page": "https://www.assetmanagement.hsbc.co.in/en/mutual-funds/investor-resources/information-library"
+    },
+    "lic": {
+      "mf_names": ["LIC Mutual Fund"],
+      "adapter": null,
+      "url_template": null,
+      "disclosure_page": "https://www.licmf.com/statutory-disclosure"
+    },
+    "sundaram": {
+      "mf_names": ["Sundaram Mutual Fund"],
+      "adapter": null,
+      "url_template": null,
+      "disclosure_page": "https://www.sundarammutual.com/Statutory-Disclosures"
+    },
+    "bajaj_finserv": {
+      "mf_names": ["Bajaj Finserv Mutual Fund"],
+      "adapter": null,
+      "url_template": null
+    },
+    "jio_blackrock": {
+      "mf_names": ["Jio BlackRock Mutual Fund"],
+      "adapter": null,
+      "url_template": null
+    },
+    "union": {
+      "mf_names": ["Union Mutual Fund"],
+      "adapter": null,
+      "url_template": null
+    }
   }
 }

@@ -25,6 +25,106 @@ def normalize_scheme_stem(name: str) -> str:
     s = re.sub(r"\s+", " ", s)
     return re.sub(r"\b(FLEXI|LARGE|MID|SMALL|MULTI)\s+CAP\b", r"\1CAP", s)
 
+
+# SEBI 2018-2025 category & AMC rebranding canonicalization rules used SOLELY to link
+# non-numeric legacy slug twins (e.g. SBI_FOCUSED_DIR, ICICI_BLUECHIP_DIR, KOTAK_EMERGING_DIR)
+# to their canonical 6-digit AMFI scheme codes without colliding distinct numeric AMFI schemes.
+_SEBI_TWIN_RENAME_PATTERNS = (
+    (r"^BIRLA SUN LIFE\b", "ADITYA BIRLA SUN LIFE"),
+    (r"^RELIANCE\b", "NIPPON INDIA"),
+    (r"^IDFC\b", "BANDHAN"),
+    (r"^L AND T\b", "HSBC"),
+    (r"^L T\b", "HSBC"),
+    (r"^DSP BLACKROCK\b", "DSP"),
+    (r"^KOTAK MAHINDRA\b", "KOTAK"),
+    (r"^PRINCIPAL\b", "SUNDARAM"),
+    (r"\bFORMERLY KNOWN AS\b.*$", ""),
+    (r"\bERSTWHILE\b.*$", ""),
+    (r"\bBLUECHIP\b", "LARGECAP"),
+    (r"\bBLUE CHIP\b", "LARGECAP"),
+    (r"\bTOP 100 EQUITY\b", "LARGECAP"),
+    (r"\bTOP 100\b", "LARGECAP"),
+    (r"\bFRONT LINE EQUITY\b", "LARGECAP"),
+    (r"\bFRONTLINE EQUITY\b", "LARGECAP"),
+    (r"\bEQUITY BLUECHIP\b", "LARGECAP"),
+    (r"\bEMERGING EQUITY\b", "MIDCAP"),
+    (r"\bMIDCAP OPPORTUNITIES\b", "MIDCAP"),
+    (r"\bPRIMA\b", "MIDCAP"),
+    (r"\bMAGNUM MIDCAP\b", "MIDCAP"),
+    (r"\bFOCUSED EQUITY\b", "FOCUSED"),
+    (r"\bFOCUSED 30\b", "FOCUSED"),
+    (r"\bFOCUSED 25\b", "FOCUSED"),
+    (r"\bLONG TERM EQUITY\b", "ELSS TAX SAVER"),
+    (r"\bTAX SAVER\b(?!\s+ELSS)", "ELSS TAX SAVER"),
+    (r"\bELSS TAX SAVER\s+FUND\b", "ELSS TAX SAVER"),
+    (r"\bEQUITY HYBRID\b", "AGGRESSIVE HYBRID"),
+    (r"\bBALANCED ADVANTAGE\b", "DYNAMIC ASSET ALLOCATION"),
+    (r"\bFUND\b", " "),
+    (r"\bSCHEME\b", " "),
+)
+
+
+def canonical_twin_stem(name: str) -> str:
+    """Normalizes legacy SEBI-renamed scheme titles so non-numeric slugs resolve to 6-digit AMFI twins."""
+    s = normalize_scheme_stem(name)
+    for pat, repl in _SEBI_TWIN_RENAME_PATTERNS:
+        s = re.sub(pat, repl, s)
+    s = re.sub(r"\b(FLEXI|LARGE|MID|SMALL|MULTI)\s+CAP\b", r"\1CAP", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def resolve_legacy_slug_twins(schemes: List[Dict[str, Any]]) -> Dict[str, str]:
+    """Maps non-numeric legacy `scheme_code` slugs to their canonical 6-digit AMFI `scheme_code`.
+
+    Preference order:
+    1. Exact `normalize_scheme_stem` match against a numeric AMFI scheme (highest `aum_crores`, then highest code).
+    2. `canonical_twin_stem` SEBI-rename match against a numeric AMFI scheme (highest `aum_crores`, then highest code).
+    """
+    numeric_by_exact: Dict[str, List[Dict[str, Any]]] = {}
+    numeric_by_canon: Dict[str, List[Dict[str, Any]]] = {}
+    slugs: List[Dict[str, Any]] = []
+
+    for s in schemes:
+        code = str(s.get("scheme_code") or "").strip()
+        if not code:
+            continue
+        if code.isdigit():
+            exact = normalize_scheme_stem(str(s.get("scheme_name") or ""))
+            canon = canonical_twin_stem(str(s.get("scheme_name") or ""))
+            if exact:
+                numeric_by_exact.setdefault(exact, []).append(s)
+            if canon:
+                numeric_by_canon.setdefault(canon, []).append(s)
+        else:
+            slugs.append(s)
+
+    def _pick_best(cands: List[Dict[str, Any]]) -> str:
+        ranked = sorted(
+            cands,
+            key=lambda x: (
+                1 if float(x.get("aum_crores") or 0.0) > 0 else 0,
+                float(x.get("aum_crores") or 0.0),
+                1 if float(x.get("nav") or 0.0) > 0 else 0,
+                int(str(x.get("scheme_code") or "0") if str(x.get("scheme_code") or "").isdigit() else 0),
+            ),
+            reverse=True,
+        )
+        return str(ranked[0]["scheme_code"])
+
+    mapping: Dict[str, str] = {}
+    for slug in slugs:
+        slug_code = str(slug.get("scheme_code") or "").strip()
+        sname = str(slug.get("scheme_name") or "")
+        exact = normalize_scheme_stem(sname)
+        if exact and exact in numeric_by_exact:
+            mapping[slug_code] = _pick_best(numeric_by_exact[exact])
+            continue
+        canon = canonical_twin_stem(sname)
+        if canon and canon in numeric_by_canon:
+            mapping[slug_code] = _pick_best(numeric_by_canon[canon])
+    return mapping
+
 def is_supabase_enabled() -> bool:
     return bool(get_supabase_url() and is_postgres_active())
 
@@ -394,7 +494,7 @@ get_mutual_fund_by_code = get_mutual_fund_scheme
 def get_active_mutual_funds(
     category: Optional[str] = None,
     broad_category: Optional[str] = None,
-    limit: Optional[int] = 500,
+    limit: Optional[int] = 2500,
     audited_only: bool = False,
     dedupe_twins: Optional[bool] = False,
 ) -> List[Dict[str, Any]]:
@@ -434,21 +534,46 @@ def get_active_mutual_funds(
         rows = cursor.fetchall()
         items = [clean_dict_row(cursor, r) for r in rows]
         if should_dedupe:
-            # Prefer curated slug as canonical representative per twin stem, then order by AUM DESC
-            items.sort(
-                key=lambda x: (
-                    0 if str(x.get("scheme_code") or "").isdigit() else 1,
+            # Group legacy slugs with their resolved 6-digit AMFI twin (including SEBI category renames),
+            # and prefer the twin carrying verified statutory holdings / higher AUM.
+            slug_to_num = resolve_legacy_slug_twins(items)
+
+            def _item_verified_rank(x: Dict[str, Any]) -> tuple:
+                meta = x.get("metadata") if isinstance(x.get("metadata"), dict) else {}
+                h_src = str(meta.get("holdings_source") or "").strip().lower()
+                is_verified = 1 if h_src in ("sebi_monthly_disclosure", "mfforecast_api", "manual_inbox") else 0
+                is_num = 1 if str(x.get("scheme_code") or "").isdigit() else 0
+                # Prefer verified statutory holdings (numeric canonical first), else curated slug, then AUM DESC
+                return (
+                    is_verified,
+                    is_num if is_verified else (1 - is_num),
                     float(x.get("aum_crores") or 0.0),
-                ),
-                reverse=True,
-            )
+                )
+
+            items.sort(key=_item_verified_rank, reverse=True)
             deduped: List[Dict[str, Any]] = []
-            seen_stems = set()
+            seen_keys = set()
             for item in items:
-                stem = normalize_scheme_stem(str(item.get("scheme_name") or "")) or str(item.get("scheme_code") or "")
-                if stem in seen_stems:
+                code = str(item.get("scheme_code") or "").strip()
+                if code in slug_to_num:
+                    twin_key = f"NUM:{slug_to_num[code]}"
+                elif code.isdigit():
+                    exact_stem = normalize_scheme_stem(str(item.get("scheme_name") or ""))
+                    # Collapse exact duplicate numeric plans (e.g. Sundaram 119588/119589) while keeping
+                    # genuinely distinct numeric schemes separate unless linked via slug_to_num.
+                    twin_key = f"NUM:{code}"
+                    if exact_stem:
+                        # Also mark exact stem so a matching slug with identical exact stem collapses
+                        if f"STEM:{exact_stem}" in seen_keys:
+                            continue
+                        seen_keys.add(f"STEM:{exact_stem}")
+                else:
+                    exact_stem = normalize_scheme_stem(str(item.get("scheme_name") or ""))
+                    twin_key = f"STEM:{exact_stem}" if exact_stem else f"SLUG:{code}"
+
+                if twin_key in seen_keys:
                     continue
-                seen_stems.add(stem)
+                seen_keys.add(twin_key)
                 deduped.append(item)
             deduped.sort(key=lambda x: float(x.get("aum_crores") or 0.0), reverse=True)
             if limit and isinstance(limit, int) and limit > 0:

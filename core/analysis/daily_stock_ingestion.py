@@ -11,11 +11,12 @@ Mission:
 """
 
 import os
+import re
 import json
 import math
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set, Tuple
 
 from normalizer import clean_ticker
 from bse_master import resolve_canonical_symbol, resolve_bse_scrip_code
@@ -29,12 +30,115 @@ from core.db.mutual_funds import (
     get_mutual_fund_scheme,
     get_fund_forensic_dossier,
     save_fund_forensic_dossier,
+    resolve_legacy_slug_twins,
 )
 from core.db.agent_sessions import record_autonomous_event
 from core.analysis.fundamentals import get_stock_fundamentals, fetch_latest_bse_announcement
 from core.config import get_secret
 
 logger = logging.getLogger("equity_research.core.analysis.daily_stock_ingestion")
+
+_RAW_ISIN_RE = re.compile(r"^IN[A-Z0-9]{10}$")
+DAILY_CATCHUP_COHORT_SIZE = 25
+DAILY_STEADY_COHORT_SIZE = 15
+CATCHUP_BACKLOG_THRESHOLD = 100
+
+
+def _resolve_constituent_ticker(identifier: str, holding_name: str, isin_map: Dict[str, str]) -> Optional[str]:
+    """Resolves a mutual fund equity holding identifier to a listed symbol, filtering unresolvable raw ISINs (L5)."""
+    raw = (identifier or "").strip().upper()
+    if not raw:
+        return None
+    if _RAW_ISIN_RE.match(raw):
+        from core.ingestion.mf_portfolio_ingest import resolve_equity_identifier
+
+        resolved = clean_ticker(resolve_equity_identifier(raw, holding_name or "", isin_map))
+        if not resolved or _RAW_ISIN_RE.match(resolved) or resolved == "UNKNOWN":
+            return None
+        return resolved
+    cleaned = clean_ticker(raw)
+    if not cleaned or _RAW_ISIN_RE.match(cleaned) or cleaned == "UNKNOWN":
+        return None
+    return cleaned
+
+
+def _compute_deduped_scheme_map(cursor, use_pg: bool) -> Tuple[Dict[str, Dict[str, Any]], Set[str], Dict[str, str]]:
+    """Loads active schemes and excludes legacy slug twins when their verified 6-digit AMFI twin also has holdings (L6)."""
+    cursor.execute("SELECT scheme_code, scheme_name, fund_house, category, aum_crores, metadata_json FROM mutual_fund_schemes;")
+    schemes_list: List[Dict[str, Any]] = []
+    schemes_by_code: Dict[str, Dict[str, Any]] = {}
+    for sc_code, sc_name, fh, cat, aum_cr, meta_raw in cursor.fetchall():
+        code_str = str(sc_code or "").strip()
+        if not code_str:
+            continue
+        meta_obj: Dict[str, Any] = {}
+        if isinstance(meta_raw, dict):
+            meta_obj = meta_raw
+        elif isinstance(meta_raw, str) and meta_raw.strip():
+            try:
+                meta_obj = json.loads(meta_raw)
+            except Exception as meta_err:
+                logger.debug("Invalid metadata_json for scheme %s: %s", code_str, meta_err)
+                meta_obj = {}
+        row_dict = {
+            "scheme_code": code_str,
+            "scheme_name": sc_name or code_str,
+            "fund_house": fh or "",
+            "category": cat or "",
+            "aum_crores": float(aum_cr or 0.0),
+            "metadata": meta_obj,
+        }
+        schemes_list.append(row_dict)
+        schemes_by_code[code_str] = row_dict
+
+    cursor.execute("SELECT DISTINCT scheme_code FROM mutual_fund_holdings;")
+    schemes_with_holdings = {str(r[0]).strip() for r in cursor.fetchall() if r and r[0]}
+
+    twin_map = resolve_legacy_slug_twins(schemes_list) if schemes_list else {}
+    excluded_twins: Set[str] = set()
+    for slug_code, num_code in twin_map.items():
+        if slug_code in schemes_with_holdings and num_code in schemes_with_holdings:
+            excluded_twins.add(slug_code)
+
+    return schemes_by_code, excluded_twins, twin_map
+
+
+def _load_user_inquired_fund_counts(cursor, twin_map: Dict[str, str]) -> Dict[str, int]:
+    """Queries telemetry (`site_usage_events`) for user-inquired mutual fund scheme codes and propagates across twins."""
+    counts: Dict[str, int] = {}
+    try:
+        cursor.execute(
+            """
+            SELECT UPPER(TRIM(ticker)), COUNT(*)
+            FROM site_usage_events
+            WHERE ticker IS NOT NULL AND ticker != '' AND ticker != 'APP'
+            GROUP BY UPPER(TRIM(ticker));
+            """
+        )
+        for tk, cnt in cursor.fetchall():
+            if tk and cnt:
+                counts[str(tk)] = int(cnt)
+    except Exception as e:
+        logger.debug("Telemetry fund inquiry lookup notice: %s", e)
+
+    for slug_code, num_code in twin_map.items():
+        combined = max(counts.get(slug_code, 0), counts.get(num_code, 0))
+        if combined > 0:
+            counts[slug_code] = combined
+            counts[num_code] = combined
+    return counts
+
+
+def count_uncovered_mf_equities() -> int:
+    """Returns exact count of distinct resolvable uncovered MF equity tickers."""
+    stats = get_ingestion_progress_stats()
+    return int(stats.get("uncovered_mf_holdings") or 0)
+
+
+def resolve_daily_stock_cohort_target(uncovered_count: Optional[int] = None) -> int:
+    """Dynamic daily catch-up governor: 25 stocks/day while uncovered backlog > 100, else 15 stocks/day."""
+    backlog = count_uncovered_mf_equities() if uncovered_count is None else int(uncovered_count)
+    return DAILY_CATCHUP_COHORT_SIZE if backlog > CATCHUP_BACKLOG_THRESHOLD else DAILY_STEADY_COHORT_SIZE
 
 
 def get_ingestion_progress_stats() -> Dict[str, Any]:
@@ -46,37 +150,52 @@ def get_ingestion_progress_stats() -> Dict[str, Any]:
     cursor = conn.cursor()
 
     try:
-        # Total distinct equity holdings in mutual funds
         cursor.execute("SELECT COUNT(DISTINCT identifier) FROM mutual_fund_holdings WHERE holding_type = 'EQUITY';")
-        total_mf_holdings = cursor.fetchone()[0] or 0
-        if total_mf_holdings == 0:
+        raw_total = cursor.fetchone()[0] or 0
+        if raw_total == 0:
             cursor.close()
             conn.close()
             from core.db.mutual_funds import seed_default_mutual_funds
             seed_default_mutual_funds()
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(DISTINCT identifier) FROM mutual_fund_holdings WHERE holding_type = 'EQUITY';")
-            total_mf_holdings = cursor.fetchone()[0] or 0
 
-        # Distinct equity holdings covered in reports.db with substantial qualitative text
-        cursor.execute("""
-            SELECT COUNT(DISTINCT h.identifier)
-            FROM mutual_fund_holdings h
-            JOIN reports r ON UPPER(TRIM(h.identifier)) = UPPER(TRIM(r.ticker))
-            WHERE h.holding_type = 'EQUITY'
-              AND r.report_text IS NOT NULL
-              AND LENGTH(r.report_text) > 100;
-        """)
-        covered_mf_holdings = cursor.fetchone()[0] or 0
+        from core.ingestion.mf_portfolio_ingest import load_isin_symbol_map
 
-        # Total researched stocks in reports.db
-        cursor.execute("SELECT COUNT(DISTINCT ticker) FROM reports WHERE report_text IS NOT NULL AND LENGTH(report_text) > 100;")
-        total_reports_count = cursor.fetchone()[0] or 0
+        isin_map = load_isin_symbol_map(force_refresh=False, allow_network=False)
 
+        cursor.execute("SELECT identifier, MAX(holding_name) FROM mutual_fund_holdings WHERE holding_type = 'EQUITY' GROUP BY identifier;")
+        distinct_tickers: Set[str] = set()
+        for ident, h_name in cursor.fetchall():
+            resolved = _resolve_constituent_ticker(str(ident or ""), str(h_name or ""), isin_map)
+            if resolved:
+                distinct_tickers.add(resolved)
+
+        cursor.execute(
+            """
+            SELECT DISTINCT UPPER(TRIM(ticker))
+            FROM reports
+            WHERE report_text IS NOT NULL
+              AND LENGTH(report_text) > 100;
+            """
+        )
+        archived_tickers = {clean_ticker(r[0]) for r in cursor.fetchall() if r and r[0]}
+        total_reports_count = len(archived_tickers)
+
+        total_mf_holdings = len(distinct_tickers)
+        covered_mf_holdings = len(distinct_tickers.intersection(archived_tickers))
         uncovered = max(0, total_mf_holdings - covered_mf_holdings)
         coverage_pct = round((covered_mf_holdings / total_mf_holdings * 100.0), 1) if total_mf_holdings > 0 else 0.0
-        days_to_full = math.ceil(uncovered / 15.0) if uncovered > 0 else 0
+
+        cadence = DAILY_CATCHUP_COHORT_SIZE if uncovered > CATCHUP_BACKLOG_THRESHOLD else DAILY_STEADY_COHORT_SIZE
+        if uncovered <= 0:
+            days_to_full = 0
+        elif uncovered > CATCHUP_BACKLOG_THRESHOLD:
+            catchup_days = math.ceil((uncovered - CATCHUP_BACKLOG_THRESHOLD) / float(DAILY_CATCHUP_COHORT_SIZE))
+            steady_days = math.ceil(CATCHUP_BACKLOG_THRESHOLD / float(DAILY_STEADY_COHORT_SIZE))
+            days_to_full = catchup_days + steady_days
+        else:
+            days_to_full = math.ceil(uncovered / float(DAILY_STEADY_COHORT_SIZE))
 
         return {
             "total_mf_holdings": total_mf_holdings,
@@ -85,7 +204,7 @@ def get_ingestion_progress_stats() -> Dict[str, Any]:
             "coverage_pct": coverage_pct,
             "total_reports_count": total_reports_count,
             "days_to_full_coverage": days_to_full,
-            "daily_cadence": 15
+            "daily_cadence": cadence,
         }
     except Exception as e:
         logger.error(f"Error computing ingestion progress stats: {e}")
@@ -96,7 +215,7 @@ def get_ingestion_progress_stats() -> Dict[str, Any]:
             "coverage_pct": 0.0,
             "total_reports_count": 0,
             "days_to_full_coverage": 0,
-            "daily_cadence": 15,
+            "daily_cadence": DAILY_STEADY_COHORT_SIZE,
             "status": "ERROR",
         }
     finally:
@@ -104,11 +223,14 @@ def get_ingestion_progress_stats() -> Dict[str, Any]:
         conn.close()
 
 
-def get_uncovered_mutual_fund_holdings_queue(limit: int = 15) -> List[Dict[str, Any]]:
+def get_uncovered_mutual_fund_holdings_queue(limit: Optional[int] = None) -> List[Dict[str, Any]]:
     """
-    Ranks all uncovered mutual fund equity constituent holdings by aggregate impact:
-    Order: scheme_count DESC, total_weight_pct DESC.
-    Returns the top candidate stocks ready for ingestion.
+    Ranks all uncovered mutual fund equity constituent holdings across twin-deduplicated schemes by:
+      1. Institutional Rupee-AUM Exposure (`weight_pct * aum_crores / 100.0`, zero synthetic 1000 Cr fallback),
+      2. Near-70%-Threshold Fund-Unlock Boost (prioritizing constituents that unlock schemes near >=70% coverage),
+      3. Telemetry User-Inquired Fund Boost (`site_usage_events`),
+      4. Scheme breadth & aggregate portfolio weight tie-breakers.
+    Resolves or filters raw `IN...` ISINs (`L5`) so only listed equity symbols enter the ingestion queue.
     """
     init_db()
     conn = get_db_connection()
@@ -125,84 +247,166 @@ def get_uncovered_mutual_fund_holdings_queue(limit: int = 15) -> List[Dict[str, 
             cursor = conn.cursor()
 
         use_pg = is_postgres_connection(conn)
-        p = "%s" if use_pg else "?"
-        sql = f"""
-            SELECT
-                h.identifier,
-                MAX(h.holding_name) AS holding_name,
-                MAX(h.sector_or_rating) AS sector_or_rating,
-                COUNT(DISTINCT h.scheme_code) AS scheme_count,
-                SUM(h.weight_pct) AS total_weight_pct,
-                SUM(h.weight_pct * COALESCE(s.aum_crores, 1000.0) / 100.0) AS estimated_aum_cr
-            FROM mutual_fund_holdings h
-            LEFT JOIN mutual_fund_schemes s ON h.scheme_code = s.scheme_code
-            WHERE h.holding_type = 'EQUITY'
-              AND UPPER(TRIM(h.identifier)) NOT IN (
-                  SELECT UPPER(TRIM(ticker))
-                  FROM reports
-                  WHERE report_text IS NOT NULL AND LENGTH(report_text) > 100
-              )
-            GROUP BY h.identifier
-            ORDER BY scheme_count DESC, total_weight_pct DESC
-            LIMIT {p};
-        """
+        from core.ingestion.mf_portfolio_ingest import load_isin_symbol_map
 
-        cursor.execute(sql, (limit,))
-        rows = cursor.fetchall()
+        allow_net = os.environ.get("TESTING") != "1"
+        isin_map = load_isin_symbol_map(force_refresh=False, allow_network=allow_net)
 
-        # Batch lookup top 3 schemes for all candidate tickers
-        tickers_list = [clean_ticker(r[0]) for r in rows if r[0]]
-        schemes_by_ticker: Dict[str, List[str]] = {}
-        if tickers_list:
-            ph = ",".join([p] * len(tickers_list))
-            top_schemes_sql = f"""
-                SELECT h.identifier, COALESCE(s.scheme_name, h.scheme_code) as scheme_name
-                FROM mutual_fund_holdings h
-                LEFT JOIN mutual_fund_schemes s ON h.scheme_code = s.scheme_code
-                WHERE UPPER(TRIM(h.identifier)) IN ({ph})
-                ORDER BY h.weight_pct DESC
+        schemes_by_code, excluded_twins, twin_map = _compute_deduped_scheme_map(cursor, use_pg)
+        inquired_counts = _load_user_inquired_fund_counts(cursor, twin_map)
+
+        cursor.execute(
             """
-            cursor.execute(top_schemes_sql, tuple(tickers_list))
-            for h_id, s_name in cursor.fetchall():
-                t_clean = clean_ticker(h_id)
-                if t_clean not in schemes_by_ticker:
-                    schemes_by_ticker[t_clean] = []
-                if len(schemes_by_ticker[t_clean]) < 3 and s_name not in schemes_by_ticker[t_clean]:
-                    schemes_by_ticker[t_clean].append(s_name)
+            SELECT UPPER(TRIM(ticker))
+            FROM reports
+            WHERE report_text IS NOT NULL AND LENGTH(report_text) > 100;
+            """
+        )
+        archived_tickers = {clean_ticker(r[0]) for r in cursor.fetchall() if r and r[0]}
 
-        candidates = []
-        for row in rows:
-            ticker = clean_ticker(row[0])
-            name = row[1] or ticker
-            sector = row[2] or "Diversified"
-            scnt = row[3] or 0
-            tot_wt = round(float(row[4] or 0.0), 2)
-            est_aum = round(float(row[5] or 0.0), 1)
+        cursor.execute(
+            """
+            SELECT scheme_code, identifier, holding_name, sector_or_rating, weight_pct
+            FROM mutual_fund_holdings
+            WHERE holding_type = 'EQUITY';
+            """
+        )
+        raw_holdings = cursor.fetchall()
 
-            top_schemes_list = schemes_by_ticker.get(ticker, [])
+        # Pass 1: Compute per-scheme equity weight & covered equity weight (for Near-70% Fund-Unlock Boost)
+        scheme_total_eq_wt: Dict[str, float] = {}
+        scheme_covered_eq_wt: Dict[str, float] = {}
+        resolved_rows: List[Tuple[str, str, str, str, float]] = []
 
-            candidates.append({
+        for sc_code_raw, ident_raw, h_name_raw, sector_raw, wt_raw in raw_holdings:
+            sc_code = str(sc_code_raw or "").strip()
+            if not sc_code or sc_code in excluded_twins:
+                continue
+            wt = float(wt_raw or 0.0)
+            if wt <= 0:
+                continue
+            ticker = _resolve_constituent_ticker(str(ident_raw or ""), str(h_name_raw or ""), isin_map)
+            if not ticker:
+                continue
+            scheme_total_eq_wt[sc_code] = scheme_total_eq_wt.get(sc_code, 0.0) + wt
+            if ticker in archived_tickers:
+                scheme_covered_eq_wt[sc_code] = scheme_covered_eq_wt.get(sc_code, 0.0) + wt
+            else:
+                resolved_rows.append((sc_code, ticker, str(h_name_raw or ticker), str(sector_raw or "Diversified"), wt))
+
+        scheme_eq_cov_pct: Dict[str, float] = {}
+        for sc_code, tot_eq in scheme_total_eq_wt.items():
+            if tot_eq > 0:
+                scheme_eq_cov_pct[sc_code] = (scheme_covered_eq_wt.get(sc_code, 0.0) / tot_eq) * 100.0
+
+        # Pass 2: Aggregate uncovered equity candidates across deduped schemes
+        agg: Dict[str, Dict[str, Any]] = {}
+        for sc_code, ticker, h_name, sector, wt in resolved_rows:
+            s_meta = schemes_by_code.get(sc_code) or {}
+            s_name = s_meta.get("scheme_name") or sc_code
+            aum_cr = max(0.0, float(s_meta.get("aum_crores") or 0.0))
+            rupee_exp_cr = (wt * aum_cr) / 100.0
+
+            cov_pct = scheme_eq_cov_pct.get(sc_code, 0.0)
+            unlock_boost = 0.0
+            near_unlock_hit = 0
+            if 45.0 <= cov_pct < 70.0:
+                near_unlock_hit = 1
+                gap_to_70 = max(1.0, 70.0 - cov_pct)
+                unlock_boost = (wt / gap_to_70) * max(aum_cr, 500.0) * 0.25
+
+            inq_cnt = inquired_counts.get(sc_code, 0)
+            inquiry_boost = float(inq_cnt) * wt * 250.0 if inq_cnt > 0 else 0.0
+
+            bucket = agg.get(ticker)
+            if bucket is None:
+                bucket = {
+                    "ticker": ticker,
+                    "company_name": h_name,
+                    "sector": sector,
+                    "schemes_seen": {},
+                    "total_weight_pct": 0.0,
+                    "estimated_aum_cr": 0.0,
+                    "unlock_boost_cr": 0.0,
+                    "inquiry_boost_cr": 0.0,
+                    "near_unlock_funds": set(),
+                    "inquired_fund_hits": 0,
+                }
+                agg[ticker] = bucket
+
+            if h_name and len(h_name) > len(bucket["company_name"]):
+                bucket["company_name"] = h_name
+            if sector and sector not in ("Unclassified", "Diversified") and bucket["sector"] in ("Unclassified", "Diversified"):
+                bucket["sector"] = sector
+
+            # Guard against duplicate rows inside the same scheme
+            prev_wt = bucket["schemes_seen"].get(sc_code)
+            if prev_wt is None:
+                bucket["schemes_seen"][sc_code] = (wt, s_name)
+                bucket["total_weight_pct"] += wt
+                bucket["estimated_aum_cr"] += rupee_exp_cr
+                bucket["unlock_boost_cr"] += unlock_boost
+                bucket["inquiry_boost_cr"] += inquiry_boost
+                if near_unlock_hit:
+                    bucket["near_unlock_funds"].add(sc_code)
+                if inq_cnt > 0:
+                    bucket["inquired_fund_hits"] += inq_cnt
+
+        effective_limit = (
+            int(limit)
+            if (limit is not None and int(limit) > 0)
+            else (DAILY_CATCHUP_COHORT_SIZE if len(agg) > CATCHUP_BACKLOG_THRESHOLD else DAILY_STEADY_COHORT_SIZE)
+        )
+
+        ranked_items: List[Dict[str, Any]] = []
+        for ticker, b in agg.items():
+            scnt = len(b["schemes_seen"])
+            tot_wt = round(float(b["total_weight_pct"]), 2)
+            est_aum = round(float(b["estimated_aum_cr"]), 1)
+            priority_score = round(
+                float(b["estimated_aum_cr"])
+                + float(b["unlock_boost_cr"])
+                + float(b["inquiry_boost_cr"])
+                + (scnt * 25.0)
+                + float(b["total_weight_pct"]),
+                2,
+            )
+            top_schemes_sorted = [
+                sname
+                for _, (_, sname) in sorted(
+                    b["schemes_seen"].items(),
+                    key=lambda kv: kv[1][0],
+                    reverse=True,
+                )[:3]
+            ]
+            ranked_items.append({
                 "ticker": ticker,
                 "canonical": ticker,
-                "company_name": name,
-                "sector": sector,
+                "company_name": b["company_name"] or ticker,
+                "sector": b["sector"] or "Diversified",
                 "scheme_count": scnt,
                 "total_weight_pct": tot_wt,
                 "estimated_aum_cr": est_aum,
-                "top_schemes": top_schemes_list,
+                "near_unlock_fund_count": len(b["near_unlock_funds"]),
+                "inquired_fund_hits": b["inquired_fund_hits"],
+                "priority_score": priority_score,
+                "top_schemes": top_schemes_sorted,
             })
 
-        # Fallback if uncovered MF holdings is less than limit: backfill from candidate universe
-        if len(candidates) < limit:
+        ranked_items.sort(
+            key=lambda x: (x["priority_score"], x["scheme_count"], x["total_weight_pct"], x["ticker"]),
+            reverse=True,
+        )
+        candidates = ranked_items[:effective_limit]
+
+        # Fallback if uncovered MF holdings is less than effective_limit: backfill from candidate universe
+        if len(candidates) < effective_limit:
             from core.analysis.stock_discovery import CANDIDATE_UNIVERSE
             existing_tickers = {c["ticker"] for c in candidates}
-            # Also get all tickers in reports
-            cursor.execute("SELECT UPPER(TRIM(ticker)) FROM reports WHERE report_text IS NOT NULL AND LENGTH(report_text) > 100;")
-            archived = {r[0] for r in cursor.fetchall()}
 
             for cand in CANDIDATE_UNIVERSE:
                 t = clean_ticker(cand.get("ticker", ""))
-                if t and t not in existing_tickers and t not in archived:
+                if t and t not in existing_tickers and t not in archived_tickers:
                     candidates.append({
                         "ticker": t,
                         "canonical": t,
@@ -211,12 +415,15 @@ def get_uncovered_mutual_fund_holdings_queue(limit: int = 15) -> List[Dict[str, 
                         "scheme_count": 0,
                         "total_weight_pct": 0.0,
                         "estimated_aum_cr": 0.0,
+                        "near_unlock_fund_count": 0,
+                        "inquired_fund_hits": 0,
+                        "priority_score": 0.0,
                         "top_schemes": [],
                         "default_roce": cand.get("roce"),
-                        "default_de": cand.get("debt_to_equity")
+                        "default_de": cand.get("debt_to_equity"),
                     })
                     existing_tickers.add(t)
-                    if len(candidates) >= limit:
+                    if len(candidates) >= effective_limit:
                         break
 
         return candidates
@@ -648,13 +855,13 @@ def recalculate_affected_mutual_funds(ingested_tickers: List[str]) -> List[Dict[
 
 def ingest_daily_stock_cohort(
     edition_date: Optional[str] = None,
-    count: int = 15,
+    count: Optional[int] = None,
     skip_gemini: bool = False
 ) -> Dict[str, Any]:
     """
     Main Daily 08:30 AM Orchestrator:
-    1. Selects top 15 uncovered mutual fund constituent equities.
-    2. Synthesizes full 7-Pillar qualitative dossiers for each.
+    1. Selects top uncovered mutual fund constituent equities (25/day catch-up while backlog > 100, else 15/day).
+    2. Synthesizes full 7-Pillar qualitative dossiers for each via Gemini Batch API (50% discount).
     3. Archives to reports.db and generates today's /discovery Morning Discovery Reel.
     4. Automatically recalculates all affected mutual fund look-through metrics.
     5. Records autonomous audit event.
@@ -662,13 +869,18 @@ def ingest_daily_stock_cohort(
     if not edition_date:
         edition_date = datetime.now(IST).strftime("%Y-%m-%d")
 
+    effective_count = int(count) if (count is not None and int(count) > 0) else resolve_daily_stock_cohort_target()
+
     if os.environ.get("TESTING") == "1":
         skip_gemini = True
 
-    logger.info(f"Starting Daily 15-Stock Ingestion Orchestrator for edition: {edition_date} (count: {count}, skip_gemini: {skip_gemini})...")
+    logger.info(
+        f"Starting Daily MF Constituent Ingestion Orchestrator for edition: {edition_date} "
+        f"(count: {effective_count}, skip_gemini: {skip_gemini})..."
+    )
 
     # 1. Fetch priority queue
-    queue = get_uncovered_mutual_fund_holdings_queue(limit=count)
+    queue = get_uncovered_mutual_fund_holdings_queue(limit=effective_count)
     if not queue:
         logger.warning("No uncovered stocks found in queue. All mutual fund constituents covered!")
         return {

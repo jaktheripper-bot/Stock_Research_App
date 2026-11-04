@@ -98,7 +98,7 @@ def _coerce_pg_date(val: Any):
 def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str, Any]], db_url: str, sqlite_path: str = None) -> Dict[str, int]:
     """Syncs all 18 multi-asset tables directly to Supabase PostgreSQL using psycopg2."""
     import psycopg2
-    from psycopg2.extras import execute_batch
+    from psycopg2.extras import execute_batch, execute_values
     from core.db.connection import IST, _normalize_pg_dsn, close_all_pg_pools, init_db
     from core.presentation.formatters import _coerce_datetime
 
@@ -156,7 +156,7 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
         ("cached_fundamentals", "ticker", True, "updated_at"),
         ("discovery_reel", "__natural_discovery__", True, "created_at"),
         ("mutual_fund_schemes", "scheme_code", True, "last_updated"),
-        ("mutual_fund_holdings", "scheme_code, holding_type, identifier", True, "created_at"),
+        ("mutual_fund_holdings", "__scheme_holdings__", True, "created_at"),
         ("fund_forensic_dossiers", "scheme_code", True, "last_audited_at"),
         ("corporate_debt_securities", "isin", True, "last_updated"),
         ("sovereign_benchmarks", "tenor_label", True, "updated_at"),
@@ -280,6 +280,59 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
                         page_size=500,
                     )
                 batch_count = len(to_insert)
+            elif conflict_col == "__scheme_holdings__":
+                cursor.execute(
+                    "SELECT scheme_code, COUNT(*), MAX(created_at) FROM mutual_fund_holdings GROUP BY scheme_code"
+                )
+                pg_by_scheme: Dict[str, Any] = {
+                    str(sc or "").strip(): (int(cnt or 0), _coerce_datetime(max_ts))
+                    for sc, cnt, max_ts in cursor.fetchall()
+                }
+
+                sq_by_scheme: Dict[str, Dict[Any, Any]] = {}
+                for row in rows:
+                    sc = str(row["scheme_code"] or "").strip()
+                    if not sc:
+                        continue
+                    nk = (
+                        sc,
+                        str(row["holding_type"] or "").strip(),
+                        str(row["identifier"] or "").strip(),
+                    )
+                    sq_by_scheme.setdefault(sc, {})[nk] = row
+
+                schemes_to_replace: List[str] = []
+                to_insert = []
+                for sc, cohort_map in sq_by_scheme.items():
+                    sq_cohort = list(cohort_map.values())
+                    sq_max_dt = max(
+                        (_coerce_datetime(r["created_at"]) for r in sq_cohort if _coerce_datetime(r["created_at"])),
+                        default=None,
+                    )
+                    if sc in pg_by_scheme:
+                        _pg_cnt, pg_max_dt = pg_by_scheme[sc]
+                        if (
+                            pg_max_dt is not None
+                            and sq_max_dt is not None
+                            and (pg_max_dt - sq_max_dt).total_seconds() > 1.0
+                        ):
+                            continue
+                        schemes_to_replace.append(sc)
+                    for r in sq_cohort:
+                        to_insert.append(tuple(_transform_cell(r[c], pg_col_types.get(c, "")) for c in cols))
+
+                for idx in range(0, len(schemes_to_replace), 500):
+                    chunk = schemes_to_replace[idx : idx + 500]
+                    cursor.execute("DELETE FROM mutual_fund_holdings WHERE scheme_code = ANY(%s)", (chunk,))
+
+                if to_insert:
+                    execute_values(
+                        cursor,
+                        f"INSERT INTO mutual_fund_holdings ({cols_joined}) VALUES %s",
+                        to_insert,
+                        page_size=2000,
+                    )
+                batch_count = len(to_insert)
             else:
                 if do_update and conflict_col:
                     conflict_targets = [c.strip() for c in conflict_col.split(",")]
@@ -294,6 +347,11 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
                                 f"{c} = CASE WHEN EXCLUDED.{c} IS NOT NULL AND TRIM(EXCLUDED.{c}) <> '' "
                                 f"THEN EXCLUDED.{c} ELSE {table_name}.{c} END"
                             )
+                        elif table_name == "mutual_fund_schemes" and c == "aum_crores":
+                            update_parts.append(
+                                f"aum_crores = CASE WHEN COALESCE(EXCLUDED.aum_crores, 0) > 0 "
+                                f"THEN EXCLUDED.aum_crores ELSE {table_name}.aum_crores END"
+                            )
                         else:
                             update_parts.append(f"{c} = EXCLUDED.{c}")
                     update_assignments = ", ".join(update_parts)
@@ -304,6 +362,10 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
                             extra_substance_guard = f" OR {table_name}.report_text IS NULL OR LENGTH(TRIM({table_name}.report_text)) < 500"
                         elif table_name == "fund_forensic_dossiers":
                             extra_substance_guard = f" OR {table_name}.dossier_text IS NULL OR TRIM({table_name}.dossier_text) = ''"
+                        elif table_name == "mutual_fund_schemes":
+                            extra_substance_guard = (
+                                f" OR (COALESCE({table_name}.aum_crores, 0) <= 0 AND COALESCE(EXCLUDED.aum_crores, 0) > 0)"
+                            )
                         where_guard = (
                             f" WHERE {table_name}.{ts_col} IS NULL "
                             f"OR EXCLUDED.{ts_col} IS NULL "

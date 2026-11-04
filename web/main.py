@@ -277,9 +277,9 @@ async def run_daily_discovery_scheduler():
             if is_past_1955:
                 with job_lease(f"mf_stock_ingest_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[Evening Scheduler] Past 19:55 IST on boot for {today_str}. Acquired lease. Triggering daily 15-stock ingestion...")
-                        await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
-                        logger.info(f"[Evening Scheduler] 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
+                        logger.info(f"[Evening Scheduler] Past 19:55 IST on boot for {today_str}. Acquired lease. Triggering daily MF constituent stock ingestion...")
+                        await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, None, False)
+                        logger.info(f"[Evening Scheduler] MF constituent stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
                     else:
                         logger.info(f"[Evening Scheduler] Lease for mf_stock_ingest_{today_str} already satisfied. Skipping boot ingestion.")
                 last_stock_run_date = today_str
@@ -315,7 +315,7 @@ async def run_daily_discovery_scheduler():
                 with job_lease(f"mf_stock_ingest_{last_trading_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
                         logger.info(f"[Evening Scheduler] Prior trading session ({last_trading_str}) missing on pre-19:45 boot. Running catch-up ingestion...")
-                        await loop.run_in_executor(None, ingest_daily_stock_cohort, last_trading_str, 15, False)
+                        await loop.run_in_executor(None, ingest_daily_stock_cohort, last_trading_str, None, False)
                 with job_lease(f"discovery_reel_{last_trading_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
                         await execute_discovery_screening(edition_date=last_trading_str, acquire_lease=False)
@@ -387,8 +387,8 @@ async def run_daily_discovery_scheduler():
                 from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
                 with job_lease(f"mf_stock_ingest_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[Evening Scheduler] 19:55 IST failover window reached for {today_str}. Acquired lease. Running daily 15-stock ingestion...")
-                        await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
+                        logger.info(f"[Evening Scheduler] 19:55 IST failover window reached for {today_str}. Acquired lease. Running daily MF constituent stock ingestion...")
+                        await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, None, False)
                         logger.info(f"[Evening Scheduler] Daily 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
                     else:
                         logger.info(f"[Evening Scheduler] Lease for mf_stock_ingest_{today_str} already satisfied by cloud batch runner. Skipping.")
@@ -2197,7 +2197,13 @@ def fund_directory_page(
                     "fund_manager": "Pending Monthly Fact Sheet Sync",
                 })
     else:
-        schemes = get_active_mutual_funds(category=category, broad_category=broad_category, audited_only=True)
+        schemes = get_active_mutual_funds(
+            category=category,
+            broad_category=broad_category,
+            limit=None,
+            audited_only=True,
+            dedupe_twins=True,
+        )
 
     total_aum = sum(float(s.get("aum_crores") or 0.0) for s in schemes)
     drag_vals = [
@@ -2231,7 +2237,7 @@ def fund_overlap_page(
 ):
     """True Diversification & Portfolio Overlap Diagnostic Tool."""
     init_db()
-    all_funds = get_active_mutual_funds()
+    all_funds = get_active_mutual_funds(limit=None, audited_only=True, dedupe_twins=True)
 
     scheme_a_code = (scheme_a or "PPFAS_FLEXICAP_DIR").strip().upper()
     scheme_b_code = (scheme_b or "MIRAE_LARGECAP_DIR").strip().upper()

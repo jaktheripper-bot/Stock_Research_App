@@ -1444,6 +1444,240 @@ Cash reserve of 12% cushions against broad equity sell-offs.
         finally:
             _cleanup()
 
+    def test_purge_seeded_clones_preserves_verified_sebi_twins(self):
+        """L1 Guard: _purge_seeded_clones_on_cursor must NEVER delete holdings on numeric schemes with verified SEBI metadata."""
+        from core.db.connection import get_db_connection, is_postgres_connection
+        from core.db.mutual_funds import get_scheme_holdings, save_mutual_fund_holdings, save_mutual_fund_scheme
+        from scripts.sync_amfi_flagship_holdings import _purge_seeded_clones_on_cursor
+
+        slug_code = "TEST_L1_SLUG_DIR"
+        verified_num = "99887766"
+        cloned_num = "99887767"
+
+        def _cleanup():
+            conn = get_db_connection()
+            p = "%s" if is_postgres_connection(conn) else "?"
+            cur = conn.cursor()
+            try:
+                for sc in (slug_code, verified_num, cloned_num):
+                    cur.execute(f"DELETE FROM mutual_fund_holdings WHERE scheme_code = {p}", (sc,))
+                    cur.execute(f"DELETE FROM mutual_fund_schemes WHERE scheme_code = {p}", (sc,))
+                conn.commit()
+            finally:
+                cur.close()
+                conn.close()
+
+        _cleanup()
+        try:
+            shared_holdings = [
+                {"holding_type": "EQUITY", "identifier": "HDFCBANK", "holding_name": "HDFC Bank", "weight_pct": 55.0},
+                {"holding_type": "EQUITY", "identifier": "INFY", "holding_name": "Infosys", "weight_pct": 41.0},
+                {"holding_type": "CASH_EQUIVALENT", "identifier": "TREPS", "holding_name": "TREPS", "weight_pct": 4.0},
+            ]
+            save_mutual_fund_scheme({
+                "scheme_code": slug_code,
+                "scheme_name": "Test L1 Flexi Cap Fund - Direct Plan - Growth",
+                "fund_house": "Test AMC",
+                "category": "Flexi Cap Fund",
+                "broad_category": "EQUITY",
+                "aum_crores": 1000.0,
+                "nav": 20.0,
+                "metadata": {"holdings_source": "sebi_monthly_disclosure"},
+            })
+            save_mutual_fund_scheme({
+                "scheme_code": verified_num,
+                "scheme_name": "Test L1 Flexi Cap Fund - Direct Plan - Growth",
+                "fund_house": "Test AMC",
+                "category": "Flexi Cap Fund",
+                "broad_category": "EQUITY",
+                "aum_crores": 1200.0,
+                "nav": 20.5,
+                "metadata": {"holdings_source": "sebi_monthly_disclosure"},
+            })
+            save_mutual_fund_scheme({
+                "scheme_code": cloned_num,
+                "scheme_name": "Test L1 Accidental Clone - Direct Plan - Growth",
+                "fund_house": "Test AMC",
+                "category": "Flexi Cap Fund",
+                "broad_category": "EQUITY",
+                "aum_crores": 0.0,
+                "nav": 10.0,
+                "metadata": {},
+            })
+            save_mutual_fund_holdings(slug_code, shared_holdings)
+            save_mutual_fund_holdings(verified_num, shared_holdings)
+            save_mutual_fund_holdings(cloned_num, shared_holdings)
+
+            conn = get_db_connection()
+            is_pg = is_postgres_connection(conn)
+            p = "%s" if is_pg else "?"
+            cur = conn.cursor()
+            try:
+                _purge_seeded_clones_on_cursor(cur, p, is_pg=is_pg, apply=True, verbose=False)
+                conn.commit()
+            finally:
+                cur.close()
+                conn.close()
+
+            self.assertEqual(len(get_scheme_holdings(verified_num)), 3, "Verified SEBI numeric twin must be preserved!")
+            self.assertEqual(len(get_scheme_holdings(cloned_num)), 0, "Unverified accidental clone must still be purged!")
+        finally:
+            _cleanup()
+
+    def test_uncovered_queue_resolves_or_filters_raw_isins_and_dedupes_twins(self):
+        """L5 & L6 Guards: Uncovered stock queue resolves BSE/NSE ISINs, filters unresolvable raw ISINs, and deduplicates twin AUM."""
+        from core.analysis.daily_stock_ingestion import get_uncovered_mutual_fund_holdings_queue
+        from core.db.connection import get_db_connection, is_postgres_connection
+        from core.db.mutual_funds import save_mutual_fund_holdings, save_mutual_fund_scheme
+
+        slug_code = "TEST_L6_TWIN_DIR"
+        num_code = "99886655"
+        unmapped_isin = "INE999Z01099"
+        custom_sym = "ZZZ_L6_TEST_EQ"
+
+        def _cleanup():
+            conn = get_db_connection()
+            p = "%s" if is_postgres_connection(conn) else "?"
+            cur = conn.cursor()
+            try:
+                for sc in (slug_code, num_code):
+                    cur.execute(f"DELETE FROM mutual_fund_holdings WHERE scheme_code = {p}", (sc,))
+                    cur.execute(f"DELETE FROM mutual_fund_schemes WHERE scheme_code = {p}", (sc,))
+                conn.commit()
+            finally:
+                cur.close()
+                conn.close()
+
+        _cleanup()
+        try:
+            for sc, aum, meta in [
+                (slug_code, 50000.0, {"holdings_source": "sebi_monthly_disclosure"}),
+                (num_code, 60000.0, {"holdings_source": "sebi_monthly_disclosure"}),
+            ]:
+                save_mutual_fund_scheme({
+                    "scheme_code": sc,
+                    "scheme_name": "Test L6 Twin Dedupe Fund - Direct Plan - Growth",
+                    "fund_house": "Test L6 Mutual Fund",
+                    "category": "Flexi Cap Fund",
+                    "broad_category": "EQUITY",
+                    "aum_crores": aum,
+                    "nav": 45.0,
+                    "metadata": meta,
+                })
+                save_mutual_fund_holdings(sc, [
+                    {"holding_type": "EQUITY", "identifier": custom_sym, "holding_name": "L6 Test Listed Co", "weight_pct": 10.0},
+                    {"holding_type": "EQUITY", "identifier": unmapped_isin, "holding_name": "Unlisted Special Purpose Trust", "weight_pct": 5.0},
+                    {"holding_type": "CASH_EQUIVALENT", "identifier": "TREPS", "holding_name": "TREPS", "weight_pct": 85.0},
+                ])
+
+            queue = get_uncovered_mutual_fund_holdings_queue(limit=500)
+            tickers_in_q = {item["ticker"]: item for item in queue}
+
+            self.assertNotIn(unmapped_isin, tickers_in_q, "Unresolvable raw ISIN must be filtered out of equity queue!")
+            self.assertIn(custom_sym, tickers_in_q)
+            self.assertEqual(tickers_in_q[custom_sym]["scheme_count"], 1, "Slug + numeric twin must count as 1 scheme, not 2!")
+            self.assertAlmostEqual(tickers_in_q[custom_sym]["estimated_aum_cr"], 6000.0, places=1)
+        finally:
+            _cleanup()
+
+    def test_ensure_scheme_fails_closed_offline_in_production(self):
+        """L8 Guard: Unknown AMFI codes fail closed to None in production even if mfapi returns empty meta."""
+        from core.analysis.fund_overlap_auditor import ensure_scheme_and_holdings_exist
+        from core.db.connection import get_db_connection, is_postgres_connection
+        from core.db.mutual_funds import get_mutual_fund_scheme
+
+        ghost_code = "999998"
+        conn = get_db_connection()
+        p = "%s" if is_postgres_connection(conn) else "?"
+        cur = conn.cursor()
+        cur.execute(f"DELETE FROM mutual_fund_schemes WHERE scheme_code = {p}", (ghost_code,))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        empty_mfapi_bytes = b'{"meta":{"fund_house":"","scheme_name":"","scheme_code":999998},"data":[],"status":"SUCCESS"}'
+
+        class _FakeResp:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self):
+                return empty_mfapi_bytes
+
+        with patch.dict(os.environ, {"TESTING": "0", "PYTEST_CURRENT_TEST": ""}), \
+             patch("core.ingestion.amfi.search_amfi_master_directory", return_value=[]), \
+             patch("urllib.request.urlopen", return_value=_FakeResp()):
+            res = ensure_scheme_and_holdings_exist(ghost_code)
+            self.assertIsNone(res)
+            self.assertIsNone(get_mutual_fund_scheme(ghost_code))
+
+    def test_fund_dossier_renders_deep_dive_card_when_locked_and_enforces_credits(self):
+        """L7 & L10 Guards: /funds/{code} renders Constituent Deep-Dive card even when locked/un-synthesized, and POST /api/funds/on-demand-audit enforces auth + 402 credit checks."""
+        from core.db.connection import get_db_connection, is_postgres_connection
+        from core.db.mutual_funds import save_mutual_fund_holdings, save_mutual_fund_scheme
+
+        test_code = "99885544"
+        uncached_sym = "ZZZ_UNCACHED_CONSTITUENT_99"
+
+        def _cleanup():
+            conn = get_db_connection()
+            p = "%s" if is_postgres_connection(conn) else "?"
+            cur = conn.cursor()
+            try:
+                cur.execute(f"DELETE FROM fund_forensic_dossiers WHERE scheme_code = {p}", (test_code,))
+                cur.execute(f"DELETE FROM mutual_fund_holdings WHERE scheme_code = {p}", (test_code,))
+                cur.execute(f"DELETE FROM mutual_fund_schemes WHERE scheme_code = {p}", (test_code,))
+                cur.execute(f"DELETE FROM reports WHERE ticker = {p}", (uncached_sym,))
+                conn.commit()
+            finally:
+                cur.close()
+                conn.close()
+
+        _cleanup()
+        try:
+            save_mutual_fund_scheme({
+                "scheme_code": test_code,
+                "scheme_name": "Test Locked Deep Dive Fund - Direct Plan - Growth",
+                "fund_house": "Test AMC",
+                "category": "Flexi Cap Fund",
+                "broad_category": "EQUITY",
+                "aum_crores": 2500.0,
+                "nav": 34.5,
+                "metadata": {"holdings_source": "sebi_monthly_disclosure"},
+            })
+            save_mutual_fund_holdings(test_code, [
+                {"holding_type": "EQUITY", "identifier": "TCS", "holding_name": "Tata Consultancy Services", "weight_pct": 55.0},
+                {"holding_type": "EQUITY", "identifier": uncached_sym, "holding_name": "Uncached Test Equity Ltd", "weight_pct": 40.0},
+                {"holding_type": "CASH_EQUIVALENT", "identifier": "TREPS", "holding_name": "TREPS", "weight_pct": 5.0},
+            ])
+
+            # 1. Anonymous GET /funds/{code} (no forensic_dossier row yet!) MUST render #btnDeepDiveAudit and #deepDiveModal
+            page_resp = self.client.get(f"/funds/{test_code}")
+            self.assertEqual(page_resp.status_code, 200)
+            self.assertIn('id="btnDeepDiveAudit"', page_resp.text)
+            self.assertIn('id="deepDiveModal"', page_resp.text)
+            self.assertIn("Constituent Stock Accounting Look-Through", page_resp.text)
+            self.assertIn("Layer 2 Deep-Dive Available", page_resp.text)
+
+            # 2. Unauthenticated POST /api/funds/on-demand-audit in production mode -> 401
+            with patch.dict(os.environ, {"TESTING": "0", "PYTEST_CURRENT_TEST": ""}):
+                unauth_res = self.client.post("/api/funds/on-demand-audit", json={"scheme_code": test_code, "allow_deep_dive": True})
+                self.assertEqual(unauth_res.status_code, 401)
+
+            # 3. Authenticated user with 0.5 credits (< 2.0 required) -> 402 Insufficient credits
+            fake_user = {"id": "usr_test_low_bal", "email": "investor@example.internal"}
+            with patch("web.main._get_current_web_user", return_value=fake_user), \
+                 patch("web.routers.markets._get_current_web_user", return_value=fake_user), \
+                 patch("web.routers.markets._is_admin_authenticated", return_value=False), \
+                 patch("core.db.is_ticker_unlocked_for_user", return_value=False), \
+                 patch("core.db.get_user_credits_balance", return_value=0.5):
+                low_bal_res = self.client.post("/api/funds/on-demand-audit", json={"scheme_code": test_code, "allow_deep_dive": True})
+                self.assertEqual(low_bal_res.status_code, 402)
+                self.assertIn("Insufficient research credits", low_bal_res.json().get("detail", ""))
+        finally:
+            _cleanup()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -47,7 +47,9 @@ SKIPPED_SENTINELS = frozenset(
         "SKIPPED_LEASE_HELD",
         "SKIPPED_LOCAL_GUARD",
         "SKIPPED_MARKET_CLOSED",
+        "SKIPPED_OUTSIDE_SEBI_WINDOW",
         "ALREADY_DISPATCHED",
+        "ALREADY_SYNCED",
     }
 )
 
@@ -343,11 +345,11 @@ def run_evening_harvest_pipeline(
         force=force,
     )
 
-    # 6. Daily 15-Stock MF Constituent Ingestion & Re-Audit (7/7 Days — Active in Weekend Warehouse Mode)
+    # 6. Daily Catch-Up (25/15-Stock) MF Constituent Ingestion & Re-Audit (7/7 Days — Active in Weekend Warehouse Mode)
     def _stock_ingestion():
         from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
 
-        res = ingest_daily_stock_cohort(edition_date=date_str, count=15, skip_gemini=False)
+        res = ingest_daily_stock_cohort(edition_date=date_str, count=None, skip_gemini=False)
         ingested_n = res.get("ingested_count", len(res.get("ingested_tickers") or res.get("ingested_stocks") or []))
         logger.info(f"Evening Phase 6: {res.get('status')} ({ingested_n} equities).")
 
@@ -356,10 +358,11 @@ def run_evening_harvest_pipeline(
         if res.get("pending_count", 0) > 0 or ingested_n == 0:
             try:
                 from scripts.synthesize_pending_equities import synthesize_pending_cohort
+                pending_list = res.get("pending_tickers") or []
                 logger.info("Compiling pending equities queue for edition %s...", date_str)
                 synth_count = synthesize_pending_cohort(
-                    limit=15,
-                    tickers=res.get("pending_tickers") or None,
+                    limit=max(15, len(pending_list)),
+                    tickers=pending_list or None,
                 )
                 logger.info("Compiled %d pending equities for edition %s.", synth_count, date_str)
                 if isinstance(res, dict) and synth_count > 0:
@@ -376,7 +379,7 @@ def run_evening_harvest_pipeline(
         results,
         "stock_ingestion",
         f"mf_stock_ingest_{date_str}",
-        "Evening Phase 6: Daily 15-Stock MF Constituent Ingestion",
+        "Evening Phase 6: Daily MF Constituent Ingestion",
         _stock_ingestion,
         force=force,
     )
@@ -408,6 +411,93 @@ def run_evening_harvest_pipeline(
     return results
 
 
+def _are_monthly_mf_portfolios_fresh_for_prior_month(ref_date_str: str) -> bool:
+    """Returns True when >= 12 public SEBI statutory AMCs already report `last_portfolio_date >= prior_month_end`."""
+    try:
+        from core.db.connection import get_db_connection
+        from core.ingestion.mf_portfolio_ingest import load_sources, recent_month_ends
+
+        dt = datetime.strptime(str(ref_date_str)[:10], "%Y-%m-%d").date()
+        target_me = recent_month_ends(1, today=dt)[0].isoformat()
+        sources = load_sources()
+        open_amcs = [k for k, cfg in sources.items() if cfg.get("status") == "open"]
+        if not open_amcs:
+            return False
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT s.fund_house, MAX(h.portfolio_date)
+                FROM mutual_fund_schemes s
+                JOIN mutual_fund_holdings h ON s.scheme_code = h.scheme_code
+                GROUP BY s.fund_house;
+                """
+            )
+            fh_dates = {str(r[0] or "").strip().lower(): str(r[1] or "")[:10] for r in cur.fetchall() if r and r[0]}
+        finally:
+            cur.close()
+            conn.close()
+
+        fresh_amcs = 0
+        for amc_key in open_amcs:
+            names = [n.lower() for n in sources[amc_key].get("mf_names", [])]
+            best_dt = max((fh_dates.get(nm, "") for nm in names), default="")
+            if best_dt >= target_me:
+                fresh_amcs += 1
+        return fresh_amcs >= min(12, len(open_amcs))
+    except Exception as exc:
+        logger.debug("Monthly MF freshness precheck notice: %s", exc)
+        return False
+
+
+def run_monthly_mf_portfolio_pipeline(
+    date_str: str,
+    force: bool = False,
+) -> dict:
+    """Executes SEBI monthly mutual fund portfolio synchronization across verified public AMC disclosures."""
+    results = {}
+    prune_zombie_leases()
+
+    try:
+        day_of_month = int(str(date_str)[8:10])
+    except ValueError:
+        day_of_month = 0
+
+    if not force and not (4 <= day_of_month <= 12):
+        results["mf_portfolio_sync"] = "SKIPPED_OUTSIDE_SEBI_WINDOW"
+        return results
+
+    if not force and _are_monthly_mf_portfolios_fresh_for_prior_month(date_str):
+        logger.info("Monthly SEBI MF portfolios already fresh for prior month-end (%s). Skipping.", date_str)
+        results["mf_portfolio_sync"] = "ALREADY_SYNCED"
+        return results
+
+    def _mf_sync():
+        from core.ingestion.mf_portfolio_ingest import ingest_top_funds
+
+        return ingest_top_funds(target=5000, dry_run=False, audit=False)
+
+    _run_leased_phase(
+        results,
+        "mf_portfolio_sync",
+        f"mf_portfolio_sync_{date_str}",
+        "SEBI Monthly Mutual Fund Portfolio Sync",
+        _mf_sync,
+        force=force,
+    )
+    record_autonomous_event(
+        event_type="MONTHLY_MF_PORTFOLIO_SYNC",
+        ticker="MUTUAL_FUNDS",
+        trigger_source="SCHEDULED_RUNNER",
+        action_taken=f"Executed monthly SEBI MF portfolio sync for {date_str}",
+        summary=f"MF Portfolio Sync: {_phase_status(results.get('mf_portfolio_sync'))}",
+        metadata=results,
+    )
+    return results
+
+
 def run_morning_pipeline(
     date_str: str,
     force: bool = False,
@@ -419,11 +509,20 @@ def run_morning_pipeline(
     results = {}
     prune_zombie_leases()
 
-    # 1. Daily 15-Stock Ingestion & Mutual Fund Look-Through Saturation
+    # 0. Monthly SEBI Statutory MF Portfolio Disclosure Window (Days 4–12 of Month)
+    try:
+        day_of_month = int(str(date_str)[8:10])
+    except ValueError:
+        day_of_month = 0
+    if 4 <= day_of_month <= 12 and os.environ.get("TESTING") != "1":
+        mf_res = run_monthly_mf_portfolio_pipeline(date_str, force=force)
+        results["mf_portfolio_sync"] = mf_res.get("mf_portfolio_sync")
+
+    # 1. Daily Catch-Up (25/15-Stock) Ingestion & Mutual Fund Look-Through Saturation
     def _stock_ingestion():
         from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
 
-        res = ingest_daily_stock_cohort(edition_date=date_str, count=15, skip_gemini=False)
+        res = ingest_daily_stock_cohort(edition_date=date_str, count=None, skip_gemini=False)
         ingested_n = res.get("ingested_count", len(res.get("ingested_tickers") or res.get("ingested_stocks") or []))
         logger.info(f"Phase 1 result: {res.get('status')} ({ingested_n} equities).")
 
@@ -432,10 +531,11 @@ def run_morning_pipeline(
         if res.get("pending_count", 0) > 0 or ingested_n == 0:
             try:
                 from scripts.synthesize_pending_equities import synthesize_pending_cohort
+                pending_list = res.get("pending_tickers") or []
                 logger.info("Compiling pending equities queue for edition %s...", date_str)
                 synth_count = synthesize_pending_cohort(
-                    limit=15,
-                    tickers=res.get("pending_tickers") or None,
+                    limit=max(15, len(pending_list)),
+                    tickers=pending_list or None,
                 )
                 logger.info("Compiled %d pending equities for edition %s.", synth_count, date_str)
                 if isinstance(res, dict) and synth_count > 0:
@@ -452,7 +552,7 @@ def run_morning_pipeline(
         results,
         "stock_ingestion",
         f"mf_stock_ingest_{date_str}",
-        "Phase 1: Daily 15-Stock MF Constituent Ingestion",
+        "Phase 1: Daily MF Constituent Ingestion",
         _stock_ingestion,
         force=force,
     )
@@ -760,7 +860,7 @@ def main():
     parser = argparse.ArgumentParser(description="Multi-Asset Scheduled Pipeline Runner")
     parser.add_argument(
         "--mode",
-        choices=["auto", "evening", "morning", "nightly", "all"],
+        choices=["auto", "evening", "morning", "nightly", "mf-portfolios", "all"],
         default="auto",
         help="Pipeline mode to execute (default: auto from IST clock)",
     )
@@ -800,6 +900,10 @@ def main():
         elif effective_mode == "nightly":
             summary["nightly"] = run_nightly_pipeline(
                 date_str, force=args.force, respect_market_calendar=True
+            )
+        elif effective_mode == "mf-portfolios":
+            summary["mf_portfolios"] = run_monthly_mf_portfolio_pipeline(
+                date_str, force=args.force or True
             )
         elif effective_mode == "all":
             summary["evening"] = run_evening_harvest_pipeline(
