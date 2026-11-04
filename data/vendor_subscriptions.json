@@ -1,0 +1,311 @@
+{
+  "schema_version": "1.0",
+  "last_updated_ist": "2026-11-04",
+  "canonical_domain": "https://moatnomics.com",
+  "subscriptions": [
+    {
+      "id": "render",
+      "vendor": "Render",
+      "account_label": "Team: Moatnomics",
+      "pattern_status": "CONFIRMED",
+      "billing_cycle": "monthly_arrears",
+      "anchor_day": 3,
+      "billing_period_note": "Calendar-month arrears (1st-end of month), auto-charged on 3rd (US) / 3rd-4th (IST) of following month",
+      "last_paid_date": "2026-11-03",
+      "last_paid_period_end": "2026-10-31",
+      "last_paid_amount": "$25.93",
+      "last_invoice_ref": "Inv BWIGQNGT-0001 / Rcpt 2479-3933",
+      "estimated_monthly_cost": "$44.00-$50.00/mo ($25.00/mo if Workspace downgraded to Hobby)",
+      "payment_method": "Visa •••• 3275",
+      "billing_url": "https://dashboard.render.com/billing",
+      "billable_line_items": [
+        "Workspace Subscription (Qty 1: $14.57 Oct prorated; $19-$25/mo full rate)",
+        "Servers - 1 instance (699h 11m Oct: $11.36; Standard 2 GB RAM / 1 vCPU @ $25.00/mo)"
+      ],
+      "project_workloads": [
+        "stock-research-app FastAPI/Uvicorn production web server",
+        "In-container failover background schedulers (ENABLE_BACKGROUND_SCHEDULERS=1)",
+        "Git-push CI build (verify_reality_audit.py + pytest) & moatnomics.com custom TLS"
+      ]
+    },
+    {
+      "id": "aws_lightsail",
+      "vendor": "AWS (Amazon Lightsail)",
+      "account_label": "Region: ap-southeast-2 (Sydney)",
+      "pattern_status": "UNCONFIRMED",
+      "billing_cycle": "monthly_arrears",
+      "anchor_day": 3,
+      "expected_window_days": [1, 6],
+      "billing_period_note": "Calendar-month arrears (1st-end of month), typically charged 2nd-5th of following month (provisioned 2026-10-10)",
+      "last_paid_date": null,
+      "last_paid_period_end": null,
+      "last_paid_amount": null,
+      "last_invoice_ref": null,
+      "estimated_monthly_cost": "~$5.00/mo",
+      "payment_method": "TBD (Verify from Oct/Nov AWS invoice)",
+      "billing_url": "https://console.aws.amazon.com/billing/home",
+      "billable_line_items": [
+        "Amazon Lightsail Linux IPv4 instance bundle (~$5.00/mo)",
+        "Dedicated Static IPv4 13.54.76.134 ($0 while attached to running instance; $3.65/mo if detached)"
+      ],
+      "project_workloads": [
+        "HTTP forward proxy (:8888) providing SEBI-compliant static IP egress (SMARTAPI_PROXY_URL) for Angel One SmartAPI"
+      ]
+    },
+    {
+      "id": "gcp_vertex",
+      "vendor": "Google Cloud Platform",
+      "account_label": "Vertex AI + OAuth",
+      "pattern_status": "UNCONFIRMED",
+      "billing_cycle": "monthly_arrears",
+      "anchor_day": 2,
+      "expected_window_days": [1, 5],
+      "billing_period_note": "Calendar-month postpay (1st-end of month), typically charged 1st-3rd of following month (Vertex live 2026-10-28)",
+      "last_paid_date": null,
+      "last_paid_period_end": null,
+      "last_paid_amount": null,
+      "last_invoice_ref": null,
+      "estimated_monthly_cost": "Metered Pay-As-You-Go (Soft cap GEMINI_MONTHLY_BUDGET_USD=$20.00)",
+      "payment_method": "TBD (Verify from GCP Billing invoice)",
+      "billing_url": "https://console.cloud.google.com/billing",
+      "billable_line_items": [
+        "Vertex AI Postpay (gemini-3.8-flash & gemini-3.5-flash-lite tokens + Google Search Grounding)",
+        "Generative Language API (AI Studio Batch/Flex 50%-discount fallback, if invoked)",
+        "Google Identity / OAuth 2.0 ($0 — /auth/google user & admin sign-in)"
+      ],
+      "project_workloads": [
+        "Daily 15-stock cohort synthesis, Mutual Fund look-through audits, on-demand /api/generate, & Research Desk Copilot"
+      ]
+    },
+    {
+      "id": "supabase",
+      "vendor": "Supabase",
+      "account_label": "Project: omswdxrtzrvlszkidssh (ap-southeast-1)",
+      "pattern_status": "UNCONFIRMED",
+      "billing_cycle": "monthly_anchor",
+      "anchor_day": null,
+      "expected_window_days": [1, 31],
+      "billing_period_note": "Monthly org anchor day (confirm Free $0 vs. Pro $25/mo tier & exact billing day; repo init 2026-09-01)",
+      "last_paid_date": null,
+      "last_paid_period_end": null,
+      "last_paid_amount": null,
+      "last_invoice_ref": null,
+      "estimated_monthly_cost": "$0/mo (Free <=500 MB) or $25.00/mo (Pro 8 GB)",
+      "payment_method": "TBD (Verify in Supabase Org Billing)",
+      "billing_url": "https://supabase.com/dashboard/org/_/billing",
+      "billable_line_items": [
+        "Organization Plan (Free $0/mo or Pro $25/mo)",
+        "Compute Add-on (Micro/Small, if enabled)"
+      ],
+      "project_workloads": [
+        "Primary Cloud PostgreSQL (18 production tables, ap-southeast-1 Singapore)",
+        "Supavisor Connection Pooler (:5432 session mode)",
+        "PostgREST HTTPS API (cloud-to-local audit sync & RLS system_settings)",
+        "GoTrue Auth (Email Magic Link / 6-digit OTP + Google OAuth PKCE callback)"
+      ]
+    },
+    {
+      "id": "perplexity_api",
+      "vendor": "Perplexity API",
+      "account_label": "Sonar Search Failover",
+      "pattern_status": "UNCONFIRMED",
+      "billing_cycle": "prepaid_balance",
+      "anchor_day": null,
+      "expected_window_days": [],
+      "billing_period_note": "Prepaid credit balance (confirm current credit balance & whether Auto-Top-Up is enabled)",
+      "last_paid_date": null,
+      "last_paid_period_end": null,
+      "last_paid_amount": null,
+      "last_invoice_ref": null,
+      "estimated_monthly_cost": "~$0.00/mo standby (top up when balance < $5)",
+      "payment_method": "TBD (Verify in Perplexity API portal)",
+      "billing_url": "https://www.perplexity.ai/settings/api",
+      "billable_line_items": [
+        "Prepaid API Credits — Sonar / Agent API (/v1/responses)"
+      ],
+      "project_workloads": [
+        "Standby grounded web-search synthesis failover circuit (zero daily burn while Vertex AI succeeds)"
+      ]
+    },
+    {
+      "id": "cloudflare_registrar",
+      "vendor": "Cloudflare Registrar",
+      "account_label": "Domain: moatnomics.com",
+      "pattern_status": "CONFIRMED",
+      "billing_cycle": "annual",
+      "anchor_month": 10,
+      "anchor_day": 13,
+      "auto_renew_lead_days": 30,
+      "billing_period_note": "Annual on Oct 13 (Cloudflare auto-renew triggers ~30 days prior on Sep 13)",
+      "last_paid_date": "2026-10-13",
+      "last_paid_period_end": "2027-10-13",
+      "last_paid_amount": "At-cost .com (~$10.44/yr)",
+      "last_invoice_ref": "Initial 1-year registration",
+      "estimated_monthly_cost": "~$10.44/yr (~$0.87/mo amortized)",
+      "payment_method": "Cloudflare card on file",
+      "billing_url": "https://dash.cloudflare.com/?to=/:account/domains",
+      "billable_line_items": [
+        ".com Domain Registration — moatnomics.com (wholesale at-cost annual renewal)"
+      ],
+      "project_workloads": [
+        "Canonical production domain registration for moatnomics.com"
+      ]
+    }
+  ],
+  "free_tier_accounts": [
+    {
+      "id": "cloudflare_edge",
+      "vendor": "Cloudflare Edge",
+      "billing_model": "Free Website Plan ($0/mo)",
+      "quota_ceiling": "Standard CDN/WAF & Cache Rules",
+      "portal_url": "https://dash.cloudflare.com",
+      "project_workloads": [
+        "Authoritative DNS (magnolia.ns.cloudflare.com, troy.ns.cloudflare.com)",
+        "Reverse proxy, CDN edge caching & DDoS/bot WAF",
+        "Email click/open tracking CNAME (links.moatnomics.com -> Resend)"
+      ]
+    },
+    {
+      "id": "razorpay",
+      "vendor": "Razorpay",
+      "billing_model": "Per-Transaction TDR 2.0% (₹0/mo fixed)",
+      "quota_ceiling": "25 req/s API limit; ~3.0-3.5% FX fee on international cards",
+      "portal_url": "https://dashboard.razorpay.com",
+      "project_workloads": [
+        "Live Checkout orders (/api/create-order, /api/verify-payment)",
+        "Live payment webhooks (/api/razorpay-webhook)",
+        "Multi-currency pricing, Pro pass & credit fulfillment, and process_refund()"
+      ]
+    },
+    {
+      "id": "angel_one",
+      "vendor": "Angel One SmartAPI",
+      "billing_model": "Free Broker-Bundled API (₹0/mo)",
+      "quota_ceiling": "10 req/s quotes, 3 req/s EOD candles; keep demat MPIN/TOTP active",
+      "portal_url": "https://smartapi.angelbroking.com",
+      "project_workloads": [
+        "Primary BSE/NSE live quotes & 5-level Level-2 order depth",
+        "1-year ONE_DAY historical EOD candles (get_eod_summary for 52W range, 50-DMA, 200-DMA)",
+        "Dynamic NSE/BSE scrip token resolver (search_scrip_token)"
+      ]
+    },
+    {
+      "id": "resend",
+      "vendor": "Resend",
+      "billing_model": "Free Tier ($0/mo)",
+      "quota_ceiling": "100 emails/day (3,000/mo) — Pro is $20/mo if exceeded",
+      "portal_url": "https://resend.com/settings/billing",
+      "project_workloads": [
+        "7-Asset Day-End Market Wrap subscriber newsletter (desk@moatnomics.com)",
+        "Two-way customer support ticket replies (/admin?tab=tickets)",
+        "Daily 9:00 PM IST subscription & optimization reminder (1 email/day)",
+        "Custom SMTP fallback (primary OTPs route via Supabase GoTrue first)"
+      ]
+    },
+    {
+      "id": "better_stack",
+      "vendor": "Better Stack",
+      "billing_model": "Free / Starter Tier ($0/mo)",
+      "quota_ceiling": "Monthly log retention & ingestion cap (is_test_environment() blocks test logs)",
+      "portal_url": "https://telemetry.betterstack.com",
+      "project_workloads": [
+        "Logtail centralized container & pipeline structured IST logs (s2808842.us-west-2a.betterstackdata.com)",
+        "Production /health HTTP uptime monitor (uptime.betterstack.com)",
+        "Scheduled pipeline cron heartbeat & incident alerts (BETTER_STACK_HEARTBEAT_URL)"
+      ]
+    },
+    {
+      "id": "github",
+      "vendor": "GitHub",
+      "billing_model": "Free / Included Actions ($0/mo)",
+      "quota_ceiling": "Monthly Actions runner minutes (2,000 free min/mo on private repos)",
+      "portal_url": "https://github.com/settings/billing",
+      "project_workloads": [
+        "Git repository hosting (main & dev branches)",
+        "GitHub Actions scheduled multi-asset pipeline (19:30, 23:15, 08:00 IST) & 21:00 IST subscription reminder",
+        "Encrypted Actions Secrets store (15 cloud secrets)"
+      ]
+    }
+  ],
+  "optimizations": [
+    {
+      "id": "P1",
+      "status": "OPEN",
+      "service": "Render Workspace Plan",
+      "current_state": "Paid Pro Workspace ($14.57 prorated in Oct -> $19-$25/mo full rate) + Standard 2 GB Server ($25/mo) = ~$44-$50/mo",
+      "recommendation": "Downgrade Workspace Plan to Hobby ($0/mo) while keeping the paid Standard 2 GB instance ($25/mo).",
+      "cost_impact": "Saves $19-$25/mo ($228-$300/yr) — cuts upcoming Dec Render bill nearly in half.",
+      "tradeoff": "Zero CPU/RAM loss. Loses multi-user seats, >1 instance autoscaling, and Render native HTTP log retention (already handled by Better Stack Logtail). Re-upgrading takes 15s during a surge."
+    },
+    {
+      "id": "P2",
+      "status": "OPEN",
+      "service": "Cloudflare Anonymous Edge Cache",
+      "current_state": "Free plan active; uncached anonymous GET hits reach Render & Supabase directly",
+      "recommendation": "Keep a permanent 30s-60s Anonymous SSR Cache Rule active (cookie-free GET requests excluding /api/, /auth/, /admin, /contact).",
+      "cost_impact": "$0/mo (shields Render Hobby bandwidth cap and prevents egress overages).",
+      "tradeoff": "~5-8x faster TTFB in India (<50ms from Mumbai/Chennai POPs vs ~400ms origin) + ~80% lower Render CPU & Supabase reads. Logged-in users bypass cache automatically via user_session_token."
+    },
+    {
+      "id": "P3",
+      "status": "OPEN",
+      "service": "AWS Lightsail Static IP Proxy",
+      "current_state": "13.54.76.134:8888 runs in ap-southeast-2 (Sydney) at ~$5/mo, hairpinning Indian market traffic",
+      "recommendation": "Re-create the $5/mo Lightsail proxy in ap-south-1 (Mumbai), whitelist the new static IP in Angel One SmartAPI, update SMARTAPI_PROXY_URL, then delete the Sydney instance AND release its detached static IP.",
+      "cost_impact": "$0 net change (still $5/mo; releasing old IP avoids $3.65/mo unattached IP fee).",
+      "tradeoff": "~3x faster live quote & EOD candle round-trips (<10ms Mumbai-to-NSE/BSE vs ~150ms+ Sydney hairpin)."
+    },
+    {
+      "id": "P4",
+      "status": "OPEN",
+      "service": "Render Build Pipeline Minutes",
+      "current_state": "render.yaml runs verify_reality_audit.py + full pytest (~3.5 min) on every git push",
+      "recommendation": "Use [skip render] on docs/ops-only commits, and offload full pytest to GitHub Actions if moving Render Workspace to Hobby (500 build min/mo cap).",
+      "cost_impact": "Prevents paid Render build-minute overages.",
+      "tradeoff": "~4x faster production container deploys (~45s vs ~3.5 min) while preserving full test gating."
+    },
+    {
+      "id": "P5",
+      "status": "OPEN",
+      "service": "Supabase Plan Sizing",
+      "current_state": "18-table multi-asset database is currently ~83 MB (well inside Free tier's 500 MB limit)",
+      "recommendation": "Verify if org is paying $25/mo for Pro early; Free tier ($0/mo) supports <=500 MB + Supavisor Pooler and never pauses because 3x daily crons keep the DB active.",
+      "cost_impact": "Saves $25/mo ($300/yr) if currently on Pro before crossing ~350-400 MB.",
+      "tradeoff": "Free tier caps direct conns at 60 (200 pooled, already configured) and omits cloud PITR (mitigated by local ./run.sh sync-down + backup)."
+    },
+    {
+      "id": "P6",
+      "status": "OPEN",
+      "service": "Google Cloud Vertex AI Search Grounding",
+      "current_state": "Flash token spend is pennies, whereas Google Search Grounding bills ~$35 / 1,000 grounded prompts once free credits end",
+      "recommendation": "Keep Search Grounding strictly scoped to 14-day/material Equity Dossier syntheses; keep MF look-throughs, surgical valuation refreshes, and Research Desk Copilot grounded on DB context without Search Grounding tools.",
+      "cost_impact": "Keeps total LLM spend well inside $5-$20/mo budget cap.",
+      "tradeoff": "Zero analytical quality loss since MF holdings, BSE headers, and DCF/DuPont figures are deterministically pre-computed."
+    }
+  ],
+  "payment_history": [
+    {
+      "date_paid": "2026-10-13",
+      "vendor": "Cloudflare Registrar",
+      "invoice_ref": "Initial Registration",
+      "period_covered": "2026-10-13 -> 2027-10-13",
+      "items": [
+        "moatnomics.com (.com 1-year domain registration)"
+      ],
+      "total_paid": "At-cost (~$10.44)",
+      "payment_method": "Cloudflare card on file"
+    },
+    {
+      "date_paid": "2026-11-03",
+      "vendor": "Render (Moatnomics)",
+      "invoice_ref": "Inv BWIGQNGT-0001 / Rcpt 2479-3933",
+      "period_covered": "2026-10-01 -> 2026-10-31",
+      "items": [
+        "Workspace Subscription (Qty 1): $14.57",
+        "Servers - 699h 11m 11s - 1 instance: $11.36"
+      ],
+      "total_paid": "$25.93",
+      "payment_method": "Visa •••• 3275"
+    }
+  ]
+}

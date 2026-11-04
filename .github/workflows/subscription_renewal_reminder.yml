@@ -1,0 +1,68 @@
+name: Subscription Renewal & Optimization Reminder
+
+on:
+  schedule:
+    # Daily at 21:00 IST / 9:00 PM IST (15:30 UTC)
+    - cron: "30 15 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Optional IST reference date (YYYY-MM-DD)"
+        required: false
+        type: string
+      force:
+        description: "Bypass 20h distributed daily email lease"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: moatnomics-subscription-reminder
+  cancel-in-progress: false
+
+jobs:
+  send-reminder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Dispatch 9:00 PM IST Subscription & Optimization Reminder
+        env:
+          TZ: Asia/Kolkata
+          PYTHONPATH: ${{ github.workspace }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          SMARTAPI_PROXY_URL: ${{ secrets.SMARTAPI_PROXY_URL }}
+          ANGEL_API_KEY: ${{ secrets.ANGEL_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ENABLE_LIVE_EMAIL_DISPATCH: "1"
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          ADMIN_ALERT_EMAIL: ${{ secrets.ADMIN_ALERT_EMAIL }}
+        run: |
+          ARGS="--send-email"
+          if [ -n "${{ inputs.date }}" ]; then
+            ARGS="$ARGS --date ${{ inputs.date }}"
+          fi
+          if [ "${{ inputs.force }}" = "true" ]; then
+            ARGS="$ARGS --force"
+          fi
+          python scripts/send_subscription_reminder.py $ARGS
