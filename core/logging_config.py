@@ -6,7 +6,7 @@ Centralized Logging & Better Stack Telemetry Ingestion Architecture.
 Integrates Python standard library logging with Better Stack (Logtail) via
 LogtailHandler:
 - Ingesting Host: s2808842.us-west-2a.betterstackdata.com (or via BETTER_STACK_INGESTING_HOST)
-- Source Token: n9BuFhtn6SwGdLrRd4A8wFn6 (or via BETTER_STACK_SOURCE_TOKEN)
+- Source Token: configured via environment variable BETTER_STACK_SOURCE_TOKEN
 - Structured logging with custom context attributes (extra={'...': '...'})
 - StreamHandler for local console output with ISO timestamps
 - Clean flush on server shutdown (flush_betterstack_logs)
@@ -36,7 +36,7 @@ class _ISTLogFormatter(logging.Formatter):
 
 logger = logging.getLogger("equity_research.core.logging_config")
 
-DEFAULT_BETTER_STACK_SOURCE_TOKEN = "n9BuFhtn6SwGdLrRd4A8wFn6"
+DEFAULT_BETTER_STACK_SOURCE_TOKEN = None
 DEFAULT_BETTER_STACK_INGESTING_HOST = "s2808842.us-west-2a.betterstackdata.com"
 
 try:

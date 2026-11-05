@@ -190,16 +190,16 @@ def get_better_stack_config() -> dict:
     """
     token = get_secret(
         "BETTER_STACK_SOURCE_TOKEN",
-        get_secret("LOGTAIL_SOURCE_TOKEN", "n9BuFhtn6SwGdLrRd4A8wFn6")
+        get_secret("LOGTAIL_SOURCE_TOKEN", "")
     )
     host = get_secret(
         "BETTER_STACK_INGESTING_HOST",
         get_secret("LOGTAIL_INGESTING_HOST", "s2808842.us-west-2a.betterstackdata.com")
     )
-    if not host.startswith("http://") and not host.startswith("https://"):
+    if host and not host.startswith("http://") and not host.startswith("https://"):
         host = f"https://{host}"
     return {
-        "source_token": str(token).strip(),
-        "host": str(host).strip(),
+        "source_token": str(token).strip() if token else "",
+        "host": str(host).strip() if host else "",
     }
 

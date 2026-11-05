@@ -108,7 +108,7 @@
   * Enforces `_ISTLogFormatter(logging.Formatter)` across console and application handlers so every log entry emits `YYYY-MM-DD HH:MM:SS,mmm IST` (`Asia/Kolkata`, `UTC+05:30`) regardless of container or host OS timezone (`Dockerfile` also pins `ENV TZ=Asia/Kolkata`, and `run.sh backup` stamps `backups/` directories using `TZ=Asia/Kolkata`).
   * Seamlessly routes Python standard library `logging` output to Better Stack (Logtail) via `logtail.LogtailHandler`.
   * **Ingesting Host:** Configured to `s2808842.us-west-2a.betterstackdata.com` (or configurable via `BETTER_STACK_INGESTING_HOST` / `LOGTAIL_INGESTING_HOST`).
-  * **Source Token:** Secured via `n9BuFhtn6SwGdLrRd4A8wFn6` (or configurable via `BETTER_STACK_SOURCE_TOKEN` / `LOGTAIL_SOURCE_TOKEN`).
+  * **Source Token:** Configured via `BETTER_STACK_SOURCE_TOKEN` / `LOGTAIL_SOURCE_TOKEN` environment secrets.
   * **Namespace Routing:** Attached to the `equity_research` namespace and the root logger, automatically transmitting events from web routes, background schedulers, multi-asset engines, and admin copilots.
   * **Structured Logging Context:** Full support for `logger.info("...", extra={"key": "value"})` conforming to the official Better Stack integration guide.
   * **FastAPI Lifespan Integration:** Initialized on startup in `web/main.py`; synchronous flush on shutdown (`flush_betterstack_logs`) prevents in-flight log drops on container restarts.

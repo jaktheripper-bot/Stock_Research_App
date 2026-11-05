@@ -30,11 +30,12 @@ class TestBetterStackLogging(unittest.TestCase):
         lc._LOGGING_INITIALIZED = False
 
     def test_get_better_stack_config_defaults(self):
-        """Verifies default credentials match specified Better Stack configuration."""
-        cfg = get_better_stack_config()
-        self.assertEqual(cfg["source_token"], DEFAULT_BETTER_STACK_SOURCE_TOKEN)
-        self.assertTrue(cfg["host"].endswith(DEFAULT_BETTER_STACK_INGESTING_HOST))
-        self.assertTrue(cfg["host"].startswith("https://"))
+        """Verifies default credentials when no token environment variable is set."""
+        with patch.dict(os.environ, {"BETTER_STACK_SOURCE_TOKEN": "", "LOGTAIL_SOURCE_TOKEN": ""}):
+            cfg = get_better_stack_config()
+            self.assertEqual(cfg["source_token"], "")
+            self.assertTrue(cfg["host"].endswith(DEFAULT_BETTER_STACK_INGESTING_HOST))
+            self.assertTrue(cfg["host"].startswith("https://"))
 
     def test_get_better_stack_config_env_override(self):
         """Verifies environment variables override default credentials."""
