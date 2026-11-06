@@ -8,12 +8,13 @@ Provides:
 """
 
 import os
+import asyncio
 import json
 import logging
 import urllib.parse
 import hashlib
 import requests
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 from pydantic import BaseModel
 
 from fastapi import APIRouter, Request, HTTPException
@@ -29,9 +30,13 @@ from core.db.telemetry import (
     extract_geo,
     is_excluded_telemetry_event,
 )
+from core.db.connection import AuthoritativeDatabaseUnavailable, is_hosted_production_runtime
+from core.billing.razorpay import captured_payment_terms
 from core.billing import (
     create_razorpay_order,
     process_successful_payment,
+    verify_webhook_signature,
+    fulfill_razorpay_order,
     RazorpayAuthError,
     RazorpayAPIError,
     SUPPORTED_CURRENCIES,
@@ -451,6 +456,43 @@ async def api_auth_signout():
 # ==============================================================================
 # Razorpay Billing Endpoints
 # ==============================================================================
+def _resolve_authenticated_billing_user(
+    request: Request,
+    claimed_user_id: Optional[str] = None,
+    claimed_email: Optional[str] = None,
+    *,
+    require_session: bool = True,
+) -> Tuple[str, str]:
+    """Resolves the authenticated billing principal, rejecting cross-user spoofing and unauthenticated order creation."""
+    from core.db.users import get_user_by_email
+
+    web_user = _get_current_web_user(request)
+    if not web_user:
+        admin_sess = _is_admin_authenticated(request)
+        if admin_sess and isinstance(admin_sess, dict) and admin_sess.get("email"):
+            admin_email = str(admin_sess["email"]).strip().lower()
+            web_user = get_user_by_email(admin_email)
+            if not web_user:
+                uid = f"usr_{admin_email.replace('@', '_at_').replace('.', '_')}"
+                web_user = get_or_create_user(user_id=uid, email=admin_email, full_name="Admin Console")
+
+    clean_claim = str(claimed_user_id or "").strip()
+    if web_user and web_user.get("id"):
+        session_uid = str(web_user["id"]).strip()
+        session_email = str(web_user.get("email") or "").strip()
+        if clean_claim and clean_claim != "guest_web_user" and clean_claim != session_uid:
+            raise HTTPException(
+                status_code=403,
+                detail="Billing request user_id does not match authenticated session.",
+            )
+        return session_uid, (session_email or str(claimed_email or "investor@example.com").strip())
+
+    if not require_session or (os.environ.get("TESTING") == "1" and not is_hosted_production_runtime()):
+        return (clean_claim or "guest_web_user"), (str(claimed_email or "").strip() or "investor@example.com")
+
+    raise HTTPException(status_code=401, detail="Authentication required to create billing orders.")
+
+
 @router.post("/api/create-order")
 async def api_create_order(payload: OrderRequest, request: Request):
     """
@@ -460,26 +502,19 @@ async def api_create_order(payload: OrderRequest, request: Request):
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
 
-    web_user = _get_current_web_user(request)
-    eff_user_id = (
-        payload.user_id
-        if (payload.user_id and payload.user_id != "guest_web_user")
-        else ((web_user.get("id") if web_user else None) or "guest_web_user")
-    )
-    eff_email = (
-        payload.email
-        if payload.email
-        else ((web_user.get("email") if web_user else None) or "investor@example.com")
+    eff_user_id, eff_email = await asyncio.to_thread(
+        _resolve_authenticated_billing_user, request, payload.user_id, payload.email
     )
 
     try:
-        order = create_razorpay_order(
+        order = await asyncio.to_thread(
+            create_razorpay_order,
             plan_id=payload.plan_id,
             amount_paise=payload.amount,
             currency=payload.currency or "INR",
             receipt=payload.receipt,
             user_id=eff_user_id,
-            user_email=eff_email
+            user_email=eff_email,
         )
         return json_response_with_cache({
             "order_id": order.get("order_id") or order.get("id"),
@@ -498,6 +533,8 @@ async def api_create_order(payload: OrderRequest, request: Request):
     except RazorpayAPIError as e:
         logger.error(f"Razorpay API failure: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    except AuthoritativeDatabaseUnavailable:
+        raise
     except ValueError as e:
         logger.error(f"Validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -526,20 +563,18 @@ async def api_verify_payment(payload: VerifyPaymentRequest, request: Request):
             detail="Missing required payment verification fields (order_id, payment_id, signature)."
         )
 
-    web_user = _get_current_web_user(request)
-    eff_user_id = (
-        payload.user_id
-        if (payload.user_id and payload.user_id != "guest_web_user")
-        else ((web_user.get("id") if web_user else None) or "guest_web_user")
+    eff_user_id, _ = await asyncio.to_thread(
+        lambda: _resolve_authenticated_billing_user(request, payload.user_id, None, require_session=False)
     )
 
     try:
-        ok, new_bal, inv_num, msg = process_successful_payment(
+        ok, new_bal, inv_num, msg = await asyncio.to_thread(
+            process_successful_payment,
             user_id=eff_user_id,
             plan_id=payload.plan_id or "single_pass",
             order_id=eff_order_id,
             payment_id=eff_payment_id,
-            signature=eff_signature
+            signature=eff_signature,
         )
         if not ok:
             raise HTTPException(
@@ -561,11 +596,59 @@ async def api_verify_payment(payload: VerifyPaymentRequest, request: Request):
             "new_balance": new_bal,
             "invoice_number": inv_num
         })
-    except HTTPException:
+    except (HTTPException, AuthoritativeDatabaseUnavailable):
         raise
     except Exception as e:
         logger.error(f"Error verifying payment: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/api/billing/webhook")
+async def api_razorpay_webhook(request: Request):
+    """
+    Server-to-server Razorpay Webhook endpoint (`payment.captured` / `order.paid`).
+    Verifies X-Razorpay-Signature against raw request bytes and fulfills the order
+    strictly from the persisted `billing_order_intents` record (never trusting event notes).
+    """
+    signature = request.headers.get("X-Razorpay-Signature", "")
+    raw_body = await request.body()
+    if not verify_webhook_signature(raw_body, signature):
+        raise HTTPException(status_code=400, detail="Invalid Razorpay webhook signature.")
+
+    try:
+        event = json.loads(raw_body.decode("utf-8"))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Malformed webhook JSON.") from exc
+
+    event_type = event.get("event")
+    if event_type not in ("payment.captured", "order.paid"):
+        return json_response_with_cache({"status": "ignored", "event": event_type})
+
+    payment_entity = ((event.get("payload") or {}).get("payment") or {}).get("entity") or {}
+    order_id = str(payment_entity.get("order_id") or "").strip()
+    payment_id = str(payment_entity.get("id") or "").strip()
+    terms = captured_payment_terms(payment_entity, order_id=order_id, payment_id=payment_id)
+    if terms is None:
+        raise HTTPException(status_code=400, detail="Incomplete or uncaptured payment entity in webhook.")
+    captured_amount, captured_currency = terms
+
+    ok, new_bal, inv_num, msg = await asyncio.to_thread(
+        fulfill_razorpay_order,
+        order_id=order_id,
+        payment_id=payment_id,
+        verified_amount_paise=captured_amount,
+        verified_currency=captured_currency,
+    )
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+
+    return json_response_with_cache({
+        "status": "fulfilled",
+        "order_id": order_id,
+        "payment_id": payment_id,
+        "invoice_number": inv_num,
+        "new_balance": new_bal,
+    })
 
 
 # ==============================================================================

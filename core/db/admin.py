@@ -7,6 +7,8 @@ Dual-binding support for PostgreSQL (Supabase) and local SQLite.
 """
 
 import os
+import math
+import time
 import uuid
 import json
 import logging
@@ -14,15 +16,137 @@ from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime, timezone
 
 from core.db.connection import (
+    AuthoritativeDatabaseUnavailable,
     init_db,
     get_db_connection,
     get_supabase_url,
     get_placeholder,
+    is_postgres_connection,
     IST,
     now_ist_iso,
 )
 
 logger = logging.getLogger("equity_research.core.db.admin")
+
+# Policy limits for administrative remedial credit grants:
+# - Single grant capped at 10.0 credits (matches largest standard retail on-demand pack: portfolio_10pack).
+# - Per-target 24-hour cumulative cap of 10.0 credits prevents repeated micro-grants to the same account.
+# - Per-actor 24-hour cumulative cap of 25.0 credits bounds daily remedial issuance across all tickets.
+MAX_SINGLE_ADMIN_CREDIT_GRANT = 10.0
+MAX_TARGET_DAILY_CREDIT_GRANT = 10.0
+MAX_ACTOR_DAILY_CREDIT_GRANT = 25.0
+PROPOSAL_TTL_SECONDS = 900  # 15 minutes
+
+
+def parse_strict_credit_amount(raw_amount: Any, *, max_allowed: float = MAX_SINGLE_ADMIN_CREDIT_GRANT) -> float:
+    """Validates that a credit grant amount is a finite positive number within policy bounds without clipping."""
+    if isinstance(raw_amount, bool) or raw_amount is None:
+        raise ValueError("Credits amount is required and must be a finite number.")
+    try:
+        val = float(raw_amount)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Invalid credits amount.") from exc
+    if not math.isfinite(val):
+        raise ValueError("Credits amount must be finite.")
+    rounded = round(val, 2)
+    if abs(val - rounded) > 1e-6:
+        raise ValueError("Credits amount may have at most 2 decimal places.")
+    if rounded < 0.1 or rounded > max_allowed:
+        raise ValueError(f"Credits amount must be between 0.1 and {max_allowed:.1f}.")
+    return rounded
+
+
+def store_admin_action_proposal(
+    actor_email: str,
+    action_type: str,
+    payload: Dict[str, Any],
+    *,
+    ttl_seconds: int = PROPOSAL_TTL_SECONDS,
+) -> str:
+    """Persists a server-side action proposal bound to the authenticated administrator."""
+    clean_actor = (actor_email or "").strip().lower()
+    if not clean_actor:
+        raise ValueError("Authenticated admin actor_email is required to create a proposal.")
+    init_db()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    p = "%s" if is_postgres_connection(conn) else "?"
+    proposal_id = f"prop_{uuid.uuid4().hex}"
+    now_epoch = int(time.time())
+    expires_epoch = now_epoch + int(ttl_seconds)
+    try:
+        cur.execute(
+            f"""
+            INSERT INTO admin_action_proposals
+                (proposal_id, actor_email, action_type, payload_json, status, created_at_epoch, expires_at_epoch)
+            VALUES ({p}, {p}, {p}, {p}, 'PENDING', {p}, {p})
+            """,
+            (proposal_id, clean_actor, action_type, json.dumps(payload, sort_keys=True), now_epoch, expires_epoch),
+        )
+        conn.commit()
+        return proposal_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+
+def consume_admin_action_proposal(
+    conn,
+    proposal_id: str,
+    actor_email: str,
+) -> Dict[str, Any]:
+    """Atomically locks, validates, and consumes a PENDING proposal inside the caller's transaction."""
+    clean_id = (proposal_id or "").strip()
+    clean_actor = (actor_email or "").strip().lower()
+    if not clean_id or not clean_actor:
+        raise PermissionError("A valid proposal_id and authenticated administrator are required.")
+
+    cur = conn.cursor()
+    use_pg = is_postgres_connection(conn)
+    p = "%s" if use_pg else "?"
+    now_epoch = int(time.time())
+    try:
+        lock_clause = " FOR UPDATE" if use_pg else ""
+        cur.execute(
+            f"""
+            SELECT proposal_id, actor_email, action_type, payload_json, status, expires_at_epoch
+            FROM admin_action_proposals
+            WHERE proposal_id = {p}{lock_clause}
+            """,
+            (clean_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise LookupError("Action proposal not found or was never registered by the server.")
+        _, stored_actor, stored_action, payload_json, status, expires_at = row
+        if stored_actor.strip().lower() != clean_actor:
+            raise PermissionError("This action proposal belongs to a different administrator.")
+        if status != "PENDING":
+            raise ValueError("This action proposal has already been executed or expired.")
+        if int(expires_at) < now_epoch:
+            raise ValueError("This action proposal has expired. Request a fresh proposal.")
+
+        cur.execute(
+            f"""
+            UPDATE admin_action_proposals
+            SET status = 'EXECUTED', consumed_at_epoch = {p}
+            WHERE proposal_id = {p} AND status = 'PENDING'
+            """,
+            (now_epoch, clean_id),
+        )
+        if cur.rowcount != 1:
+            raise ValueError("This action proposal has already been consumed.")
+        return {
+            "proposal_id": clean_id,
+            "actor_email": stored_actor,
+            "action_type": stored_action,
+            "payload": json.loads(payload_json),
+        }
+    finally:
+        cur.close()
 
 DEFAULT_OWNER_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@moatnomics.com")
 AUTHORIZED_OWNER_EMAILS = {os.environ.get("ADMIN_EMAIL", "admin@moatnomics.com"), "admin@moatnomics.com"}
@@ -501,7 +625,8 @@ def admin_grant_user_credits(
     resolve_ticket: bool = True,
     auto_provision: bool = False,
     ip_address: Optional[str] = None,
-    user_agent: Optional[str] = None
+    user_agent: Optional[str] = None,
+    connection=None,
 ) -> Dict[str, Any]:
     """
     Atomically grants remedial or promotional research credits to a user account.
@@ -521,48 +646,124 @@ def admin_grant_user_credits(
         return {"success": False, "error": "Target user email or user ID is required."}
 
     try:
-        credits_val = round(float(credits_amount), 2)
-        if credits_val <= 0:
-            return {"success": False, "error": "Credits amount must be greater than zero."}
-    except (ValueError, TypeError):
-        return {"success": False, "error": "Invalid credits amount."}
+        credits_val = parse_strict_credit_amount(credits_amount, max_allowed=MAX_SINGLE_ADMIN_CREDIT_GRANT)
+    except ValueError as val_err:
+        return {"success": False, "error": str(val_err)}
 
     clean_reason = (reason_code or "TASK_REMEDY").strip().upper().replace(" ", "_")
     clean_ticket = (ticket_id or "").strip() if ticket_id else None
     clean_ticker = (task_ticker or "").strip().upper() if task_ticker else None
 
-    init_db()
-    conn = get_db_connection()
+    owns_conn = connection is None
+    if owns_conn:
+        init_db()
+        conn = get_db_connection()
+    else:
+        conn = connection
     cursor = conn.cursor()
-    p = get_placeholder()
-    supabase_url = get_supabase_url()
+    use_pg = is_postgres_connection(conn)
+    p = "%s" if use_pg else "?"
 
     try:
-        # Step 0: Locate target user account
+        if owns_conn and not use_pg:
+            cursor.execute("BEGIN IMMEDIATE")
+
+        # Enforce 24-hour cumulative target and actor grant limits from admin_audit_log
+        if use_pg:
+            cursor.execute(
+                "SELECT details, admin_email FROM admin_audit_log WHERE action = 'GRANT_USER_CREDITS' AND created_at >= (now() - INTERVAL '24 hours') FOR UPDATE;"
+            )
+        else:
+            cursor.execute(
+                "SELECT details, admin_email FROM admin_audit_log WHERE action = 'GRANT_USER_CREDITS' AND created_at >= datetime('now', '-24 hours');"
+            )
+        recent_rows = cursor.fetchall()
+        actor_24h_total = 0.0
+        target_24h_total = 0.0
+        for det_raw, row_admin in recent_rows:
+            try:
+                det = json.loads(det_raw) if det_raw else {}
+            except Exception as det_err:
+                logger.debug("Skipping malformed admin_audit_log details JSON: %s", det_err)
+                det = {}
+            granted = float(det.get("credits_granted") or 0.0)
+            row_email = str(det.get("user_email") or "").strip().lower()
+            row_uid = str(det.get("user_id") or "").strip().lower()
+            if clean_target in (row_email, row_uid):
+                target_24h_total += granted
+            if str(row_admin or "").strip().lower() == clean_admin:
+                actor_24h_total += granted
+
+        if target_24h_total + credits_val > MAX_TARGET_DAILY_CREDIT_GRANT + 1e-6:
+            if owns_conn:
+                conn.rollback()
+            return {
+                "success": False,
+                "error": f"24h target grant limit exceeded ({target_24h_total:.1f} already granted; max {MAX_TARGET_DAILY_CREDIT_GRANT:.1f}/24h).",
+            }
+        if actor_24h_total + credits_val > MAX_ACTOR_DAILY_CREDIT_GRANT + 1e-6:
+            if owns_conn:
+                conn.rollback()
+            return {
+                "success": False,
+                "error": f"24h administrator grant limit exceeded ({actor_24h_total:.1f} already granted; max {MAX_ACTOR_DAILY_CREDIT_GRANT:.1f}/24h).",
+            }
+
+        # Step 0: Locate target user account (in-transaction provisioning avoids nested SQLite write locks)
+        lock_user = " FOR UPDATE" if use_pg else ""
         cursor.execute(
-            f"SELECT id, email, full_name, credits_balance FROM user_accounts WHERE LOWER(email) = LOWER({p}) OR id = {p} LIMIT 1;",
+            f"SELECT id, email, full_name, credits_balance FROM user_accounts WHERE LOWER(email) = LOWER({p}) OR id = {p} LIMIT 1{lock_user};",
             (clean_target, clean_target)
         )
         user_row = cursor.fetchone()
         if not user_row:
-            # Auto-provision if granting to self, authorized bootstrap owner, or explicit auto_provision requested
             should_auto_provision = auto_provision or (clean_target == clean_admin) or (clean_target in get_authorized_bootstrap_emails())
             if should_auto_provision and ("@" in clean_target or clean_target.startswith("usr_")):
                 import re
-                from core.db.users import get_or_create_user
                 gen_user_id = f"usr_{re.sub(r'[^a-zA-Z0-9]', '_', clean_target.lower())[:32]}"
                 gen_user_email = clean_target if "@" in clean_target else f"{clean_target}@user.local"
                 gen_user_name = clean_target.split("@")[0].replace(".", " ").title() if "@" in clean_target else "Investor"
-                new_user = get_or_create_user(user_id=gen_user_id, email=gen_user_email, full_name=gen_user_name)
-                if new_user:
-                    cursor.execute(
-                        f"SELECT id, email, full_name, credits_balance FROM user_accounts WHERE id = {p} OR LOWER(email) = LOWER({p}) LIMIT 1;",
-                        (new_user.get("id"), gen_user_email)
-                    )
-                    user_row = cursor.fetchone()
+                cursor.execute(
+                    f"""
+                    INSERT INTO user_accounts (id, email, full_name, credits_balance, subscription_tier)
+                    VALUES ({p}, {p}, {p}, 0.0, 'free')
+                    ON CONFLICT DO NOTHING;
+                    """,
+                    (gen_user_id, gen_user_email, gen_user_name),
+                )
+                cursor.execute(
+                    f"SELECT id, email, full_name, credits_balance FROM user_accounts WHERE id = {p} OR LOWER(email) = LOWER({p}) LIMIT 1{lock_user};",
+                    (gen_user_id, gen_user_email)
+                )
+                user_row = cursor.fetchone()
 
         if not user_row:
+            if owns_conn:
+                conn.rollback()
             return {"success": False, "error": f"User '{target_user_identifier}' not found in registered accounts."}
+
+        # Re-check 24h target limit against resolved canonical user_id and user_email
+        resolved_uid = str(user_row[0]).strip().lower()
+        resolved_email = str(user_row[1]).strip().lower()
+        if clean_target not in (resolved_uid, resolved_email):
+            target_24h_total = 0.0
+            for det_raw, _ in recent_rows:
+                try:
+                    det = json.loads(det_raw) if det_raw else {}
+                except Exception as det_err:
+                    logger.debug("Skipping malformed admin_audit_log details JSON: %s", det_err)
+                    det = {}
+                if resolved_uid == str(det.get("user_id") or "").strip().lower() or resolved_email == str(det.get("user_email") or "").strip().lower():
+                    target_24h_total += float(det.get("credits_granted") or 0.0)
+            if target_24h_total + credits_val > MAX_TARGET_DAILY_CREDIT_GRANT + 1e-6:
+                if owns_conn:
+                    conn.rollback()
+                return {
+                    "success": False,
+                    "error": f"24h target grant limit exceeded ({target_24h_total:.1f} already granted; max {MAX_TARGET_DAILY_CREDIT_GRANT:.1f}/24h).",
+                }
+
+
 
         user_id = user_row[0]
         user_email = user_row[1]
@@ -582,7 +783,7 @@ def admin_grant_user_credits(
         inv_num = f"INV-GRANT-{uuid.uuid4().hex[:8].upper()}"
         pack_type = f"ADMIN_GRANT_{clean_reason}"
 
-        if supabase_url:
+        if use_pg:
             cursor.execute(
                 f"""
                 INSERT INTO credit_transactions (
@@ -641,7 +842,7 @@ def admin_grant_user_credits(
         }
         details_json = json.dumps(audit_details, ensure_ascii=False)
 
-        if supabase_url:
+        if use_pg:
             cursor.execute(
                 f"""
                 INSERT INTO admin_audit_log (id, admin_email, action, target_type, target_id, details, ip_address, user_agent, created_at)
@@ -678,7 +879,8 @@ def admin_grant_user_credits(
                     (final_status, new_notes, now_ts, clean_ticket)
                 )
 
-        conn.commit()
+        if owns_conn:
+            conn.commit()
         logger.info(f"Admin '{clean_admin}' successfully granted {credits_val} credits to {user_email} (New balance: {new_balance})")
         return {
             "success": True,
@@ -691,14 +893,18 @@ def admin_grant_user_credits(
             "reason_code": clean_reason,
             "message": f"Successfully granted {credits_val} credits to {user_email}."
         }
+    except AuthoritativeDatabaseUnavailable:
+        raise
     except Exception as e:
         logger.error(f"Error granting credits to '{clean_target}': {e}", exc_info=True)
-        try:
-            conn.rollback()
-        except Exception as rb_err:
-            logger.debug(f"Rollback failed: {rb_err}")
+        if owns_conn:
+            try:
+                conn.rollback()
+            except Exception as rb_err:
+                logger.debug(f"Rollback failed: {rb_err}")
         return {"success": False, "error": f"Database error during credit grant: {e}"}
     finally:
         cursor.close()
-        conn.close()
+        if owns_conn:
+            conn.close()
 

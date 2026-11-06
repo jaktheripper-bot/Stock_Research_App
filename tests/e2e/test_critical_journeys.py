@@ -128,19 +128,23 @@ class TestPaymentIdempotencyReplayJourneys(unittest.TestCase):
         initial_balance = get_user_credits_balance(self.user_id)
 
         uid_suffix = uuid.uuid4().hex[:8]
-        order_id = f"order_sim_e2e_replay_{uid_suffix}"
         payment_id = f"pay_sim_e2e_replay_{uid_suffix}"
-
-        replay_payload = {
-            "order_id": order_id,
-            "payment_id": payment_id,
-            "signature": "simulated_success",
-            "user_id": self.user_id,
-            "plan_id": "single_pass"  # Adds 1 credit
-        }
 
         # Execute simulated replay attack with unconfigured keys (pure simulation mode)
         with mock.patch("core.billing.razorpay.get_razorpay_keys", return_value=("", "", False)):
+            order_resp = self.client.post(
+                "/api/create-order",
+                json={"plan_id": "single_pass", "user_id": self.user_id, "email": f"{self.user_id}@test.com"},
+            )
+            self.assertEqual(order_resp.status_code, 200)
+            order_id = order_resp.json()["order_id"]
+            replay_payload = {
+                "order_id": order_id,
+                "payment_id": payment_id,
+                "signature": "simulated_success",
+                "user_id": self.user_id,
+                "plan_id": "single_pass",  # Adds 1 credit
+            }
             # First Verification Attempt (Legitimate user purchase)
             resp1 = self.client.post("/api/billing/verify", json=replay_payload)
             self.assertEqual(resp1.status_code, 200)
@@ -241,10 +245,11 @@ class TestAdmin2FAGateAndCopilotJourneys(unittest.TestCase):
         # Verify NO credits have been allocated yet (first step only proposes!)
         self.assertEqual(get_user_credits_balance(self.recipient_id), initial_bal)
 
-        # Step 2: Administrator reviews proposal card and submits explicit confirmation
+        # Step 2: Administrator reviews proposal card and submits explicit confirmation with server proposal_id
         exec_payload = {
+            "proposal_id": proposal["proposal_id"],
             "action_type": proposal["action_type"],
-            "payload": proposal["payload"]
+            "payload": proposal["payload"],
         }
         exec_resp = self.client.post("/api/admin/copilot/execute", json=exec_payload)
         self.assertEqual(exec_resp.status_code, 200)

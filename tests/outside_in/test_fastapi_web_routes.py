@@ -261,14 +261,33 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertNotIn('<link rel="canonical"', res_unlisted.text)
 
         # 2. Listed pending ticker: active synthesis button with 1 Credit prompt + noindex directives
-        res_listed = self.client.get("/dossier/ABB")
-        self.assertEqual(res_listed.status_code, 200)
-        self.assertIn('id="synthesizeBtn"', res_listed.text)
-        self.assertIn("Generate Stock Report (1 Credit)", res_listed.text)
-        self.assertIn("onclick=\"synthesizeReport('ABB')\"", res_listed.text)
-        self.assertEqual(res_listed.headers.get("X-Robots-Tag"), "noindex, nofollow")
-        self.assertIn('<meta name="robots" content="noindex, nofollow">', res_listed.text)
-        self.assertNotIn('<link rel="canonical"', res_listed.text)
+        from core.db.connection import get_db_connection, get_placeholder
+        _conn = get_db_connection()
+        _cur = _conn.cursor()
+        _p = get_placeholder()
+        _cur.execute(f"SELECT ticker, short_name, report_text, timestamp, citations_json FROM reports WHERE ticker = {_p}", ("ABB",))
+        _saved_abb = _cur.fetchone()
+        if _saved_abb:
+            _cur.execute(f"DELETE FROM reports WHERE ticker = {_p}", ("ABB",))
+            _conn.commit()
+        try:
+            res_listed = self.client.get("/dossier/ABB")
+            self.assertEqual(res_listed.status_code, 200)
+            self.assertIn('id="synthesizeBtn"', res_listed.text)
+            self.assertIn("Generate Stock Report (1 Credit)", res_listed.text)
+            self.assertIn("onclick=\"synthesizeReport('ABB')\"", res_listed.text)
+            self.assertEqual(res_listed.headers.get("X-Robots-Tag"), "noindex, nofollow")
+            self.assertIn('<meta name="robots" content="noindex, nofollow">', res_listed.text)
+            self.assertNotIn('<link rel="canonical"', res_listed.text)
+        finally:
+            if _saved_abb:
+                _cur.execute(
+                    f"INSERT INTO reports (ticker, short_name, report_text, timestamp, citations_json) VALUES ({_p}, {_p}, {_p}, {_p}, {_p})",
+                    tuple(_saved_abb),
+                )
+                _conn.commit()
+            _cur.close()
+            _conn.close()
 
     def test_pillar_links_never_borrow_another_company_scrip(self):
         """Without a valid scrip code, pillar cards must show no exchange link at all."""

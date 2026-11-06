@@ -879,6 +879,21 @@ app.add_exception_handler(RateLimitExceeded, lambda request, exc: Response(conte
 app.add_middleware(SlowAPIMiddleware)
 
 
+from core.db.connection import AuthoritativeDatabaseUnavailable as _AuthoritativeDatabaseUnavailable
+from fastapi.encoders import jsonable_encoder as _jsonable_encoder
+
+
+@app.exception_handler(_AuthoritativeDatabaseUnavailable)
+async def _authoritative_db_unavailable_handler(request: Request, exc: _AuthoritativeDatabaseUnavailable):
+    return JSONResponse(
+        status_code=503,
+        content=_jsonable_encoder({
+            "status": "unavailable",
+            "detail": "Primary database is temporarily unavailable. Please retry shortly.",
+        }),
+    )
+
+
 class HeadMethodMiddleware(BaseHTTPMiddleware):
     """Transparently handles HEAD requests for uptime monitors and link crawlers."""
     async def dispatch(self, request: Request, call_next):

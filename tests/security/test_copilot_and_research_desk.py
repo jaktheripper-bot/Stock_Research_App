@@ -836,6 +836,14 @@ class TestAdminCopilot(unittest.TestCase):
         get_or_create_user(user_id="usr_copilot_test_1", email=cls.test_user_email, full_name="Copilot User")
 
     def setUp(self):
+        from core.db.connection import get_db_connection, get_placeholder
+        _c = get_db_connection()
+        _cur = _c.cursor()
+        _p = get_placeholder()
+        _cur.execute(f"DELETE FROM admin_audit_log WHERE action = {_p}", ("GRANT_USER_CREDITS",))
+        _c.commit()
+        _cur.close()
+        _c.close()
         self.client = TestClient(app)
         get_or_create_user(user_id="usr_copilot_test_1", email=self.test_user_email, full_name="Copilot User")
 
@@ -880,11 +888,15 @@ class TestAdminCopilot(unittest.TestCase):
 
     def test_execute_confirmed_admin_action_rbac_and_grant_credits(self):
         """Verify role-based access control and state mutation for credit grant."""
+        from core.db.admin import store_admin_action_proposal
         # Viewer attempt -> must be rejected
         viewer_user = {"email": self.viewer_email, "role": "viewer"}
+        viewer_payload = {"target_user": self.test_user_email, "credits": 3.0}
+        viewer_prop = store_admin_action_proposal(self.viewer_email, AdminActionType.GRANT_CREDITS, viewer_payload)
         res_viewer = execute_confirmed_admin_action(
+            proposal_id=viewer_prop,
             action_type=AdminActionType.GRANT_CREDITS,
-            payload={"target_user": self.test_user_email, "credits": 3.0},
+            payload=viewer_payload,
             admin_user=viewer_user
         )
         self.assertFalse(res_viewer["success"])
@@ -892,14 +904,17 @@ class TestAdminCopilot(unittest.TestCase):
 
         # Owner attempt -> must succeed
         owner_user = {"email": self.owner_email, "role": "owner"}
+        owner_payload = {
+            "target_user": self.test_user_email,
+            "credits": 4.0,
+            "reason": "TASK_REMEDY",
+            "admin_note": "Copilot Unit Test Grant"
+        }
+        owner_prop = store_admin_action_proposal(self.owner_email, AdminActionType.GRANT_CREDITS, owner_payload)
         res_owner = execute_confirmed_admin_action(
+            proposal_id=owner_prop,
             action_type=AdminActionType.GRANT_CREDITS,
-            payload={
-                "target_user": self.test_user_email,
-                "credits": 4.0,
-                "reason": "TASK_REMEDY",
-                "admin_note": "Copilot Unit Test Grant"
-            },
+            payload=owner_payload,
             admin_user=owner_user
         )
         self.assertTrue(res_owner.get("success"), f"Grant failed: {res_owner}")
@@ -911,6 +926,7 @@ class TestAdminCopilot(unittest.TestCase):
 
     def test_execute_confirmed_admin_action_ticket_update(self):
         """Verify support grievance ticket status update via action engine."""
+        from core.db.admin import store_admin_action_proposal
         tkt = create_support_ticket(
             user_email="copilot_tkt@example.com",
             subject="Test Inquiry for Copilot",
@@ -919,13 +935,16 @@ class TestAdminCopilot(unittest.TestCase):
         ticket_id = tkt["ticket_id"]
 
         owner_user = {"email": self.owner_email, "role": "owner"}
+        upd_payload = {
+            "ticket_id": ticket_id,
+            "status": "resolved",
+            "admin_notes": "Resolved via Copilot Action Execution"
+        }
+        upd_prop = store_admin_action_proposal(self.owner_email, AdminActionType.UPDATE_TICKET, upd_payload)
         res_update = execute_confirmed_admin_action(
+            proposal_id=upd_prop,
             action_type=AdminActionType.UPDATE_TICKET,
-            payload={
-                "ticket_id": ticket_id,
-                "status": "resolved",
-                "admin_notes": "Resolved via Copilot Action Execution"
-            },
+            payload=upd_payload,
             admin_user=owner_user
         )
         self.assertTrue(res_update["success"])
@@ -938,8 +957,11 @@ class TestAdminCopilot(unittest.TestCase):
 
     def test_execute_confirmed_admin_action_purge_test_data(self):
         """Verify purging test telemetry via action engine."""
+        from core.db.admin import store_admin_action_proposal
         owner_user = {"email": self.owner_email, "role": "owner"}
+        purge_prop = store_admin_action_proposal(self.owner_email, AdminActionType.PURGE_TEST_DATA, {})
         res_purge = execute_confirmed_admin_action(
+            proposal_id=purge_prop,
             action_type=AdminActionType.PURGE_TEST_DATA,
             payload={},
             admin_user=owner_user
@@ -977,44 +999,50 @@ class TestAdminCopilot(unittest.TestCase):
         self.assertTrue(prop["requires_confirmation"])
 
     def test_process_admin_copilot_turn_grant_credits_to_self(self):
-        """Verify credit requests targeting 'myself' or 'me' automatically resolve to admin email and directly execute."""
+        """Verify credit requests targeting 'myself' or 'me' resolve to admin email and require explicit proposal confirmation."""
         import asyncio
-        from core.db.users import get_user_by_email
+        from core.db.users import get_user_by_email, get_or_create_user
         owner_user = {"email": self.owner_email, "role": "owner"}
 
-        # Fetch baseline balance (ensuring account initialized)
-        from core.db.users import get_or_create_user
         u_before = get_user_by_email(self.owner_email)
         if not u_before:
             u_before = get_or_create_user(user_id="usr_owner_test", email=self.owner_email, full_name="Owner")
         base_bal = float(u_before.get("credits_balance", 0.0))
 
-        # 1. "send some credits to myself" -> Auto-executes without confirmation friction
+        # 1. "send some credits to myself" -> Returns stored proposal (never auto-executes)
         res1 = asyncio.run(process_admin_copilot_turn(
             admin_user=owner_user,
             message="send some credits to myself"
         ))
-        self.assertIsNone(res1["action_proposal"])
-        self.assertEqual(res1["status"], "COMPLETED_EXECUTED")
-        self.assertIn("Successfully Granted 5.0 Research Credits", res1["reply"])
-        self.assertEqual(res1["new_balance"], base_bal + 5.0)
+        prop1 = res1.get("action_proposal")
+        self.assertIsNotNone(prop1)
+        self.assertNotEqual(res1.get("status"), "COMPLETED_EXECUTED")
+        self.assertEqual(float(get_user_by_email(self.owner_email)["credits_balance"]), base_bal)
 
-        # Verify in database
-        u_after1 = get_user_by_email(self.owner_email)
-        self.assertEqual(float(u_after1["credits_balance"]), base_bal + 5.0)
+        exec1 = execute_confirmed_admin_action(
+            proposal_id=prop1["proposal_id"],
+            action_type=prop1["action_type"],
+            payload=prop1["payload"],
+            admin_user=owner_user,
+        )
+        self.assertTrue(exec1["success"])
+        self.assertEqual(float(get_user_by_email(self.owner_email)["credits_balance"]), base_bal + 5.0)
 
-        # 2. "give me 10 credits"
+        # 2. "give me 5 credits" -> Confirming second 5.0 grant reaches 10.0/24h cap
         res2 = asyncio.run(process_admin_copilot_turn(
             admin_user=owner_user,
-            message="give me 10 credits"
+            message="give me 5 credits"
         ))
-        self.assertIsNone(res2["action_proposal"])
-        self.assertEqual(res2["status"], "COMPLETED_EXECUTED")
-        self.assertIn("Successfully Granted 10.0 Research Credits", res2["reply"])
-        self.assertEqual(res2["new_balance"], base_bal + 15.0)
-
-        u_after2 = get_user_by_email(self.owner_email)
-        self.assertEqual(float(u_after2["credits_balance"]), base_bal + 15.0)
+        prop2 = res2.get("action_proposal")
+        self.assertIsNotNone(prop2)
+        exec2 = execute_confirmed_admin_action(
+            proposal_id=prop2["proposal_id"],
+            action_type=prop2["action_type"],
+            payload=prop2["payload"],
+            admin_user=owner_user,
+        )
+        self.assertTrue(exec2["success"])
+        self.assertEqual(float(get_user_by_email(self.owner_email)["credits_balance"]), base_bal + 10.0)
 
     def test_api_admin_copilot_chat_endpoint_unauthorized(self):
         """Verify /api/admin/copilot/chat blocks unauthenticated access with 403."""
@@ -1040,19 +1068,22 @@ class TestAdminCopilot(unittest.TestCase):
         self.assertIn("Cash Flow & Revenue Diagnostics", data.get("reply", ""))
 
     def test_api_admin_copilot_execute_endpoint(self):
-        """Verify /api/admin/copilot/execute executes confirmed proposals."""
+        """Verify /api/admin/copilot/execute executes server-stored proposals."""
+        from core.db.admin import store_admin_action_proposal
         self.client.cookies.set(ADMIN_COOKIE_NAME, self.owner_token)
+        grant_payload = {
+            "target_user": self.test_user_email,
+            "credits": 2.0,
+            "reason": "TASK_REMEDY",
+            "admin_note": "API execute endpoint test",
+        }
+        prop_id = store_admin_action_proposal(self.owner_email, AdminActionType.GRANT_CREDITS, grant_payload)
         res = self.client.post(
             "/api/admin/copilot/execute",
             json={
                 "action_type": AdminActionType.GRANT_CREDITS,
-                "payload": {
-                    "target_user": self.test_user_email,
-                    "credits": 2.0,
-                    "reason": "TASK_REMEDY",
-                    "admin_note": "API execute endpoint test"
-                },
-                "proposal_id": "prop_test_123"
+                "payload": grant_payload,
+                "proposal_id": prop_id,
             }
         )
         self.assertEqual(res.status_code, 200)
@@ -1109,13 +1140,15 @@ class TestAdminCopilot(unittest.TestCase):
         self.assertIn("We have credited your account with 5.0 credits.", prop["payload"]["reply_message"])
         self.assertTrue(prop["requires_confirmation"])
 
-        # 4. Execute confirmed REPLY_TICKET proposal
-        exec_payload = dict(prop["payload"], dispatch_email=False)
-        exec_res = execute_confirmed_admin_action(
-            admin_user=owner_user,
-            action_type=prop["action_type"],
-            payload=exec_payload,
-        )
+        # 4. Execute confirmed REPLY_TICKET proposal using stored proposal_id
+        from unittest.mock import patch
+        with patch("core.agents.copilot.admin_copilot.send_ticket_reply_email", return_value=False):
+            exec_res = execute_confirmed_admin_action(
+                proposal_id=prop["proposal_id"],
+                admin_user=owner_user,
+                action_type=prop["action_type"],
+                payload=prop["payload"],
+            )
         self.assertTrue(exec_res["success"])
         self.assertEqual(exec_res["ticket_id"], tkt_id)
         updated_tkt = get_ticket_by_id(tkt_id, include_responses=True)
@@ -1209,8 +1242,11 @@ class TestAdminCopilot(unittest.TestCase):
             return {"audit_id": "AUD-TEST-99", "overall_status": "PASS", "overall_score": 99.5}
 
         async def _invoke_from_running_loop():
+            from core.db.admin import store_admin_action_proposal
+            audit_prop = store_admin_action_proposal(self.owner_email, AdminActionType.TRIGGER_PROJECT_AUDIT, {"quick": True})
             with patch.object(core.audit.project_auditor, "audit_project_full", side_effect=fake_audit_coro):
                 return execute_confirmed_admin_action(
+                    proposal_id=audit_prop,
                     admin_user=owner_user,
                     action_type=AdminActionType.TRIGGER_PROJECT_AUDIT,
                     payload={"quick": True},

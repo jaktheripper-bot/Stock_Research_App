@@ -166,6 +166,14 @@ class TestAdminCreditGrant(unittest.TestCase):
         cls.admin_cookie = _generate_admin_token(cls.admin_email, "owner")
 
     def setUp(self):
+        from core.db.connection import get_db_connection, get_placeholder
+        _c = get_db_connection()
+        _cur = _c.cursor()
+        _p = get_placeholder()
+        _cur.execute(f"DELETE FROM admin_audit_log WHERE action = {_p}", ("GRANT_USER_CREDITS",))
+        _c.commit()
+        _cur.close()
+        _c.close()
         self.unique_suffix = uuid.uuid4().hex[:8]
         self.test_user_email = f"remedy_user_{self.unique_suffix}@example.com"
         self.user_record = get_or_create_user(
@@ -595,7 +603,7 @@ class TestRenderHardening(unittest.TestCase):
 class TestDatabaseDualBindingFailover(unittest.TestCase):
     def test_init_db_transparent_sqlite_failover_when_postgres_unreachable(self):
         """Verifies that when SUPABASE_DB_URL is set to an unreachable host, init_db()
-        transparently falls back to SQLite without raising 'near EXISTS: syntax error'."""
+        fails closed with AuthoritativeDatabaseUnavailable, and explicit local SQLite mode runs all migrations."""
         import tempfile
         import sqlite3
         from core.db.connection import (
@@ -612,6 +620,7 @@ class TestDatabaseDualBindingFailover(unittest.TestCase):
 
         old_testing = os.environ.pop("TESTING", None)
         old_test_sb = os.environ.pop("TEST_SUPABASE", None)
+        old_force_sqlite = os.environ.pop("FORCE_LOCAL_SQLITE", None)
         old_sb_url = os.environ.get("SUPABASE_DB_URL")
         old_db_path = os.environ.get("DB_PATH")
 
@@ -628,7 +637,18 @@ class TestDatabaseDualBindingFailover(unittest.TestCase):
             self.assertFalse(is_postgres_connection(s_conn))
             s_conn.close()
 
-            # Execute init_db(force=True) on fresh database - MUST NOT raise OperationalError
+            # P0 Containment: unreachable configured PostgreSQL MUST fail closed (never silently write SQLite)
+            from core.db.connection import AuthoritativeDatabaseUnavailable
+            os.environ["TEST_SUPABASE"] = "1"
+            with self.assertRaises(AuthoritativeDatabaseUnavailable):
+                init_db(force=True)
+
+            # Explicit local SQLite mode (no SUPABASE_DB_URL configured) cleanly runs all SQLite migrations
+            os.environ.pop("TEST_SUPABASE", None)
+            os.environ["SUPABASE_DB_URL"] = ""
+            conn_mod._CACHED_SUPABASE_URL = None
+            conn_mod._SUPABASE_URL_RESOLVED = False
+            conn_mod._PG_AVAILABLE = None
             init_db(force=True)
 
             # Placeholder must be '?' for SQLite, not '%s'
@@ -654,6 +674,10 @@ class TestDatabaseDualBindingFailover(unittest.TestCase):
                 os.environ["TESTING"] = old_testing
             if old_test_sb is not None:
                 os.environ["TEST_SUPABASE"] = old_test_sb
+            if old_force_sqlite is not None:
+                os.environ["FORCE_LOCAL_SQLITE"] = old_force_sqlite
+            else:
+                os.environ.pop("FORCE_LOCAL_SQLITE", None)
             if old_sb_url is not None:
                 os.environ["SUPABASE_DB_URL"] = old_sb_url
             else:

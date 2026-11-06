@@ -1,0 +1,43 @@
+name: P0 Release Gate & Contract Audit
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+
+jobs:
+  audit-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: "pip"
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run System Contract & Zero-Illusion Reality Audit
+      env:
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'MOCK_CI_KEY_FOR_STATIC_AUDIT' }}
+      run: |
+        python check_system.py
+        python scripts/verify_reality_audit.py
+
+    - name: Run P0 Containment & Regression Test Suite
+      env:
+        TESTING: "1"
+        FORCE_LOCAL_SQLITE: "1"
+        ADMIN_PASSWORD: "ci_test_admin_pwd_default"
+        RAZORPAY_WEBHOOK_SECRET: "ci_test_webhook_secret"
+      run: |
+        python -m pytest -q tests/unit/test_p0_credit_and_db_containment.py
+        python -m unittest discover -s tests

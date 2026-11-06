@@ -68,6 +68,8 @@ from core.db.admin import (
     record_admin_audit,
     get_admin_audit_logs,
     admin_grant_user_credits,
+    parse_strict_credit_amount,
+    MAX_SINGLE_ADMIN_CREDIT_GRANT,
 )
 from core.db.telemetry import purge_test_telemetry
 from web.common import (
@@ -134,9 +136,9 @@ class AdminCopilotChatRequest(BaseModel):
 
 
 class AdminCopilotExecuteRequest(BaseModel):
-    action_type: str
-    payload: Dict[str, Any]
     proposal_id: Optional[str] = None
+    action_type: Optional[str] = None
+    payload: Optional[Dict[str, Any]] = None
 
 
 # ==============================================================================
@@ -1989,9 +1991,7 @@ async def admin_grant_credits_endpoint(request: Request):
         )
 
     try:
-        credits_amount = float(credits_val)
-        if credits_amount <= 0 or credits_amount > 1000.0:
-            raise ValueError("Credits amount must be between 0.1 and 1000.0.")
+        credits_amount = parse_strict_credit_amount(credits_val, max_allowed=MAX_SINGLE_ADMIN_CREDIT_GRANT)
     except Exception as e:
         logger.warning("Invalid credits amount requested: %s", e)
         err_msg = f"Invalid credits amount: {e}"
@@ -2342,6 +2342,8 @@ async def api_admin_copilot_execute(
     client_ip = _get_client_ip(request)
     user_agent = request.headers.get("user-agent", "")
 
+    from fastapi.encoders import jsonable_encoder
+
     result = await run_in_threadpool(
         execute_confirmed_admin_action,
         action_type=req.action_type,
@@ -2349,9 +2351,10 @@ async def api_admin_copilot_execute(
         admin_user=admin_session,
         client_ip=client_ip,
         user_agent=user_agent,
+        proposal_id=req.proposal_id,
     )
     status_code = 200 if result.get("success") else 400
-    return JSONResponse(status_code=status_code, content=result)
+    return JSONResponse(status_code=status_code, content=jsonable_encoder(result))
 
 
 @router.post("/api/admin/stocks/run-daily-ingest")

@@ -207,14 +207,18 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
     def test_copilot_reply_ticket_action(self, mock_get_admin, mock_send_email):
         """Test REPLY_TICKET action via Admin Copilot."""
         mock_get_admin.return_value = {"email": "admin@moatnomics.com", "role": "admin"}
+        from core.db.admin import store_admin_action_proposal
+        reply_payload = {
+            "ticket_id": self.ticket_id,
+            "reply_message": "Automated analytical guidance dispatched from Executive Copilot.",
+            "status": "resolved",
+            "dispatch_email": True,
+        }
+        prop_id = store_admin_action_proposal("admin@moatnomics.com", AdminActionType.REPLY_TICKET, reply_payload)
         action_res = execute_confirmed_admin_action(
+            proposal_id=prop_id,
             action_type=AdminActionType.REPLY_TICKET,
-            payload={
-                "ticket_id": self.ticket_id,
-                "reply_message": "Automated analytical guidance dispatched from Executive Copilot.",
-                "status": "resolved",
-                "dispatch_email": True
-            },
+            payload=reply_payload,
             admin_user={"email": "admin@moatnomics.com", "role": "admin"}
         )
         self.assertTrue(action_res["success"])

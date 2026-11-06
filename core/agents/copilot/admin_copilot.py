@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
 
 from core.config import get_secret
-from core.db.connection import IST
+from core.db.connection import AuthoritativeDatabaseUnavailable, IST, get_db_connection, init_db, is_postgres_connection
 from core.brand.moatnomics_house import get_system_prompt_context, MOATNOMICS_BRAND_HOUSE
 from core.db import (
     init_db,
@@ -53,6 +53,10 @@ from core.db.admin import (
     record_admin_audit,
     get_admin_audit_logs,
     admin_grant_user_credits,
+    MAX_SINGLE_ADMIN_CREDIT_GRANT,
+    parse_strict_credit_amount,
+    store_admin_action_proposal,
+    consume_admin_action_proposal,
 )
 from core.db.users import (
     get_user_by_email,
@@ -545,13 +549,21 @@ def create_action_proposal(
     summary: str,
     payload: Dict[str, Any],
     impact_level: str = "MEDIUM",
-    impact_warning: Optional[str] = None
+    impact_warning: Optional[str] = None,
+    actor_email: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Constructs an interactive action proposal payload requiring explicit admin confirmation.
-    Enforces that NO destructive or financial state mutation executes automatically.
+    Persists the proposal server-side bound to actor_email so confirmation cannot be forged or replayed.
     """
-    prop_id = f"prop_{uuid.uuid4().hex[:10]}"
+    if actor_email:
+        prop_id = store_admin_action_proposal(
+            actor_email=actor_email,
+            action_type=action_type,
+            payload=payload,
+        )
+    else:
+        prop_id = f"prop_{uuid.uuid4().hex}"
     return {
         "proposal_id": prop_id,
         "action_type": action_type,
@@ -570,19 +582,22 @@ def create_action_proposal(
 # Confirmed Action Execution Engine
 # ==============================================================================
 def execute_confirmed_admin_action(
-    action_type: str,
-    payload: Dict[str, Any],
-    admin_user: Dict[str, Any],
+    action_type: Optional[str] = None,
+    payload: Optional[Dict[str, Any]] = None,
+    admin_user: Optional[Dict[str, Any]] = None,
     client_ip: str = "127.0.0.1",
-    user_agent: str = ""
+    user_agent: str = "",
+    proposal_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Executes an action ONLY after the administrator has reviewed the proposal
-    and explicitly clicked 'Confirm & Execute'.
-    Enforces RBAC permissions and writes an immutable audit record.
+    Executes a stored server-side proposal ONLY after the administrator has reviewed
+    the proposal and explicitly clicked 'Confirm & Execute'.
+    Consumes proposal_id atomically inside the same DB transaction as credit grants.
     """
     if not admin_user or not admin_user.get("email"):
         return {"success": False, "error": "Unauthorized: Admin session required."}
+    if not proposal_id or not str(proposal_id).strip():
+        return {"success": False, "error": "Missing required proposal_id for confirmation."}
 
     admin_email = admin_user.get("email").strip().lower()
     admin_role = (admin_user.get("role") or "viewer").strip().lower()
@@ -594,32 +609,68 @@ def execute_confirmed_admin_action(
     elif admin_role in ("super_admin", "superadmin"):
         admin_role = "admin"
 
+    init_db()
+    conn = get_db_connection()
+    use_pg = is_postgres_connection(conn)
+    try:
+        if not use_pg:
+            conn.cursor().execute("BEGIN IMMEDIATE")
+        consumed = consume_admin_action_proposal(conn, proposal_id=proposal_id, actor_email=admin_email)
+        stored_action_type = consumed["action_type"]
+        stored_payload = consumed["payload"]
+
+        # Reject any attempt by the caller to tamper with action_type or payload after proposal creation
+        if action_type and action_type != stored_action_type:
+            conn.rollback()
+            conn.close()
+            return {"success": False, "error": "Action type does not match the stored proposal."}
+        if payload is not None and payload != stored_payload:
+            conn.rollback()
+            conn.close()
+            return {"success": False, "error": "Payload was modified from the stored proposal."}
+
+        action_type = stored_action_type
+        payload = stored_payload
+    except AuthoritativeDatabaseUnavailable:
+        conn.close()
+        raise
+    except (PermissionError, LookupError, ValueError) as prop_err:
+        conn.rollback()
+        conn.close()
+        return {"success": False, "error": str(prop_err)}
+    except Exception as exc:
+        logger.warning("Failed verifying admin action proposal %s: %s", proposal_id, exc)
+        conn.rollback()
+        conn.close()
+        return {"success": False, "error": f"Failed to verify proposal: {exc}"}
+
     allowed_roles = ALLOWED_ROLES_PER_ACTION.get(action_type, {"owner"})
     if admin_role not in allowed_roles:
+        conn.rollback()
+        conn.close()
         err_msg = f"Forbidden: Action '{action_type}' requires role in {list(allowed_roles)}. Current role is '{admin_role}'."
         record_admin_audit(
             admin_email=admin_email,
             action="UNAUTHORIZED_ACTION_ATTEMPT",
             target_type="action_proposal",
             target_id=action_type,
-            details={"error": err_msg, "payload": payload},
+            details={"error": err_msg, "payload": payload, "proposal_id": proposal_id},
             ip_address=client_ip,
             user_agent=user_agent
         )
         return {"success": False, "error": err_msg}
 
-    # 1. GRANT_CREDITS
+    # 1. GRANT_CREDITS (shares the exact DB transaction with proposal consumption)
     if action_type == AdminActionType.GRANT_CREDITS:
         target_user = str(payload.get("target_user") or payload.get("user_email") or payload.get("user_id") or "").strip()
-        # Seamlessly resolve self-references to the authenticated admin's own email
         if not target_user or target_user.lower() in ("myself", "me", "self", "my account", "my_account", "current_user", "admin", "owner"):
             target_user = admin_email
         try:
-            credits_val = float(payload.get("credits", 2.0))
-            if credits_val <= 0 or credits_val > 1000.0:
-                return {"success": False, "error": "Credits must be between 0.1 and 1000.0."}
-        except (ValueError, TypeError):
-            return {"success": False, "error": "Invalid credits amount."}
+            credits_val = parse_strict_credit_amount(payload.get("credits"), max_allowed=MAX_SINGLE_ADMIN_CREDIT_GRANT)
+        except ValueError as val_err:
+            conn.rollback()
+            conn.close()
+            return {"success": False, "error": str(val_err)}
 
         reason_code = str(payload.get("reason") or "TASK_REMEDY").strip()
         admin_note = str(payload.get("admin_note") or "Executed via Admin Executive Copilot").strip()
@@ -627,23 +678,35 @@ def execute_confirmed_admin_action(
         task_ticker = payload.get("task_ticker")
         resolve_ticket = bool(payload.get("resolve_ticket", True if ticket_id else False))
 
-        res = admin_grant_user_credits(
-            admin_email=admin_email,
-            target_user_identifier=target_user,
-            credits_amount=credits_val,
-            reason_code=reason_code,
-            admin_note=admin_note,
-            ticket_id=ticket_id,
-            task_ticker=task_ticker,
-            resolve_ticket=resolve_ticket,
-            auto_provision=True,
-            ip_address=client_ip,
-            user_agent=user_agent
-        )
-        return res
+        try:
+            res = admin_grant_user_credits(
+                admin_email=admin_email,
+                target_user_identifier=target_user,
+                credits_amount=credits_val,
+                reason_code=reason_code,
+                admin_note=admin_note,
+                ticket_id=ticket_id,
+                task_ticker=task_ticker,
+                resolve_ticket=resolve_ticket,
+                auto_provision=True,
+                ip_address=client_ip,
+                user_agent=user_agent,
+                connection=conn,
+            )
+            if res.get("success"):
+                conn.commit()
+            else:
+                conn.rollback()
+            return res
+        finally:
+            conn.close()
+
+    # Commit proposal consumption before executing non-grant administrative actions
+    conn.commit()
+    conn.close()
 
     # 2. UPDATE_TICKET
-    elif action_type == AdminActionType.UPDATE_TICKET:
+    if action_type == AdminActionType.UPDATE_TICKET:
         ticket_id = str(payload.get("ticket_id") or "").strip()
         new_status = str(payload.get("status") or "resolved").strip().lower()
         admin_notes = payload.get("admin_notes")
@@ -925,7 +988,8 @@ def parse_deterministic_admin_query(
             summary="Delete all synthetic telemetry events, automated test tickets (@example.com, @test.com), and test orders from reports.db.",
             payload={},
             impact_level="HIGH",
-            impact_warning="This action irreversibly removes test records from the active database to ensure only real visitor data is reported."
+            impact_warning="This action irreversibly removes test records from the active database to ensure only real visitor data is reported.",
+            actor_email=(admin_user.get("email") or "").strip().lower(),
         )
         reply = (
             "⚠️ **Action Proposal Prepared: Purge Synthetic Test Data**\n\n"
@@ -983,7 +1047,8 @@ def parse_deterministic_admin_query(
                 "dispatch_email": True
             },
             impact_level="MEDIUM",
-            impact_warning=f"This will append an official response to {ticket_id}, mark it resolved, and dispatch an email notification to {recipient_email}."
+            impact_warning=f"This will append an official response to {ticket_id}, mark it resolved, and dispatch an email notification to {recipient_email}.",
+            actor_email=(admin_user.get("email") or "").strip().lower(),
         )
         reply = (
             f"📨 **Action Proposal Prepared: Reply to Ticket {ticket_id}**\n\n"
@@ -1024,7 +1089,11 @@ def parse_deterministic_admin_query(
             if is_self or admin_email:
                 target_email = admin_email
 
-        credits_val = slots.get("number") or 5.0
+        raw_num = slots.get("number") if slots.get("number") is not None else 5.0
+        try:
+            credits_val = parse_strict_credit_amount(raw_num, max_allowed=MAX_SINGLE_ADMIN_CREDIT_GRANT)
+        except ValueError as val_err:
+            return f"❌ **Invalid Credit Grant Request:** {val_err}", None
 
         if not target_email:
             return (
@@ -1036,38 +1105,6 @@ def parse_deterministic_admin_query(
 
         is_self_target = (target_email == admin_email)
         recipient_display = "your administrator account" if is_self_target else f"account `{target_email}`"
-
-        if is_self_target:
-            grant_res = admin_grant_user_credits(
-                admin_email=admin_email,
-                target_user_identifier=admin_email,
-                credits_amount=credits_val,
-                reason_code="TASK_REMEDY",
-                admin_note=f"Granted via Admin Executive Copilot by {admin_email}",
-                ticket_id=ticket_id,
-                resolve_ticket=bool(ticket_id),
-                auto_provision=True
-            )
-            if grant_res.get("success"):
-                new_bal = grant_res.get("new_balance", credits_val)
-                reply = (
-                    f"✅ **Successfully Granted {credits_val:.1f} Research Credits to Your Account**\n\n"
-                    f"- **Target Account:** `{admin_email}`\n"
-                    f"- **Credits Added:** `+{credits_val:.1f}`\n"
-                    f"- **Updated Available Balance:** **{new_bal:.1f} credits**\n"
-                    f"- **Audit Status:** Committed to database and recorded in immutable Admin Audit Trail (`GRANT_USER_CREDITS`)."
-                )
-                exec_meta = {
-                    "action_type": AdminActionType.GRANT_CREDITS,
-                    "status": "EXECUTED",
-                    "new_balance": new_bal,
-                    "target_user": admin_email,
-                    "credits": credits_val
-                }
-                return reply, exec_meta
-            else:
-                err_msg = grant_res.get("error", "Failed to allocate credits.")
-                return f"❌ **Credit Allocation Failed:** {err_msg}", None
 
         proposal = create_action_proposal(
             action_type=AdminActionType.GRANT_CREDITS,
@@ -1082,7 +1119,8 @@ def parse_deterministic_admin_query(
                 "resolve_ticket": bool(ticket_id)
             },
             impact_level="MEDIUM",
-            impact_warning=f"This will increment the user's research credit balance by +{credits_val} and create a zero-revenue ledger entry."
+            impact_warning=f"This will increment the user's research credit balance by +{credits_val} and create a zero-revenue ledger entry.",
+            actor_email=admin_email,
         )
         reply = (
             f"📋 **Action Proposal Prepared: Grant {credits_val} Credits**\n\n"
@@ -1117,7 +1155,8 @@ def parse_deterministic_admin_query(
                 "admin_notes": f"Status updated via Admin Copilot by {admin_user.get('email', 'admin')}"
             },
             impact_level="LOW",
-            impact_warning="This will update the ticket record and log an immutable entry in the administrative audit trail."
+            impact_warning="This will update the ticket record and log an immutable entry in the administrative audit trail.",
+            actor_email=(admin_user.get("email") or "").strip().lower(),
         )
         reply = (
             f"📋 **Action Proposal Prepared: Update Ticket {ticket_id}**\n\n"
@@ -1148,7 +1187,8 @@ def parse_deterministic_admin_query(
                 "reason": "Executive Copilot Refund Request"
             },
             impact_level="HIGH",
-            impact_warning="This initiates an online reversal on Razorpay and recalculates net cash receipts in reports.db."
+            impact_warning="This initiates an online reversal on Razorpay and recalculates net cash receipts in reports.db.",
+            actor_email=(admin_user.get("email") or "").strip().lower(),
         )
         reply = (
             f"⚠️ **Action Proposal Prepared: Process Payment Refund**\n\n"
@@ -1167,7 +1207,8 @@ def parse_deterministic_admin_query(
             summary="Scan mutual fund portfolios, debt securities, and sovereign bond curves for portfolio shifts and fresh pricing.",
             payload={},
             impact_level="LOW",
-            impact_warning="Monitoring scan inspects live AMFI and NSE debt feeds and updates the local security catalog."
+            impact_warning="Monitoring scan inspects live AMFI and NSE debt feeds and updates the local security catalog.",
+            actor_email=(admin_user.get("email") or "").strip().lower(),
         )
         reply = (
             f"📡 **Action Proposal Prepared: {title}**\n\n"
@@ -1184,7 +1225,8 @@ def parse_deterministic_admin_query(
             summary="Run the 5-pillar autonomous system verification suite (Strategy, Code Hygiene, CSS Design Tokens, Link Health, AST anti-patterns).",
             payload={"quick": True},
             impact_level="LOW",
-            impact_warning="Executes deterministic audit probes and generates an immutable Markdown audit dossier."
+            impact_warning="Executes deterministic audit probes and generates an immutable Markdown audit dossier.",
+            actor_email=(admin_user.get("email") or "").strip().lower(),
         )
         reply = (
             "🛡️ **Action Proposal Prepared: Project Health Audit**\n\n"
@@ -1477,14 +1519,11 @@ async def process_admin_copilot_turn(
 
     if is_testing or not api_key:
         reply, proposal = parse_deterministic_admin_query(clean_msg, admin_user, kpis, history=history)
-        is_executed = bool(proposal and proposal.get("status") == "EXECUTED")
-        new_bal = proposal.get("new_balance") if is_executed else None
-        active_prop = None if is_executed else proposal
         return {
             "reply": reply,
-            "action_proposal": active_prop,
-            "status": "COMPLETED_EXECUTED" if is_executed else "COMPLETED_DETERMINISTIC",
-            "new_balance": new_bal
+            "action_proposal": proposal,
+            "status": "COMPLETED_DETERMINISTIC",
+            "new_balance": None,
         }
 
     # Attempt Generative AI Cascade
@@ -1610,39 +1649,21 @@ RECENT CONVERSATION HISTORY:
                 action_type = parsed.get("action_type")
                 if action_type:
                     payload = parsed.get("payload", {})
-                    # Normalize self target in GenAI proposals
+                    # Normalize self target and strictly validate credit grant amounts in GenAI proposals
                     if action_type == AdminActionType.GRANT_CREDITS:
                         target = str(payload.get("target_user") or "").strip().lower()
                         if not target or target in ("myself", "me", "self", "my account", "my_account", "current_user", "admin", "owner"):
                             payload["target_user"] = admin_user.get("email")
-
-                    # If this is a self-credit grant from GenAI, auto-execute directly without requiring confirmation
-                    target = str(payload.get("target_user") or "").strip().lower()
-                    admin_email = (admin_user.get("email") or "").strip().lower()
-                    if action_type == AdminActionType.GRANT_CREDITS and target == admin_email:
-                        credits_val = float(payload.get("credits", 5.0))
-                        grant_res = admin_grant_user_credits(
-                            admin_email=admin_email,
-                            target_user_identifier=admin_email,
-                            credits_amount=credits_val,
-                            reason_code="TASK_REMEDY",
-                            admin_note=f"Granted via Admin Executive Copilot by {admin_email}",
-                            auto_provision=True
-                        )
-                        if grant_res.get("success"):
-                            new_bal = grant_res.get("new_balance", credits_val)
-                            clean_reply = (
-                                f"✅ **Successfully Granted {credits_val:.1f} Research Credits to Your Account**\n\n"
-                                f"- **Target Account:** `{admin_email}`\n"
-                                f"- **Credits Added:** `+{credits_val:.1f}`\n"
-                                f"- **Updated Available Balance:** **{new_bal:.1f} credits**\n"
-                                f"- **Audit Status:** Committed to database and recorded in immutable Admin Audit Trail (`GRANT_USER_CREDITS`)."
+                        try:
+                            payload["credits"] = parse_strict_credit_amount(
+                                payload.get("credits"),
+                                max_allowed=MAX_SINGLE_ADMIN_CREDIT_GRANT,
                             )
+                        except ValueError as val_err:
                             return {
-                                "reply": clean_reply,
+                                "reply": f"❌ **Invalid Credit Grant Request:** {val_err}",
                                 "action_proposal": None,
-                                "status": "COMPLETED_EXECUTED",
-                                "new_balance": new_bal
+                                "status": "REJECTED_POLICY",
                             }
 
                     action_proposal = create_action_proposal(
@@ -1651,7 +1672,8 @@ RECENT CONVERSATION HISTORY:
                         summary=parsed.get("summary", ""),
                         payload=payload,
                         impact_level=parsed.get("impact_level", "MEDIUM"),
-                        impact_warning=parsed.get("impact_warning", "")
+                        impact_warning=parsed.get("impact_warning", ""),
+                        actor_email=(admin_user.get("email") or "").strip().lower(),
                     )
                     # Strip raw json block from user display text
                     clean_reply = agent_reply[:proposal_pattern.start()].strip() + "\n\n" + agent_reply[proposal_pattern.end():].strip()
@@ -1661,16 +1683,15 @@ RECENT CONVERSATION HISTORY:
 
         # If LLM didn't produce proposal block but message is clearly an action, use deterministic proposal
         if not action_proposal:
-            _, fallback_prop = parse_deterministic_admin_query(clean_msg, admin_user, kpis, history=history)
+            det_reply, fallback_prop = parse_deterministic_admin_query(clean_msg, admin_user, kpis, history=history)
             if fallback_prop:
-                if fallback_prop.get("status") == "EXECUTED":
-                    return {
-                        "reply": agent_reply,
-                        "action_proposal": None,
-                        "status": "COMPLETED_EXECUTED",
-                        "new_balance": fallback_prop.get("new_balance")
-                    }
                 action_proposal = fallback_prop
+            elif det_reply and det_reply.startswith("❌"):
+                return {
+                    "reply": det_reply,
+                    "action_proposal": None,
+                    "status": "REJECTED_POLICY",
+                }
 
         return {
             "reply": agent_reply,

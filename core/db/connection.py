@@ -24,6 +24,24 @@ _PG_AVAILABLE = None  # None = untested, True = alive, False = failed
 _PG_LAST_FAIL = 0.0
 _PG_FAIL_COOLDOWN = 60.0  # retry failed postgres after 60s cooldown
 
+
+class AuthoritativeDatabaseUnavailable(RuntimeError):
+    """Raised when PostgreSQL is configured or required in production, but unreachable."""
+    pass
+
+
+def is_hosted_production_runtime() -> bool:
+    """Returns True when running in a hosted cloud environment where local SQLite fallback is forbidden."""
+    return bool(
+        os.environ.get("RENDER")
+        or os.environ.get("RENDER_SERVICE_ID")
+        or os.environ.get("FLY_APP_NAME")
+        or os.environ.get("K_SERVICE")
+        or os.environ.get("ENVIRONMENT", "").strip().lower() == "production"
+        or os.environ.get("APP_ENV", "").strip().lower() == "production"
+    )
+
+
 def _is_unit_test_runtime() -> bool:
     """Detects active unittest/pytest runners or isolated audit test subprocesses."""
     import sys
@@ -40,13 +58,14 @@ def _is_unit_test_runtime() -> bool:
 
 def get_configured_supabase_url() -> str | None:
     """Returns configured Supabase DB URL from secrets or environment, or None in unit tests / explicit local-only mode."""
-    if os.environ.get("FORCE_LOCAL_SQLITE") == "1":
+    hosted_prod = is_hosted_production_runtime()
+    if not hosted_prod and os.environ.get("FORCE_LOCAL_SQLITE") == "1":
         return None
     if "SUPABASE_DB_URL" in os.environ and not os.environ["SUPABASE_DB_URL"].strip():
         return None
-    if os.environ.get("TESTING") == "1" and os.environ.get("TEST_SUPABASE") != "1":
+    if not hosted_prod and os.environ.get("TESTING") == "1" and os.environ.get("TEST_SUPABASE") != "1":
         return None
-    if _is_unit_test_runtime() and os.environ.get("TEST_SUPABASE") != "1":
+    if not hosted_prod and _is_unit_test_runtime() and os.environ.get("TEST_SUPABASE") != "1":
         explicit_url = os.environ.get("SUPABASE_DB_URL", "")
         if explicit_url and ("127.0.0.1" in explicit_url or "localhost" in explicit_url):
             return explicit_url
@@ -372,14 +391,27 @@ def get_db_path() -> str:
 DB_NAME = "reports.db"
 
 def _get_raw_connection():
-    """Returns an unwrapped direct PostgreSQL or SQLite connection with automatic dual-binding failover."""
+    """Returns an unwrapped direct PostgreSQL or SQLite connection.
+    Fails closed (raises AuthoritativeDatabaseUnavailable) if PostgreSQL is required or configured
+    and cannot be reached, preventing split-brain writes to container-local SQLite.
+    """
     global _PG_AVAILABLE, _PG_LAST_FAIL
     raw_url = get_configured_supabase_url()
+    pg_required = is_hosted_production_runtime() or bool(raw_url)
+
+    if pg_required and not raw_url:
+        raise AuthoritativeDatabaseUnavailable(
+            "Production environment requires SUPABASE_DB_URL, but no PostgreSQL DSN is configured."
+        )
 
     can_try_pg = bool(raw_url)
     if _PG_AVAILABLE is False:
         import time
         if time.time() - _PG_LAST_FAIL < _PG_FAIL_COOLDOWN:
+            if pg_required:
+                raise AuthoritativeDatabaseUnavailable(
+                    "Primary PostgreSQL database is in failure cooldown. Refusing local SQLite fallback."
+                )
             can_try_pg = False
         else:
             _PG_AVAILABLE = None  # Cooldown passed; retry PG
@@ -410,10 +442,13 @@ def _get_raw_connection():
                 import time
                 _PG_AVAILABLE = False
                 _PG_LAST_FAIL = time.time()
-                logger.warning(
-                    f"Direct PostgreSQL fallback failed: {direct_err}. "
-                    f"Transparently failing over to local SQLite database ({get_db_path()})."
+                logger.error(
+                    "Direct PostgreSQL connection failed: %s. Failing closed (SQLite fallback disabled when PG is configured).",
+                    direct_err,
                 )
+                raise AuthoritativeDatabaseUnavailable(
+                    "Primary PostgreSQL database is temporarily unreachable."
+                ) from direct_err
 
     import sqlite3
     db_path = get_db_path()
@@ -438,9 +473,10 @@ def get_db_context():
             logger.debug(f"Failed closing connection in get_db_context: {e}")
 
 def get_db_connection():
-    """Returns a pooled PostgreSQL connection or WAL-mode SQLite fallback connection."""
+    """Returns a pooled PostgreSQL connection or local/test SQLite connection."""
     raw_url = get_configured_supabase_url()
-    target_key = "postgres" if (raw_url and is_postgres_active()) else get_db_path()
+    pg_required = is_hosted_production_runtime() or bool(raw_url)
+    target_key = "postgres" if pg_required else get_db_path()
 
     if target_key not in _INITIALIZED_DBS:
         init_db()
@@ -452,11 +488,12 @@ get_connection = get_db_connection
 
 
 def init_db(force: bool = False):
-    """Initializes tables and executes incremental schema migrations (v001 - v038)."""
+    """Initializes tables and executes incremental schema migrations (v001 - v043)."""
     global _DB_INITIALIZED, _INITIALIZED_DBS
 
     raw_url = get_configured_supabase_url()
-    target_key = "postgres" if (raw_url and is_postgres_active()) else get_db_path()
+    pg_required = is_hosted_production_runtime() or bool(raw_url)
+    target_key = "postgres" if pg_required else get_db_path()
 
     if (target_key in _INITIALIZED_DBS) and not force:
         return
@@ -2472,6 +2509,46 @@ def init_db(force: bool = False):
                             ON equity_price_history_cache(updated_at);
                     """)
                     cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v039_equity_price_history_cache') ON CONFLICT DO NOTHING;")
+                conn.commit()
+
+            # Migration v043: P0 Durable Billing Order Intents & Admin Copilot Action Proposals
+            if "v043_p0_billing_intents_and_admin_proposals" not in applied:
+                logger.info("Applying schema migration: v043_p0_billing_intents_and_admin_proposals...")
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS billing_order_intents (
+                        order_id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        user_email TEXT NOT NULL,
+                        plan_id TEXT NOT NULL,
+                        amount_paise INTEGER NOT NULL CHECK (amount_paise >= 100),
+                        currency TEXT NOT NULL,
+                        credits REAL NOT NULL CHECK (credits > 0),
+                        is_simulated INTEGER NOT NULL DEFAULT 0,
+                        status TEXT NOT NULL CHECK (status IN ('CREATED', 'FULFILLED')),
+                        gateway_payment_id TEXT UNIQUE,
+                        invoice_number TEXT,
+                        created_at_epoch BIGINT NOT NULL,
+                        fulfilled_at_epoch BIGINT
+                    );
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS admin_action_proposals (
+                        proposal_id TEXT PRIMARY KEY,
+                        actor_email TEXT NOT NULL,
+                        action_type TEXT NOT NULL,
+                        payload_json TEXT NOT NULL,
+                        status TEXT NOT NULL CHECK (status IN ('PENDING', 'EXECUTED', 'EXPIRED')),
+                        created_at_epoch BIGINT NOT NULL,
+                        expires_at_epoch BIGINT NOT NULL,
+                        consumed_at_epoch BIGINT
+                    );
+                """)
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_admin_proposals_actor ON admin_action_proposals(actor_email, status);"
+                )
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version) VALUES ('v043_p0_billing_intents_and_admin_proposals') ON CONFLICT DO NOTHING;"
+                )
                 conn.commit()
 
             _DB_INITIALIZED = True
