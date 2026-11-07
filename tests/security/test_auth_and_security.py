@@ -421,7 +421,9 @@ class TestRenderHardening(unittest.TestCase):
         test_app = FastAPI()
         valid_key = "a" * 32
 
-        with patch.dict(os.environ, {"ENVIRONMENT": "production", "SECRET_KEY": valid_key, "TESTING": "1"}):
+        with patch.dict(os.environ, {"ENVIRONMENT": "production", "SECRET_KEY": valid_key, "TESTING": "1"}), patch(
+            "web.main.init_db"
+        ):
             async def run_boot():
                 async with lifespan(test_app):
                     pass

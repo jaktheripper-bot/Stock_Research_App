@@ -71,6 +71,7 @@ from core.db.admin import (
     parse_strict_credit_amount,
     MAX_SINGLE_ADMIN_CREDIT_GRANT,
 )
+from core.db.connection import AuthoritativeDatabaseUnavailable
 from core.db.telemetry import purge_test_telemetry
 from web.common import (
     templates,
@@ -1715,7 +1716,32 @@ async def admin_reply_ticket(
         err_msg = "Reply message cannot be empty."
         if is_ajax:
             return JSONResponse(status_code=400, content={"success": False, "error": err_msg})
-        return RedirectResponse(url=f"/admin?tab=tickets&err={urllib.parse.quote_plus(err_msg)}", status_code=303)
+        return RedirectResponse(
+            url=f"/admin?tab=tickets&err={urllib.parse.quote_plus(err_msg)}",
+            status_code=303,
+        )
+
+    remedial_credits_to_grant = 0.0
+    raw_remedial_credits = (
+        "" if grant_remedial_credits is None else str(grant_remedial_credits).strip()
+    )
+    if raw_remedial_credits not in ("", "0", "0.0", "0.00"):
+        try:
+            remedial_credits_to_grant = parse_strict_credit_amount(
+                grant_remedial_credits,
+                max_allowed=MAX_SINGLE_ADMIN_CREDIT_GRANT,
+            )
+        except ValueError as exc:
+            err_msg = f"Invalid remedial credits amount: {exc}"
+            if is_ajax:
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": err_msg},
+                )
+            return RedirectResponse(
+                url=f"/admin?tab=tickets&err={urllib.parse.quote_plus(err_msg)}",
+                status_code=303,
+            )
 
     admin_email = admin_session.get("email", "support@moatnomics.com")
     admin_name = "Moatnomics Service Desk"
@@ -1756,23 +1782,43 @@ async def admin_reply_ticket(
 
     # 4. Handle optional remedial credits grant
     credits_granted = 0.0
-    if grant_remedial_credits and float(grant_remedial_credits) > 0:
+    grant_error = None
+    if remedial_credits_to_grant > 0:
         try:
-            credits_val = float(grant_remedial_credits)
-            admin_grant_user_credits(
+            grant_result = admin_grant_user_credits(
                 admin_email=admin_email,
                 target_user_identifier=ticket.get("user_email"),
-                credits_amount=credits_val,
+                credits_amount=remedial_credits_to_grant,
                 reason_code="TASK_REMEDY",
                 admin_note=f"Remedial grant from ticket response {canonical_tid}",
                 ticket_id=canonical_tid,
                 resolve_ticket=False,
                 auto_provision=True,
-                ip_address=client_ip
+                ip_address=client_ip,
+                user_agent=request.headers.get("user-agent", ""),
             )
-            credits_granted = credits_val
-        except Exception as e:
-            logger.error("Error granting remedial credits during ticket reply: %s", e)
+            if grant_result.get("success"):
+                credits_granted = float(
+                    grant_result.get("credits_added") or remedial_credits_to_grant
+                )
+            else:
+                grant_error = str(
+                    grant_result.get("error") or "Remedial credit grant was rejected."
+                )
+                logger.warning(
+                    "Remedial credit grant rejected for ticket %s: %s",
+                    canonical_tid,
+                    grant_error,
+                )
+        except AuthoritativeDatabaseUnavailable:
+            raise
+        except Exception as exc:
+            grant_error = str(exc)
+            logger.error(
+                "Remedial credit grant failed for ticket %s: %s",
+                canonical_tid,
+                exc,
+            )
 
     # 5. Record admin audit log
     record_admin_audit(
@@ -1787,7 +1833,8 @@ async def admin_reply_ticket(
             "email_configured": email_configured,
             "email_status_text": email_status_text,
             "credits_granted": credits_granted,
-            "reply_preview": clean_reply[:100]
+            "grant_error": grant_error,
+            "reply_preview": clean_reply[:100],
         },
         ip_address=client_ip
     )
@@ -1807,7 +1854,21 @@ async def admin_reply_ticket(
             "email_dispatched": email_dispatched,
             "email_service_configured": email_configured,
             "email_status_text": email_status_text,
-            "message": f"Response recorded for {ticket.get('user_email')} (Status: {new_status.upper()}). Outgoing Email: {email_status_text}."
+            "credits_granted": credits_granted,
+            "grant_error": grant_error,
+            "message": (
+                f"Response recorded for {ticket.get('user_email')} "
+                f"(Status: {new_status.upper()}). Outgoing Email: {email_status_text}."
+                + (
+                    f" Granted +{credits_granted} remedial credits."
+                    if credits_granted > 0
+                    else (
+                        f" Remedial credit grant skipped: {grant_error}"
+                        if grant_error
+                        else ""
+                    )
+                )
+            ),
         })
 
     msg = f"Response+recorded+for+{ticket.get('user_email')}"
@@ -1817,6 +1878,8 @@ async def admin_reply_ticket(
         msg += "+(email+unconfigured+-+mock+logged)"
     if credits_granted > 0:
         msg += f"+(+{credits_granted}+credits+granted)"
+    elif grant_error:
+        msg += f"+(credit+grant+skipped:+{urllib.parse.quote_plus(grant_error)})"
     return RedirectResponse(url=f"/admin?tab=tickets&msg={msg}", status_code=303)
 
 

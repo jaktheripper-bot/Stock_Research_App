@@ -28,7 +28,10 @@ import os
 import sqlite3
 import tempfile
 import threading
+import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -218,6 +221,262 @@ class TestP0CreditAndDbContainment(unittest.TestCase):
         counts_after = self._sqlite_row_counts()
         self.assertEqual(before_alice, after_alice)
         self.assertEqual(counts_before, counts_after)
+
+
+    @staticmethod
+    def _wrap_conn_with_audit_read_latency(delay_sec: float = 0.05):
+        """Inject latency on admin_audit_log reads to expose any check-then-insert race."""
+        import core.db.admin as adm_mod
+
+        orig_get_conn = adm_mod.get_db_connection
+
+        class _LatencyCursor:
+            def __init__(self, cur):
+                self._cur = cur
+
+            def execute(self, sql, *args, **kwargs):
+                res = self._cur.execute(sql, *args, **kwargs)
+                if "FROM admin_audit_log" in str(sql):
+                    time.sleep(delay_sec)
+                return res
+
+            def __getattr__(self, name):
+                return getattr(self._cur, name)
+
+        class _LatencyConn:
+            def __init__(self, conn):
+                self._conn = conn
+
+            def cursor(self, *args, **kwargs):
+                return _LatencyCursor(self._conn.cursor(*args, **kwargs))
+
+            def __getattr__(self, name):
+                return getattr(self._conn, name)
+
+        return patch.object(adm_mod, "get_db_connection", side_effect=lambda: _LatencyConn(orig_get_conn()))
+
+    def test_concurrent_grants_share_target_cap_across_id_and_email(self):
+        starting_balance = get_user_credits_balance("usr_alice")
+        barrier = threading.Barrier(2)
+
+        def grant(actor, target):
+            barrier.wait(timeout=5)
+            return admin_grant_user_credits(actor, target, 6.0)
+
+        with self._wrap_conn_with_audit_read_latency(0.05), ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(grant, "owner@example.com", "usr_alice")
+            second = pool.submit(grant, "other-admin@example.com", "alice@example.com")
+            results = [first.result(timeout=10), second.result(timeout=10)]
+
+        self.assertEqual(sum(result["success"] for result in results), 1, results)
+        rejected = next(result for result in results if not result["success"])
+        self.assertIn("24h target grant limit exceeded", rejected["error"])
+        self.assertEqual(get_user_credits_balance("usr_alice"), starting_balance + 6.0)
+
+    def test_concurrent_grants_share_actor_cap_across_targets(self):
+        get_or_create_user("usr_carol", "carol@example.com", "Carol")
+        get_or_create_user("usr_dan", "dan@example.com", "Dan")
+        actor = "owner@example.com"
+        for target in ("usr_alice", "usr_bob"):
+            self.assertTrue(admin_grant_user_credits(actor, target, 10.0)["success"])
+        targets = ("usr_carol", "usr_dan")
+        starting_total = sum(get_user_credits_balance(target) for target in targets)
+        barrier = threading.Barrier(2)
+
+        def grant(target):
+            barrier.wait(timeout=5)
+            return admin_grant_user_credits(actor, target, 4.0)
+
+        with self._wrap_conn_with_audit_read_latency(0.05), ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(grant, targets))
+
+        self.assertEqual(sum(result["success"] for result in results), 1, results)
+        rejected = next(result for result in results if not result["success"])
+        self.assertIn("24h administrator grant limit exceeded", rejected["error"])
+        self.assertEqual(sum(get_user_credits_balance(target) for target in targets), starting_total + 4.0)
+
+    def test_postgres_grant_cap_locks_actor_and_target_before_reading_audit_history(self):
+        """PostgreSQL path must take the actor advisory lock and the target FOR UPDATE lock BEFORE reading admin_audit_log."""
+        executed_sql = []
+
+        class _FakePgCursor:
+            def execute(self, sql, params=None):
+                norm = " ".join(str(sql).split())
+                executed_sql.append((norm, params))
+                self._last = norm
+
+            def fetchone(self):
+                if "FROM user_accounts" in self._last:
+                    return ("usr_alice", "alice@example.com", "Alice Sharma", 2.0)
+                return None
+
+            def fetchall(self):
+                if "FROM admin_audit_log" in self._last:
+                    return [(json.dumps({"user_id": "usr_alice", "user_email": "alice@example.com", "credits_granted": 6.0}), "other@example.com")]
+                return []
+
+            def close(self):
+                pass
+
+        class _FakePgConn:
+            def cursor(self):
+                return _FakePgCursor()
+
+            def commit(self):
+                pass
+
+            def rollback(self):
+                pass
+
+            def close(self):
+                pass
+
+        with patch("core.db.admin.is_postgres_connection", return_value=True):
+            res = admin_grant_user_credits(
+                "owner@example.com",
+                "alice@example.com",
+                6.0,
+                connection=_FakePgConn(),
+            )
+        self.assertFalse(res["success"])
+        self.assertIn("24h target grant limit exceeded", res["error"])
+        queries = [q for q, _ in executed_sql]
+        adv_idx = next((i for i, q in enumerate(queries) if "pg_advisory_xact_lock(193759, hashtext(%s))" in q), -1)
+        usr_idx = next((i for i, q in enumerate(queries) if "FROM user_accounts" in q and "FOR UPDATE" in q), -1)
+        aud_idx = next((i for i, q in enumerate(queries) if "FROM admin_audit_log" in q and "statement_timestamp()" in q), -1)
+        self.assertGreaterEqual(adv_idx, 0, f"Missing pg_advisory_xact_lock in: {queries}")
+        self.assertGreater(usr_idx, adv_idx, f"user_accounts FOR UPDATE must follow advisory lock: {queries}")
+        self.assertGreater(aud_idx, usr_idx, f"admin_audit_log read must follow both locks: {queries}")
+
+    def _insert_grant_audit(self, audit_id, details, created_at=None, admin="other@example.com"):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO admin_audit_log
+                    (id, admin_email, action, details, created_at)
+                VALUES (?, ?, 'GRANT_USER_CREDITS', ?, COALESCE(?, datetime('now')))
+                """,
+                (audit_id, admin, details, created_at),
+            )
+            conn.commit()
+
+    def test_credit_grant_history_fails_closed_on_invalid_recent_amounts(self):
+        original_balance = get_user_credits_balance("usr_alice")
+        invalid_details = (
+            "{not-json",
+            json.dumps({}),
+            json.dumps({"credits_granted": "NaN"}),
+            json.dumps({"credits_granted": -1}),
+        )
+
+        for index, details in enumerate(invalid_details):
+            with self.subTest(details=details):
+                with sqlite3.connect(self.db_path) as conn:
+                    conn.execute(
+                        "DELETE FROM admin_audit_log WHERE action = 'GRANT_USER_CREDITS'"
+                    )
+                    conn.commit()
+
+                self._insert_grant_audit(f"aud_invalid_{index}", details)
+                result = admin_grant_user_credits(
+                    "owner@example.com",
+                    "alice@example.com",
+                    1.0,
+                )
+                self.assertFalse(result["success"])
+                self.assertIn("history failed integrity validation", result["error"])
+                self.assertEqual(
+                    get_user_credits_balance("usr_alice"),
+                    original_balance,
+                )
+
+    def test_email_identity_and_ist_boundary_control_target_cap(self):
+        from core.db.connection import IST
+
+        now_ist = datetime.now(IST)
+        old_timestamp = (now_ist - timedelta(hours=25)).isoformat(
+            sep=" ", timespec="seconds"
+        )
+        recent_timestamp = (now_ist - timedelta(hours=2)).isoformat(
+            sep=" ", timespec="seconds"
+        )
+
+        self._insert_grant_audit(
+            "aud_expired_bob",
+            json.dumps(
+                {
+                    "user_id": "usr_bob",
+                    "user_email": "bob@example.com",
+                    "credits_granted": 9.0,
+                }
+            ),
+            old_timestamp,
+        )
+        self._insert_grant_audit(
+            "aud_prior_alice_id",
+            json.dumps(
+                {
+                    "user_id": "usr_legacy_alice",
+                    "user_email": "alice@example.com",
+                    "credits_granted": 7.0,
+                }
+            ),
+            recent_timestamp,
+        )
+
+        self.assertTrue(
+            admin_grant_user_credits(
+                "owner@example.com", "usr_bob", 5.0
+            )["success"]
+        )
+        result = admin_grant_user_credits(
+            "owner@example.com", "usr_alice", 4.0
+        )
+        self.assertFalse(result["success"])
+        self.assertIn("24h target grant limit exceeded", result["error"])
+
+    def test_ticket_reply_reports_rejected_remedial_grant_truthfully(self):
+        from core.db.support import create_support_ticket
+        from web.common import ADMIN_COOKIE_NAME, _generate_admin_token
+
+        self._insert_grant_audit(
+            "aud_alice_cap",
+            json.dumps(
+                {
+                    "user_id": "usr_prior_alice",
+                    "user_email": "alice@example.com",
+                    "credits_granted": 10.0,
+                }
+            ),
+        )
+        ticket = create_support_ticket(
+            "alice@example.com",
+            "Credit issue",
+            "Please review",
+            user_name="Alice Sharma",
+        )
+        cookie = _generate_admin_token("owner@example.com", "owner")
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.post(
+            "/api/admin/tickets/reply",
+            data={
+                "ticket_id": ticket["ticket_id"],
+                "reply_message": "We investigated the issue.",
+                "dispatch_email": "off",
+                "grant_remedial_credits": "1.0",
+            },
+            headers={
+                "Cookie": f"{ADMIN_COOKIE_NAME}={cookie}",
+                "Origin": "http://testserver",
+                "Accept": "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["credits_granted"], 0.0)
+        self.assertIn("24h target grant limit exceeded", body["grant_error"])
 
     def test_admin_copilot_proposal_binding_one_time_consumption_and_tamper_rejection(self):
         """Verify self-grants require confirmation, proposals are actor-bound, tamper-proof, one-time, and enforce finite/cumulative limits."""

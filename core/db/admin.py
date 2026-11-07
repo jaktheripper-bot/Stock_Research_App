@@ -668,102 +668,202 @@ def admin_grant_user_credits(
         if owns_conn and not use_pg:
             cursor.execute("BEGIN IMMEDIATE")
 
-        # Enforce 24-hour cumulative target and actor grant limits from admin_audit_log
+        # Lock order is actor -> target. The actor advisory lock serializes the
+        # per-actor cap across different target accounts; FOR UPDATE serializes
+        # the per-target cap across different administrators.
         if use_pg:
             cursor.execute(
-                "SELECT details, admin_email FROM admin_audit_log WHERE action = 'GRANT_USER_CREDITS' AND created_at >= (now() - INTERVAL '24 hours') FOR UPDATE;"
+                "SELECT pg_advisory_xact_lock(193759, hashtext(%s))",
+                (clean_admin,),
             )
-        else:
-            cursor.execute(
-                "SELECT details, admin_email FROM admin_audit_log WHERE action = 'GRANT_USER_CREDITS' AND created_at >= datetime('now', '-24 hours');"
-            )
-        recent_rows = cursor.fetchall()
-        actor_24h_total = 0.0
-        target_24h_total = 0.0
-        for det_raw, row_admin in recent_rows:
-            try:
-                det = json.loads(det_raw) if det_raw else {}
-            except Exception as det_err:
-                logger.debug("Skipping malformed admin_audit_log details JSON: %s", det_err)
-                det = {}
-            granted = float(det.get("credits_granted") or 0.0)
-            row_email = str(det.get("user_email") or "").strip().lower()
-            row_uid = str(det.get("user_id") or "").strip().lower()
-            if clean_target in (row_email, row_uid):
-                target_24h_total += granted
-            if str(row_admin or "").strip().lower() == clean_admin:
-                actor_24h_total += granted
 
-        if target_24h_total + credits_val > MAX_TARGET_DAILY_CREDIT_GRANT + 1e-6:
-            if owns_conn:
-                conn.rollback()
-            return {
-                "success": False,
-                "error": f"24h target grant limit exceeded ({target_24h_total:.1f} already granted; max {MAX_TARGET_DAILY_CREDIT_GRANT:.1f}/24h).",
-            }
-        if actor_24h_total + credits_val > MAX_ACTOR_DAILY_CREDIT_GRANT + 1e-6:
-            if owns_conn:
-                conn.rollback()
-            return {
-                "success": False,
-                "error": f"24h administrator grant limit exceeded ({actor_24h_total:.1f} already granted; max {MAX_ACTOR_DAILY_CREDIT_GRANT:.1f}/24h).",
-            }
-
-        # Step 0: Locate target user account (in-transaction provisioning avoids nested SQLite write locks)
+        # Resolve and lock the canonical target before inspecting the rolling
+        # history. This prevents a user_id/email alias from bypassing the cap.
         lock_user = " FOR UPDATE" if use_pg else ""
         cursor.execute(
-            f"SELECT id, email, full_name, credits_balance FROM user_accounts WHERE LOWER(email) = LOWER({p}) OR id = {p} LIMIT 1{lock_user};",
-            (clean_target, clean_target)
+            f"""
+            SELECT id, email, full_name, credits_balance
+            FROM user_accounts
+            WHERE LOWER(email) = LOWER({p}) OR id = {p}
+            LIMIT 1{lock_user};
+            """,
+            (clean_target, clean_target),
         )
         user_row = cursor.fetchone()
+
         if not user_row:
-            should_auto_provision = auto_provision or (clean_target == clean_admin) or (clean_target in get_authorized_bootstrap_emails())
-            if should_auto_provision and ("@" in clean_target or clean_target.startswith("usr_")):
+            should_auto_provision = (
+                auto_provision
+                or clean_target == clean_admin
+                or clean_target in get_authorized_bootstrap_emails()
+            )
+            if should_auto_provision and (
+                "@" in clean_target or clean_target.startswith("usr_")
+            ):
                 import re
-                gen_user_id = f"usr_{re.sub(r'[^a-zA-Z0-9]', '_', clean_target.lower())[:32]}"
-                gen_user_email = clean_target if "@" in clean_target else f"{clean_target}@user.local"
-                gen_user_name = clean_target.split("@")[0].replace(".", " ").title() if "@" in clean_target else "Investor"
+
+                generated_id = (
+                    f"usr_{re.sub(r'[^a-zA-Z0-9]', '_', clean_target)[:32]}"
+                )
+                generated_email = (
+                    clean_target
+                    if "@" in clean_target
+                    else f"{clean_target}@user.local"
+                )
+                generated_name = (
+                    clean_target.split("@")[0].replace(".", " ").title()
+                    if "@" in clean_target
+                    else "Investor"
+                )
                 cursor.execute(
                     f"""
-                    INSERT INTO user_accounts (id, email, full_name, credits_balance, subscription_tier)
+                    INSERT INTO user_accounts
+                        (id, email, full_name, credits_balance, subscription_tier)
                     VALUES ({p}, {p}, {p}, 0.0, 'free')
                     ON CONFLICT DO NOTHING;
                     """,
-                    (gen_user_id, gen_user_email, gen_user_name),
+                    (generated_id, generated_email, generated_name),
                 )
                 cursor.execute(
-                    f"SELECT id, email, full_name, credits_balance FROM user_accounts WHERE id = {p} OR LOWER(email) = LOWER({p}) LIMIT 1{lock_user};",
-                    (gen_user_id, gen_user_email)
+                    f"""
+                    SELECT id, email, full_name, credits_balance
+                    FROM user_accounts
+                    WHERE id = {p} OR LOWER(email) = LOWER({p})
+                    LIMIT 1{lock_user};
+                    """,
+                    (generated_id, generated_email),
                 )
                 user_row = cursor.fetchone()
 
         if not user_row:
             if owns_conn:
                 conn.rollback()
-            return {"success": False, "error": f"User '{target_user_identifier}' not found in registered accounts."}
+            return {
+                "success": False,
+                "error": (
+                    f"User '{target_user_identifier}' not found in registered accounts."
+                ),
+            }
 
-        # Re-check 24h target limit against resolved canonical user_id and user_email
-        resolved_uid = str(user_row[0]).strip().lower()
-        resolved_email = str(user_row[1]).strip().lower()
-        if clean_target not in (resolved_uid, resolved_email):
-            target_24h_total = 0.0
-            for det_raw, _ in recent_rows:
-                try:
-                    det = json.loads(det_raw) if det_raw else {}
-                except Exception as det_err:
-                    logger.debug("Skipping malformed admin_audit_log details JSON: %s", det_err)
-                    det = {}
-                if resolved_uid == str(det.get("user_id") or "").strip().lower() or resolved_email == str(det.get("user_email") or "").strip().lower():
-                    target_24h_total += float(det.get("credits_granted") or 0.0)
-            if target_24h_total + credits_val > MAX_TARGET_DAILY_CREDIT_GRANT + 1e-6:
-                if owns_conn:
-                    conn.rollback()
-                return {
-                    "success": False,
-                    "error": f"24h target grant limit exceeded ({target_24h_total:.1f} already granted; max {MAX_TARGET_DAILY_CREDIT_GRANT:.1f}/24h).",
-                }
+        resolved_uid = str(user_row[0] or "").strip().lower()
+        resolved_email = str(user_row[1] or "").strip().lower()
 
+        # Read after both applicable locks. PostgreSQL READ COMMITTED obtains a
+        # fresh statement snapshot here after any preceding lock wait.
+        if use_pg:
+            cursor.execute(
+                """
+                SELECT details, admin_email
+                FROM admin_audit_log
+                WHERE action = 'GRANT_USER_CREDITS'
+                  AND created_at >= statement_timestamp() - INTERVAL '24 hours'
+                """
+            )
+        else:
+            # datetime(created_at) normalizes legacy UTC, IST-offset, and plain
+            # SQLite values before comparison. The broad textual prefilter keeps
+            # the indexed scan bounded without deciding eligibility by itself.
+            cursor.execute(
+                """
+                SELECT details, admin_email
+                FROM admin_audit_log
+                WHERE action = 'GRANT_USER_CREDITS'
+                  AND created_at >= datetime('now', '-36 hours')
+                  AND datetime(created_at) >= datetime('now', '-24 hours')
+                """
+            )
 
+        actor_24h_total = 0.0
+        target_24h_total = 0.0
+        integrity_error = None
+
+        for details_raw, row_admin in cursor.fetchall():
+            try:
+                details = json.loads(details_raw)
+            except (TypeError, ValueError) as exc:
+                integrity_error = "malformed audit details"
+                logger.error(
+                    "Credit grant history integrity failure: malformed audit JSON: %s",
+                    exc,
+                )
+                break
+
+            if not isinstance(details, dict):
+                integrity_error = "non-object audit details"
+                logger.error(
+                    "Credit grant history integrity failure: audit details are not an object."
+                )
+                break
+
+            raw_amount = details.get("credits_granted")
+            if isinstance(raw_amount, bool) or raw_amount is None:
+                integrity_error = "missing or boolean audit amount"
+                logger.error(
+                    "Credit grant history integrity failure: missing or invalid credits_granted."
+                )
+                break
+
+            try:
+                granted = float(raw_amount)
+            except (TypeError, ValueError):
+                integrity_error = "non-numeric audit amount"
+                logger.error(
+                    "Credit grant history integrity failure: non-numeric credits_granted."
+                )
+                break
+
+            if not math.isfinite(granted) or granted < 0:
+                integrity_error = "non-finite or negative audit amount"
+                logger.error(
+                    "Credit grant history integrity failure: invalid credits_granted=%r.",
+                    raw_amount,
+                )
+                break
+
+            row_uid = str(details.get("user_id") or "").strip().lower()
+            row_email = str(details.get("user_email") or "").strip().lower()
+            if (
+                (resolved_uid and row_uid == resolved_uid)
+                or (resolved_email and row_email == resolved_email)
+            ):
+                target_24h_total += granted
+            if str(row_admin or "").strip().lower() == clean_admin:
+                actor_24h_total += granted
+
+        if integrity_error:
+            if owns_conn:
+                conn.rollback()
+            return {
+                "success": False,
+                "error": (
+                    "Credit grant history failed integrity validation. "
+                    "No credits were granted."
+                ),
+            }
+
+        if target_24h_total + credits_val > MAX_TARGET_DAILY_CREDIT_GRANT + 1e-6:
+            if owns_conn:
+                conn.rollback()
+            return {
+                "success": False,
+                "error": (
+                    f"24h target grant limit exceeded "
+                    f"({target_24h_total:.1f} already granted; "
+                    f"max {MAX_TARGET_DAILY_CREDIT_GRANT:.1f}/24h)."
+                ),
+            }
+
+        if actor_24h_total + credits_val > MAX_ACTOR_DAILY_CREDIT_GRANT + 1e-6:
+            if owns_conn:
+                conn.rollback()
+            return {
+                "success": False,
+                "error": (
+                    f"24h administrator grant limit exceeded "
+                    f"({actor_24h_total:.1f} already granted; "
+                    f"max {MAX_ACTOR_DAILY_CREDIT_GRANT:.1f}/24h)."
+                ),
+            }
 
         user_id = user_row[0]
         user_email = user_row[1]
@@ -791,7 +891,7 @@ def admin_grant_user_credits(
                     payment_gateway, gateway_order_id, gateway_payment_id, status, pack_type,
                     invoice_number, base_amount_inr, tax_gst_inr, sac_code, created_at
                 )
-                VALUES ({p}, {p}, {p}, {p}, 0.0, {p}, 'admin_grant', {p}, {p}, 'success', {p}, {p}, 0.0, 0.0, '', now());
+                VALUES ({p}, {p}, {p}, {p}, 0.0, {p}, 'admin_grant', {p}, {p}, 'success', {p}, {p}, 0.0, 0.0, '', statement_timestamp());
                 """,
                 (tx_id, user_id, user_email, user_name, credits_val, clean_ticket or "ADMIN_GRANT", None, pack_type, inv_num)
             )
@@ -799,7 +899,7 @@ def admin_grant_user_credits(
             cursor.execute(
                 f"""
                 INSERT INTO credit_usage_ledger (user_id, ticker, action_type, credits_consumed, balance_after, created_at)
-                VALUES ({p}, {p}, {p}, 0.0, {p}, now());
+                VALUES ({p}, {p}, {p}, 0.0, {p}, statement_timestamp());
                 """,
                 (user_id, clean_ticker or "PLATFORM", pack_type, new_balance)
             )
@@ -846,7 +946,7 @@ def admin_grant_user_credits(
             cursor.execute(
                 f"""
                 INSERT INTO admin_audit_log (id, admin_email, action, target_type, target_id, details, ip_address, user_agent, created_at)
-                VALUES ({p}, {p}, 'GRANT_USER_CREDITS', 'user', {p}, {p}, {p}, {p}, now());
+                VALUES ({p}, {p}, 'GRANT_USER_CREDITS', 'user', {p}, {p}, {p}, {p}, statement_timestamp());
                 """,
                 (audit_id, clean_admin, user_id, details_json, ip_address, user_agent)
             )

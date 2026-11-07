@@ -4534,7 +4534,7 @@ html[data-theme="light"] .copilot-input {
           </div>
           <div>
             <label style="display: block; font-size: 11px; margin-bottom: 4px; color: #94a3b8; font-weight: 600;">Remedial Credits (Optional)</label>
-            <input type="number" step="any" min="0" max="100" name="grant_remedial_credits" id="replyRemedialCredits" value="0.0" class="admin-input" style="width: 100%; box-sizing: border-box; font-size: 16px; padding: 5px 8px;" placeholder="0.0">
+            <input type="number" step="0.01" min="0" max="10" name="grant_remedial_credits" id="replyRemedialCredits" value="0.0" class="admin-input" style="width: 100%; box-sizing: border-box; font-size: 16px; padding: 5px 8px;" placeholder="0.0 (max 10.0)">
           </div>
         </div>
 
@@ -5230,7 +5230,20 @@ html[data-theme="light"] .copilot-input {
         // Reload modal thread while preserving the newly applied status
         await openTicketReplyModal(res.ticket_id, effectiveStatus);
         if (window.showToast) {
-          window.showToast(`Reply sent & ticket ${res.ticket_id} marked ${effectiveStatus.toUpperCase()}`, 'success');
+          if (res.grant_error) {
+            window.showToast(
+              `Reply sent (${effectiveStatus.toUpperCase()}); remedial grant skipped: ${res.grant_error}`,
+              'warning'
+            );
+          } else {
+            const creditSuffix = Number(res.credits_granted) > 0
+              ? ` (+${res.credits_granted} credits)`
+              : '';
+            window.showToast(
+              `Reply sent & ticket ${res.ticket_id} marked ${effectiveStatus.toUpperCase()}${creditSuffix}`,
+              'success'
+            );
+          }
         }
       } else {
         alert('Failed to send reply: ' + (res.error || res.detail || 'Unknown error'));
