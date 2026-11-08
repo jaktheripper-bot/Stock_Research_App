@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# P0 credit-grant integrity hardening (v2: PostgreSQL test env fix, lock-order tests restored,
-# Living Docs sync, TestRenderHardening fix, duplicate-line and dirty-tree-guard fixes).
+# P0 credit-grant integrity hardening (v3: isolated PostgreSQL integration tests,
+# outcome-unknown handling, and complete release gates).
 #
 # Fixes:
 # - Serializes PostgreSQL credit-cap checks across same-admin and same-target grants.
@@ -10,7 +10,9 @@
 # - Reports actual ticket-remedy grant outcomes.
 # - Uses staged writes with rollback on write failure; does not claim cross-file atomicity.
 # - Adds SQLite regression coverage, deterministic PostgreSQL lock-order coverage, and an opt-in
-#   real PostgreSQL integration test (requires a dedicated test database).
+#   real PostgreSQL integration test that requires an explicitly named disposable database.
+# - Never labels an authoritative-database interruption as a skipped grant: reconciliation is
+#   required before a human retries the ticket action.
 # - Synchronizes Living Docs (AGENTS.md Rule 3) and fixes the pytest boot-guard test.
 #
 # Usage:
@@ -19,7 +21,8 @@
 #   bash apply_p0_credit_hardening.sh --apply --with-tests
 #
 # Optional PostgreSQL integration test:
-#   MOATNOMICS_TEST_POSTGRES_DSN='postgresql://...' \
+#   MOATNOMICS_TEST_POSTGRES_DSN='postgresql://.../moatnomics_test_credit' \
+#   MOATNOMICS_PG_TEST_ACK=DISPOSABLE_DATABASE \
 #     .venv/bin/python -m unittest \
 #     tests.integration.test_postgres_credit_grant_concurrency
 
@@ -27,7 +30,7 @@ set -euo pipefail
 
 MODE="check"
 WITH_TESTS=0
-REPO="${REPO:-/Users/lyndonpinto/Documents/Stock_Research_App}"
+REPO="${REPO:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 
 while (($#)); do
   case "$1" in
@@ -277,7 +280,7 @@ replace_between(
             try:
                 granted = float(raw_amount)
             except (TypeError, ValueError):
-                integrity_error = "non-numeric audit amount"
+                integrity_error = "non-numeric credits_granted"
                 logger.error(
                     "Credit grant history integrity failure: non-numeric credits_granted."
                 )
@@ -452,6 +455,7 @@ replace_between(
                     grant_error,
                 )
         except AuthoritativeDatabaseUnavailable:
+            # Fail closed on authoritative database outage; preserve 503 response
             raise
         except Exception as exc:
             grant_error = str(exc)
@@ -504,7 +508,7 @@ replace_once(
                     f" Granted +{credits_granted} remedial credits."
                     if credits_granted > 0
                     else (
-                        f" Remedial credit grant skipped: {grant_error}"
+                        f" Remedial credit status: {grant_error}"
                         if grant_error
                         else ""
                     )
@@ -522,7 +526,7 @@ replace_once(
     '''    if credits_granted > 0:
         msg += f"+(+{credits_granted}+credits+granted)"
     elif grant_error:
-        msg += f"+(credit+grant+skipped:+{urllib.parse.quote_plus(grant_error)})"
+        msg += f"+(credit+grant+status:+{urllib.parse.quote_plus(grant_error)})"
     return RedirectResponse(url=f"/admin?tab=tickets&msg={msg}", status_code=303)
 ''',
 )
@@ -544,7 +548,7 @@ replace_once(
     '''        if (window.showToast) {
           if (res.grant_error) {
             window.showToast(
-              `Reply sent (${effectiveStatus.toUpperCase()}); remedial grant skipped: ${res.grant_error}`,
+              `Reply sent (${effectiveStatus.toUpperCase()}); remedial credit status: ${res.grant_error}`,
               'warning'
             );
           } else {
@@ -857,6 +861,8 @@ import unittest
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
+from urllib.parse import urlparse
+import re
 
 
 POSTGRES_DSN = os.environ.get("MOATNOMICS_TEST_POSTGRES_DSN", "").strip()
@@ -866,9 +872,17 @@ POSTGRES_DSN = os.environ.get("MOATNOMICS_TEST_POSTGRES_DSN", "").strip()
 class TestPostgresCreditGrantConcurrency(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if "test" not in POSTGRES_DSN.lower():
+        parsed_dsn = urlparse(POSTGRES_DSN)
+        database_name = parsed_dsn.path.lstrip("/")
+        if not re.fullmatch(r"moatnomics_test_[a-z0-9_]+", database_name):
             raise RuntimeError(
-                "Refusing PostgreSQL integration test: DSN must identify a dedicated test database."
+                "Refusing PostgreSQL integration test: database name must match "
+                "moatnomics_test_<purpose>."
+            )
+        if os.environ.get("MOATNOMICS_PG_TEST_ACK") != "DISPOSABLE_DATABASE":
+            raise RuntimeError(
+                "Refusing PostgreSQL integration test without "
+                "MOATNOMICS_PG_TEST_ACK=DISPOSABLE_DATABASE."
             )
 
         import core.db.connection as db
@@ -969,6 +983,52 @@ class TestPostgresCreditGrantConcurrency(unittest.TestCase):
             futures = [pool.submit(grant, *call) for call in calls]
             return [future.result(timeout=30) for future in futures]
 
+    def tearDown(self):
+        """Remove every row created by this test, even when an assertion fails."""
+        from core.db.connection import get_db_connection
+
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            ids = (self.alice_id, self.bob_id, self.carol_id, self.dan_id)
+            cur.execute(
+                "DELETE FROM admin_audit_log WHERE target_id IN (%s, %s, %s, %s)", ids
+            )
+            cur.execute(
+                "DELETE FROM credit_usage_ledger WHERE user_id IN (%s, %s, %s, %s)", ids
+            )
+            cur.execute(
+                "DELETE FROM credit_transactions WHERE user_id IN (%s, %s, %s, %s)", ids
+            )
+            cur.execute("DELETE FROM user_accounts WHERE id IN (%s, %s, %s, %s)", ids)
+            conn.commit()
+        finally:
+            conn.close()
+
+    def _account_counts(self, user_id):
+        from core.db.connection import get_db_connection
+
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT credits_balance FROM user_accounts WHERE id = %s", (user_id,)
+            )
+            balance = float(cur.fetchone()[0])
+            cur.execute("SELECT COUNT(*) FROM credit_transactions WHERE user_id = %s", (user_id,))
+            transactions = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM credit_usage_ledger WHERE user_id = %s", (user_id,))
+            ledger_rows = cur.fetchone()[0]
+            cur.execute(
+                "SELECT COUNT(*) FROM admin_audit_log "
+                "WHERE action = 'GRANT_USER_CREDITS' AND target_id = %s",
+                (user_id,),
+            )
+            audit_rows = cur.fetchone()[0]
+            return balance, transactions, ledger_rows, audit_rows
+        finally:
+            conn.close()
+
     def test_target_cap_serializes_across_two_administrators(self):
         results = self._concurrent_grants(
             (
@@ -981,6 +1041,7 @@ class TestPostgresCreditGrantConcurrency(unittest.TestCase):
             "24h target grant limit exceeded",
             next(item["error"] for item in results if not item["success"]),
         )
+        self.assertEqual(self._account_counts(self.alice_id), (6.0, 1, 1, 1))
 
     def test_actor_cap_serializes_across_two_targets(self):
         from core.db.admin import admin_grant_user_credits
@@ -1003,17 +1064,22 @@ class TestPostgresCreditGrantConcurrency(unittest.TestCase):
             "24h administrator grant limit exceeded",
             next(item["error"] for item in results if not item["success"]),
         )
+        alice = self._account_counts(self.alice_id)
+        bob = self._account_counts(self.bob_id)
+        carol = self._account_counts(self.carol_id)
+        dan = self._account_counts(self.dan_id)
+        self.assertEqual(alice[0], 10.0)
+        self.assertEqual(bob[0], 10.0)
+        self.assertEqual(carol[0] + dan[0], 4.0)
+        self.assertEqual(alice[1] + bob[1] + carol[1] + dan[1], 3)
+        self.assertEqual(alice[2] + bob[2] + carol[2] + dan[2], 3)
+        self.assertEqual(alice[3] + bob[3] + carol[3] + dan[3], 3)
 
 
 if __name__ == "__main__":
     unittest.main()
 '''
 pg_path = repo / "tests/integration/test_postgres_credit_grant_concurrency.py"
-if pg_path.exists():
-    raise SystemExit(
-        "ERROR: tests/integration/test_postgres_credit_grant_concurrency.py already exists; "
-        "review it rather than overwriting it."
-    )
 staged[pg_path] = pg_test
 
 
@@ -1116,8 +1182,7 @@ if [[ "$MODE" == "apply" && "$WITH_TESTS" == "1" ]]; then
     TESTING=1 FORCE_LOCAL_SQLITE=1 \
       ADMIN_PASSWORD=test_admin_pwd_default \
       "$PY" -m pytest -q \
-      tests/unit/test_p0_credit_and_db_containment.py \
-      tests/integration/test_postgres_credit_grant_concurrency.py
+      tests/unit/test_p0_credit_and_db_containment.py
 
     TESTING=1 FORCE_LOCAL_SQLITE=1 \
       ADMIN_PASSWORD=test_admin_pwd_default \
@@ -1126,6 +1191,16 @@ if [[ "$MODE" == "apply" && "$WITH_TESTS" == "1" ]]; then
 
     TESTING=1 FORCE_LOCAL_SQLITE=1 \
       "$PY" scripts/verify_reality_audit.py
+
+    TESTING=1 FORCE_LOCAL_SQLITE=1 \
+      "$PY" scripts/run_project_audit.py --quick
+
+    if [[ -n "${MOATNOMICS_TEST_POSTGRES_DSN:-}" ]]; then
+      MOATNOMICS_PG_TEST_ACK="${MOATNOMICS_PG_TEST_ACK:-}" \
+        "$PY" -m pytest -q tests/integration/test_postgres_credit_grant_concurrency.py
+    else
+      echo "SKIPPED: postgres-concurrency (MOATNOMICS_TEST_POSTGRES_DSN not configured)"
+    fi
 
     TESTING=1 FORCE_LOCAL_SQLITE=1 \
       "$PY" -m unittest discover -s tests
