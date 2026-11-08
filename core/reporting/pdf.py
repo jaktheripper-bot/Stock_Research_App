@@ -494,10 +494,32 @@ def generate_fund_dossier_pdf(
     else:
         health_display = "Coverage Pending"
         health_status = "Look-Through Audit Paused (< 70% Verified Coverage)"
-    moat = float(dossier.get("weighted_moat_score") or 65.0)
-    asri = float(dossier.get("accounting_risk_index") or 15.0)
-    mos = float(dossier.get("margin_of_safety_pct") or 0.0)
-    active_share = float(dossier.get("active_share_pct") or 75.0)
+    raw_moat = dossier.get("weighted_moat_score")
+    if raw_moat is not None and float(raw_moat) >= 0:
+        moat_val = float(raw_moat)
+        moat_display = f"{moat_val:.1f} / 100"
+        moat_posture = "Wide Moat Bias" if moat_val >= 70 else "Blend"
+    else:
+        moat_display = "Coverage Pending"
+        moat_posture = "Awaiting >= 70% Constituent Coverage"
+
+    raw_asri = dossier.get("accounting_risk_index")
+    if raw_asri is not None and float(raw_asri) >= 0:
+        asri_val = float(raw_asri)
+        asri_display = f"{asri_val:.1f}%"
+        asri_posture = "Clean Portfolio" if asri_val < 20 else "Elevated Audit Caution"
+    else:
+        asri_display = "Coverage Pending"
+        asri_posture = "Awaiting >= 70% Constituent Coverage"
+
+    raw_active_share = dossier.get("active_share_pct")
+    if raw_active_share is not None and float(raw_active_share) >= 0:
+        active_share_val = float(raw_active_share)
+        active_share_display = f"{active_share_val:.1f}%"
+        active_share_posture = "True Active Alpha" if active_share_val >= 60 else "Closet Indexing Drag"
+    else:
+        active_share_display = "Benchmark Pending"
+        active_share_posture = "Benchmark Proxy Not Mapped"
 
     header = f"""# Mutual Fund Look-Through Report: {scheme_title}
 > **Scheme Code:** `{scheme_code}` | **Document ID:** `{doc_id}`  
@@ -506,22 +528,22 @@ def generate_fund_dossier_pdf(
 """
 
     if deep_dive_unlocked:
-        deep_rows = f"""| **Weighted Moat Score** | **{moat:.1f} / 100** | {'Wide Moat Bias' if moat >= 70 else 'Blend'} |
-| **Accounting Risk Index (ASRI)** | **{asri:.1f}%** | {'Clean Portfolio' if asri < 20 else 'Elevated Audit Caution'} |
-| **Margin of Safety (MoS)** | **{mos:+.1f}%** | {'Discounted Under-Valuation' if mos > 0 else 'Premium Over Fair Value'} |
+        deep_rows = f"""| **Weighted Moat Score** | **{moat_display}** | {moat_posture} |
+| **Accounting Risk Index (ASRI)** | **{asri_display}** | {asri_posture} |
+| **Valuation Tilt** | **Qualitative Pillar Grades** | Constituent-level DCF figures are not aggregated |
 """
     else:
         deep_rows = (
             "| **Weighted Moat Score** | Deep Dive | Unlock on the website (1 credit) |\n"
             "| **Accounting Risk Index (ASRI)** | Deep Dive | Unlock on the website (1 credit) |\n"
-            "| **Margin of Safety (MoS)** | Deep Dive | Unlock on the website (1 credit) |\n"
+            "| **Valuation Tilt** | Deep Dive | Unlock on the website (1 credit) |\n"
         )
 
     scorecard_md = f"""### Executive Look-Through Scorecard
 | Metric | Value | Posture / Status |
 | :--- | :--- | :--- |
 | **Composite Health Score** | **{health_display}** | {health_status} |
-{deep_rows}| **Active Share (Closet-Indexing)** | **{active_share:.1f}%** | {'True Active Alpha' if active_share >= 60 else 'Closet Indexing Drag'} |
+{deep_rows}| **Active Share (Closet-Indexing)** | **{active_share_display}** | {active_share_posture} |
 """
 
     meta_table = f"""### Scheme Profile & Portfolio Facts

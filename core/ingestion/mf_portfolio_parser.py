@@ -642,34 +642,39 @@ def _holding_type_from_isin(isin: str, section: Optional[str]) -> str:
     return base
 
 
+def _disclosure_dates(text: str) -> List[str]:
+    text = re.sub(r"(\d{1,2})(?:st|nd|rd|th)\b", r"\1", _clean(text), flags=re.IGNORECASE)
+    results: List[str] = []
+    patterns = (
+        (r"(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)", (1, 2, 3)),
+        (r"([A-Za-z]{3,9})\.?\s+(\d{1,2})\s*,?\s*(\d{4})(?!\d)", (3, 1, 2)),
+        (r"(?<!\d)(\d{1,2})[-\s/_]([A-Za-z]{3,9})[-\s/_,]*(\d{2,4})(?!\d)", (3, 2, 1)),
+        (r"(?<![\d-])(\d{1,2})[./-](\d{1,2})[./-](\d{4})(?!\d)", (3, 2, 1)),
+    )
+    for pattern, (year_group, month_group, day_group) in patterns:
+        for match in re.finditer(pattern, text):
+            month_raw = match.group(month_group).lower()
+            if month_raw.isdigit():
+                month: Optional[int] = int(month_raw)
+            else:
+                month = next((number for name, number in _MONTHS.items() if name[:3] == month_raw[:3]), None)
+            if month is None:
+                continue
+            year = int(match.group(year_group))
+            if year < 100:
+                year += 2000
+            try:
+                results.append(date(year, month, int(match.group(day_group))).isoformat())
+            except ValueError as dt_err:
+                logger.debug("Invalid disclosure date candidate in %r: %s", text, dt_err)
+                continue
+    return results
+
+
 def parse_as_on_date(text: str) -> Optional[str]:
-    """Parses 'as on August 31,2026' / '31st September 2026' / '31-Aug-2026' / '31/08/2026' into ISO date."""
-    t = re.sub(r"(\d{1,2})(?:st|nd|rd|th)\b", r"\1", _clean(text), flags=re.IGNORECASE)
-    m = re.search(r"([A-Za-z]{3,9})\.?\s+(\d{1,2})\s*,?\s*(\d{4})", t)
-    if m:
-        mon = next((v for k, v in _MONTHS.items() if k == m.group(1).lower() or k.startswith(m.group(1).lower()[:3])), None)
-        if mon:
-            try:
-                return date(int(m.group(3)), mon, int(m.group(2))).isoformat()
-            except ValueError:
-                pass
-    m = re.search(r"(\d{1,2})[-\s/_]([A-Za-z]{3,9})[-\s/_,]*(\d{2,4})", t)
-    if m:
-        mon = next((v for k, v in _MONTHS.items() if k.startswith(m.group(2).lower()[:3])), None)
-        if mon:
-            yr = int(m.group(3))
-            yr += 2000 if yr < 100 else 0
-            try:
-                return date(yr, mon, int(m.group(1))).isoformat()
-            except ValueError:
-                pass
-    m = re.search(r"(\d{1,2})[./-](\d{1,2})[./-](\d{4})", t)
-    if m:
-        try:
-            return date(int(m.group(3)), int(m.group(2)), int(m.group(1))).isoformat()
-        except ValueError:
-            return None
-    return None
+    """Return the first date candidate for legacy source discovery."""
+    dates = _disclosure_dates(text)
+    return dates[0] if dates else None
 
 
 def _pick_scheme_title_candidate(candidates: List[str]) -> str:
@@ -691,7 +696,8 @@ def parse_scheme_sheet(rows: Iterable[List[Any]]) -> Optional[Dict[str, Any]]:
     """Parses one scheme sheet. Returns None if the sheet is not a portfolio statement."""
     title_candidates: List[str] = []
     aliases: List[str] = []
-    as_on: Optional[str] = None
+    explicit_dates: set[str] = set()
+    contextual_dates: set[str] = set()
     cols: Optional[Dict[str, int]] = None
     section: Optional[str] = None
     holdings: List[Dict[str, Any]] = []
@@ -705,8 +711,11 @@ def parse_scheme_sheet(rows: Iterable[List[Any]]) -> Optional[Dict[str, Any]]:
 
         if cols is None:
             joined = " ".join(nonempty)
-            if not as_on and any(k in joined.lower() for k in ("portfolio", "as on", "as at", "statement")):
-                as_on = parse_as_on_date(joined)
+            marker = re.search(r"\bas\s+(?:on|at|of)\b", joined, re.IGNORECASE)
+            if marker:
+                explicit_dates.update(_disclosure_dates(joined[marker.end():]))
+            elif re.search(r"\b(?:portfolio|statement)\b", joined, re.IGNORECASE):
+                contextual_dates.update(_disclosure_dates(joined))
             detected = _detect_columns(list(row))
             if detected:
                 cols = detected
@@ -808,11 +817,12 @@ def parse_scheme_sheet(rows: Iterable[List[Any]]) -> Optional[Dict[str, Any]]:
         return None
 
     scheme_title = _pick_scheme_title_candidate(title_candidates)
+    dates = explicit_dates or contextual_dates
     return {
         "scheme_title": scheme_title,
         "scheme_name": _strip_parenthetical(scheme_title),
         "aliases": aliases,
-        "as_on_date": as_on,
+        "as_on_date": next(iter(dates)) if len(dates) == 1 else None,
         "holdings": holdings,
         "header_row": header_seen_at,
     }

@@ -262,6 +262,7 @@ class TestResearchDeskPaywall(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         init_db()
+        _seed_published_fund_fixture(FUND)
 
     def _turn(self, cid, message, ticker, asset_type, section=None, **kwargs):
         return asyncio.run(process_research_desk_turn(
@@ -342,6 +343,78 @@ class TestResearchDeskPaywall(unittest.TestCase):
             self.assertNotIn(gated, captured)
 
 
+def _seed_published_fund_fixture(scheme_code: str = FUND) -> str:
+    """Publish a validated test disclosure snapshot and receipted dossier for paywall gating tests."""
+    from core.db.mutual_funds import (
+        get_current_fund_disclosure,
+        get_mutual_fund_scheme,
+        get_scheme_holdings,
+        publish_mutual_fund_disclosure,
+        save_fund_forensic_dossier,
+        seed_default_mutual_funds,
+    )
+
+    scheme = get_mutual_fund_scheme(scheme_code)
+    if not scheme:
+        seed_default_mutual_funds()
+        scheme = get_mutual_fund_scheme(scheme_code)
+
+    current = get_current_fund_disclosure(scheme_code)
+    if current:
+        snapshot_id = current["snapshot_id"]
+        as_on = current["as_on_date"]
+        disclosure_source = current.get("holdings_source") or "sebi_monthly_disclosure"
+        disclosure_source_url = current.get("source_url") or "https://www.ppfas.com/downloads/portfolio-disclosure/fixture.xls"
+    else:
+        holdings = get_scheme_holdings(scheme_code) or [
+            {"holding_type": "EQUITY", "identifier": "INFY", "holding_name": "Infosys Ltd", "weight_pct": 100.0}
+        ]
+        as_on = "2025-09-30"
+        disclosure_source = "sebi_monthly_disclosure"
+        disclosure_source_url = "https://www.ppfas.com/downloads/portfolio-disclosure/fixture.xls"
+        pub_scheme = {
+            **(scheme or {"scheme_code": scheme_code, "scheme_name": scheme_code, "broad_category": "EQUITY"}),
+            "last_portfolio_date": as_on,
+            "metadata": {
+                **((scheme or {}).get("metadata") or {}),
+                "holdings_source": disclosure_source,
+                "holdings_source_url": disclosure_source_url,
+            },
+        }
+        pub_holdings = [{**h, "portfolio_date": as_on} for h in holdings]
+        snapshot_id = publish_mutual_fund_disclosure(pub_scheme, pub_holdings)
+
+    receipt = {
+        "snapshot_id": snapshot_id,
+        "scheme_code": scheme_code,
+        "as_on_date": as_on,
+        "disclosure_source": disclosure_source,
+        "disclosure_source_url": disclosure_source_url,
+        "analyzed_at": "2025-10-05T10:00:00+05:30",
+        "method_version": "fund-evidence-v1",
+        "researched_weight_pct_nav": 78.5,
+        "researched_equity_weight_pct": 85.0,
+        "top_uncovered_holdings": [],
+        "metrics": {
+            "valuation_tilt": {"value": "balanced", "coverage_pct_nav": 78.5},
+            "governance_solvency_watchlist": {"value_pct_nav": 0.0, "coverage_pct_nav": 78.5},
+        },
+    }
+    save_fund_forensic_dossier(
+        {
+            "scheme_code": scheme_code,
+            "composite_health_score": 82.0,
+            "weighted_moat_score": 84.0,
+            "accounting_risk_index": 3.5,
+            "top_quality_holdings": [{"identifier": "INFY", "name": "Infosys Ltd", "weight_pct": 6.8}],
+            "top_risky_holdings": [],
+            "dossier_text": "### Look-Through Findings\nGrounded portfolio look-through evidence on disclosed equity holdings.",
+            "evidence_receipt": receipt,
+        }
+    )
+    return snapshot_id
+
+
 # ==============================================================================
 # 5. Pages & APIs Gating
 # ==============================================================================
@@ -350,6 +423,7 @@ class TestPagesAndApis(unittest.TestCase):
     def setUpClass(cls):
         from web.main import app
         init_db()
+        _seed_published_fund_fixture(FUND)
         cls.client = TestClient(app)
 
     def test_guest_fund_page_shows_unlock_card_not_gated_content(self):
@@ -409,6 +483,7 @@ class TestUnlockEndpoints(unittest.TestCase):
     def setUpClass(cls):
         from web.main import app
         init_db()
+        _seed_published_fund_fixture(FUND)
         cls.client = TestClient(app)
 
     def test_unlock_requires_sign_in(self):
@@ -426,13 +501,20 @@ class TestUnlockEndpoints(unittest.TestCase):
         self.assertEqual(self.client.post("/api/debt/unlock/NOPE000000000").status_code, 404)
 
     def test_fund_unlock_charges_namespaced_key(self):
-        with mock.patch("web.main._get_current_web_user", return_value={"id": "u1"}), \
-             mock.patch("web.main.unlock_ticker_for_user", return_value=(True, 4.0, "ok")) as charge:
+        from uuid import uuid4
+        from core.db.users import add_user_credits, get_or_create_user, is_ticker_unlocked_for_user
+
+        uid = f"u1-{uuid4().hex[:8]}"
+        get_or_create_user(uid, f"{uid}@example.invalid", "Unlock Tester")
+        add_user_credits(uid, 3.0, "TOPUP", f"pay-{uid}")  # 2.0 welcome + 3.0 = 5.0 credits
+        with mock.patch.dict("os.environ", {"ENABLE_DURABLE_FUND_AUDITS": "1"}), \
+             mock.patch("web.main._get_current_web_user", return_value={"id": uid}), \
+             mock.patch("web.routers.markets._validate_request_origin", return_value=True):
             resp = self.client.post(f"/api/funds/unlock/{FUND}")
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(charge.call_args.kwargs["ticker"], f"FUND:{FUND}")
-        self.assertEqual(charge.call_args.kwargs["amount"], 1.0)
+        self.assertEqual(resp.status_code, 200, resp.text)
         self.assertEqual(resp.json()["new_balance"], 4.0)
+        self.assertTrue(is_ticker_unlocked_for_user(uid, f"FUND:{FUND}"))
+        self.assertFalse(is_ticker_unlocked_for_user(uid, FUND))
 
     def test_debt_unlock_insufficient_credits_returns_402(self):
         with mock.patch("web.main._get_current_web_user", return_value={"id": "u1"}), \
@@ -527,6 +609,7 @@ class TestMultiAssetCopilotPaywallRedactions(unittest.TestCase):
 
     def setUp(self):
         init_db()
+        _seed_published_fund_fixture(FUND)
 
     def test_locked_fund_redacts_forensic_dossier_text(self):
         captured = {}

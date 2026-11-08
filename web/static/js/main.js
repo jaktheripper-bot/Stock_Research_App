@@ -706,13 +706,13 @@ const EVALUATION_CONFIGS = {
     ]
   },
   opportunity: {
-    badge: 'Multi-Asset Arbitrage Scanner',
+    badge: 'Multi-Asset Opportunity Terminal',
     title: (name) => `Evaluating Multi-Asset Opportunity: ${name || 'Selected Opportunity'}`,
     stages: [
-      { maxSec: 7, stage: "Step 1/4: Parsing Multi-Asset Yield Spreads", msg: "Scanning equity earnings yields, bond spreads, sovereign curve rates, and real asset distributions..." },
-      { maxSec: 16, stage: "Step 2/4: Computing Post-Tax Hurdle Rates", msg: "Deducting statutory LTCG/STCG tax drag and CPI inflation hurdles from nominal yields..." },
-      { maxSec: 25, stage: "Step 3/4: Stress-Testing Capital Recovery", msg: "Benchmarking asset coverage ratios, insolvency recovery tiers, and liquidity lock-in rules..." },
-      { maxSec: 30, stage: "Step 4/4: Rendering Risk-Adjusted Matrix", msg: "Compiling multi-asset opportunity matrix, tax efficiency profile, and tactical allocator verdict..." }
+      { maxSec: 7, stage: "Step 1/4: Reading Dated Market Observations", msg: "Scanning source-dated bond quotes, auction cut-offs, trailing distributions, and historical CAGRs..." },
+      { maxSec: 16, stage: "Step 2/4: Checking Freshness & Provenance", msg: "Separating current source-dated measures from stale or unavailable observations..." },
+      { maxSec: 25, stage: "Step 3/4: Grouping Comparable Measures", msg: "Partitioning instruments by measure family, asset class, seniority tier, and maturity band..." },
+      { maxSec: 30, stage: "Step 4/4: Rendering Opportunity Terminal", msg: "Assembling Bento cards, dated debt maturity matrix, dense table, and side-by-side comparison tray..." }
     ]
   },
   macro: {
@@ -1021,8 +1021,8 @@ const HUD_DISCOVERY_CARDS = [
     category: 'product',
     weight: 1.0,
     badge: 'Platform Spotlight • Opportunity Terminal (/opportunities)',
-    title: 'Cross-Asset Relative-Value & Yield Spread Terminal',
-    body: 'Compare post-tax, CPI-inflation-adjusted real yields across equities, corporate bonds, REITs, ETFs, and G-Secs on a unified risk-adjusted frontier.',
+    title: 'Cross-Asset Source-Dated Opportunity Terminal',
+    body: 'Explore typed, source-dated yields, auction cut-offs, trailing distributions, and 3-year CAGRs across equities, debt, REITs, ETFs, and G-Secs within comparable maturity groups.',
     pill: 'Product: Markets → Opportunity Terminal'
   },
   {
@@ -2038,6 +2038,7 @@ window.openSignInModal = function() {
   const user = getStoredUser();
   if (user) {
     if (confirm(`Logged in as ${user.full_name} (${user.email})\nCredits Balance: ${user.credits_balance} Credits\n\nWould you like to sign out?`)) {
+      window.dispatchEvent(new CustomEvent('moat:auth-logout'));
       fetch('/api/auth/signout', { method: 'POST' }).catch(() => {});
       localStorage.removeItem('sr_user');
       window.location.reload();

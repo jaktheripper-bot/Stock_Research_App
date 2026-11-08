@@ -959,6 +959,28 @@ def admin_grant_user_credits(
                 (audit_id, clean_admin, user_id, details_json, ip_address, user_agent)
             )
 
+        cursor.execute(
+            f"""
+            INSERT INTO credit_settlement_operations (
+                operation_id, user_id, operation_type, credits_delta, balance_after,
+                idempotency_key, actor_id, reason_code, metadata_json, created_at
+            )
+            VALUES ({p}, {p}, 'ADMIN_GRANT', {p}, {p}, {p}, {p}, {p}, {p}, {p})
+            ON CONFLICT (idempotency_key) DO NOTHING;
+            """,
+            (
+                f"cso_{audit_id}",
+                user_id,
+                credits_val,
+                new_balance,
+                f"admgrant:{audit_id}",
+                clean_admin,
+                clean_reason,
+                details_json,
+                now_epoch,
+            ),
+        )
+
         # Step 4: (Optional) Update support ticket if ticket_id provided
         if clean_ticket:
             cursor.execute(

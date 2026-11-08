@@ -1338,40 +1338,40 @@ def build_mutual_fund_deterministic_response(
             "Would you like to drill into the top constituent holdings or portfolio concentration?"
         )
     elif not locked and (any(k in msg for k in ["asri", "accounting risk", "accounting", "pledg", "risky", "high-risk", "stress index"]) or (not has_explicit_msg_topic and sec in ["asri_solvency", "accounting_risk", "promoter_pledge"])):
-        asri = context_data.get("accounting_risk_index", "N/A")
-        pledge = context_data.get("promoter_pledge_exposure_pct", 0.0)
+        asri_raw = context_data.get("accounting_risk_index")
+        asri = f"{asri_raw}%" if asri_raw is not None else "Pending constituent coverage"
         risky = context_data.get("top_risky_holdings", [])
         risky_str = ", ".join([f"{h.get('name', h.get('identifier', 'Unknown'))} ({h.get('weight_pct', 0)}%)" for h in risky]) if risky else "Zero elevated leverage or governance watchpoints"
         return (
             f"**Look-Through Accounting Risk (ASRI) Diagnostic for {name}:**\n\n"
-            f"- Portfolio Accounting Risk Index (ASRI): {asri}%\n"
-            f"- Promoter Pledge Exposure: {pledge}%\n"
-            f"- Constituents on Solvency Watchlist: {risky_str}\n\n"
-            "**Analytical Implication:** Look-through ASRI aggregates capital-weighted balance sheet and accrual risk across underlying holdings, "
-            "highlighting where working-capital stretch, Beneish M-Score flags, or promoter pledges warrant closer inspection.\n\n"
+            f"- Portfolio Accounting Risk Index (ASRI): {asri}\n"
+            f"- Constituents on Governance & Solvency Watchlist: {risky_str}\n"
+            f"- Promoter Pledge Note: Constituent reports provide qualitative governance pillar grades; scheme-level numeric pledge exposure is withheld without a direct constituent numeric feed.\n\n"
+            "**Analytical Implication:** Look-through ASRI aggregates capital-weighted balance sheet and governance pillar risk across researched equity holdings.\n\n"
             "Which underlying holding would you like to inspect in detail?"
         )
     elif not locked and (any(k in msg for k in ["moat", "quality", "compounder", "pricing power", "economic moat"]) or (not has_explicit_msg_topic and sec in ["moat_index", "quality"])):
-        moat = context_data.get("weighted_moat_score", "N/A")
-        comp = context_data.get("composite_health_score", "N/A")
+        moat_raw = context_data.get("weighted_moat_score")
+        comp_raw = context_data.get("composite_health_score")
+        moat = f"{moat_raw}/100" if moat_raw is not None else "Pending constituent coverage"
+        comp = f"{comp_raw}/100" if comp_raw is not None else "Pending constituent coverage"
         quality = context_data.get("top_quality_holdings", [])
         qual_str = ", ".join([f"{h.get('name', h.get('identifier', 'Unknown'))} ({h.get('weight_pct', 0)}%)" for h in quality]) if quality else "Diversified core compounders"
         return (
             f"**Weighted Moat & Quality Diagnostic for {name}:**\n\n"
-            f"- Weighted Moat Score: {moat}/100\n"
-            f"- Composite Health Score: {comp}/100\n"
+            f"- Weighted Moat Score: {moat}\n"
+            f"- Composite Health Score: {comp}\n"
             f"- Core Compounder Allocations: {qual_str}\n\n"
-            "**Analytical Implication:** The Weighted Moat Index reflects return-on-capital durability and pricing discipline across the underlying equity holdings. "
+            "**Analytical Implication:** The Weighted Moat Index reflects return-on-capital durability and pricing discipline across researched equity holdings. "
             "Even when constituent quality is high, future fund returns still depend on the valuation multiples paid for those holdings.\n\n"
-            "Would you like to examine valuation margins or downside capture next?"
+            "Would you like to examine valuation posture or downside capture next?"
         )
     elif not locked and (any(k in msg for k in ["margin of safety", "dcf", "intrinsic", "discount", "premium"]) or (not has_explicit_msg_topic and sec == "margin_of_safety")):
-        mos = context_data.get("margin_of_safety_pct", "N/A")
         return (
-            f"**Weighted Margin of Safety (DCF) Diagnostic for {name}:**\n\n"
-            f"- Weighted Portfolio Margin of Safety: {mos}%\n"
-            f"- Category: {context_data.get('category', 'Equity Scheme')}\n\n"
-            "**Analytical Implication:** This metric aggregates the capital-weighted discount or premium to conservative DCF fair value across the fund's underlying equity holdings, separating business quality from portfolio valuation.\n\n"
+            f"**Qualitative Valuation Tilt for {name}:**\n\n"
+            f"- Category: {context_data.get('category', 'Equity Scheme')}\n"
+            f"- Valuation Scope: Constituent 7-pillar reports supply qualitative Valuation pillar grades rather than a portfolio-wide numeric DCF margin of safety.\n\n"
+            "**Analytical Implication:** Inspect individual researched constituent dossiers to review stock-level Reverse DCF implied growth and valuation multiples directly.\n\n"
             "Would you like to examine constituent holdings or fee drag next?"
         )
     elif any(k in msg for k in ["holding", "allocation", "sleeve", "portfolio", "concentration", "top 10"]) or (not has_explicit_msg_topic and sec in ["holdings", "dual_sleeve"]):
@@ -1424,18 +1424,22 @@ def build_mutual_fund_deterministic_response(
 
     # Default Mutual Fund Look-Through Summary
     aum = context_data.get("aum_crores", "N/A")
+    comp_val = context_data.get("composite_health_score")
+    comp_disp = f"{comp_val}/100" if comp_val is not None else "Coverage Pending"
+    moat_val = context_data.get("weighted_moat_score")
+    asri_val = context_data.get("accounting_risk_index")
+    as_val = context_data.get("active_share_pct")
     deep_lines = (
-        "- Moat, accounting-risk and margin-of-safety scores: part of the Deep Dive (1 credit)\n"
+        "- Moat & accounting-risk scores: part of the Deep Dive (1 credit)\n"
         if locked else
-        f"- Weighted Moat Score: {context_data.get('weighted_moat_score', 'N/A')}/100\n"
-        f"- Look-Through Accounting Risk Index (ASRI): {context_data.get('accounting_risk_index', 'N/A')}%\n"
-        f"- Weighted Margin of Safety: {context_data.get('margin_of_safety_pct', 'N/A')}%\n"
+        f"- Weighted Moat Score: {f'{moat_val}/100' if moat_val is not None else 'Coverage Pending'}\n"
+        f"- Look-Through Accounting Risk Index (ASRI): {f'{asri_val}%' if asri_val is not None else 'Coverage Pending'}\n"
     )
     return (
         f"**Look-Through Summary for {name}:**\n\n"
-        f"- Composite Health Score: {context_data.get('composite_health_score', 'N/A')}/100\n"
+        f"- Composite Health Score: {comp_disp}\n"
         f"{deep_lines}"
-        f"- Active Share: {context_data.get('active_share_pct', 'N/A')}%\n"
+        f"- Active Share: {f'{as_val}%' if as_val is not None else 'Benchmark Pending'}\n"
         f"- AUM: ₹{aum} Cr\n\n"
         "What specific look-through metric, constituent holding, or fee drag area would you like to investigate?"
     )
@@ -2743,6 +2747,12 @@ async def process_research_desk_turn(
             canonical_code = scheme.get("scheme_code") if scheme else clean_ticker
             dossier = get_fund_forensic_dossier(canonical_code) or {}
 
+            raw_comp = dossier.get("composite_health_score")
+            raw_moat = dossier.get("weighted_moat_score")
+            raw_asri = dossier.get("accounting_risk_index")
+            raw_as = dossier.get("active_share_pct")
+            if raw_as is None and scheme:
+                raw_as = scheme.get("active_share_pct")
             context_data.update({
                 "scheme_code": canonical_code,
                 "scheme_name": scheme.get("scheme_name", clean_ticker) if scheme else clean_ticker,
@@ -2753,12 +2763,10 @@ async def process_research_desk_turn(
                 "aum_crores": (scheme.get("aum_crores") or scheme.get("aum_cr", 0.0)) if scheme else 0.0,
                 "ter_direct_pct": scheme.get("ter_direct_pct", 0.0) if scheme else 0.0,
                 "ter_regular_pct": scheme.get("ter_regular_pct", 0.0) if scheme else 0.0,
-                "composite_health_score": dossier.get("composite_health_score", 70.0),
-                "weighted_moat_score": dossier.get("weighted_moat_score", 65.0),
-                "accounting_risk_index": dossier.get("accounting_risk_index", 15.0),
-                "margin_of_safety_pct": dossier.get("margin_of_safety_pct", 0.0),
-                "active_share_pct": dossier.get("active_share_pct") or (scheme.get("active_share_pct", 75.0) if scheme else 75.0),
-                "promoter_pledge_exposure_pct": dossier.get("promoter_pledge_exposure_pct", 0.0),
+                "composite_health_score": raw_comp if (raw_comp is not None and float(raw_comp) >= 0) else None,
+                "weighted_moat_score": raw_moat if (raw_moat is not None and float(raw_moat) >= 0) else None,
+                "accounting_risk_index": raw_asri if (raw_asri is not None and float(raw_asri) >= 0) else None,
+                "active_share_pct": raw_as if (raw_as is not None and float(raw_as) >= 0) else None,
                 "top_risky_holdings": dossier.get("top_risky_holdings", []),
                 "top_quality_holdings": dossier.get("top_quality_holdings", []),
                 "dossier_text": dossier.get("dossier_text", ""),

@@ -109,11 +109,13 @@ def _resolve_mode_and_date(
 
 
 def _phase_status(value) -> str:
-    """Maps a phase result to OK / SKIPPED / FAILED for event summaries."""
+    """Maps a phase result to OK / SKIPPED / FAILED / PARTIAL for event summaries."""
     if isinstance(value, str) and value in SKIPPED_SENTINELS:
         return "SKIPPED"
     if isinstance(value, str) and value.startswith("FAILED"):
         return "FAILED"
+    if isinstance(value, dict) and value.get("status") == "PARTIAL":
+        return "PARTIAL"
     return "OK"
 
 
@@ -411,45 +413,53 @@ def run_evening_harvest_pipeline(
     return results
 
 
-def _are_monthly_mf_portfolios_fresh_for_prior_month(ref_date_str: str) -> bool:
-    """Returns True when >= 12 public SEBI statutory AMCs already report `last_portfolio_date >= prior_month_end`."""
+def _monthly_mf_coverage(ref_date_str: str, universe: list[dict]) -> dict:
+    from core.db.connection import get_db_connection
+    from core.ingestion.mf_portfolio_ingest import amc_key_for_fund_house, load_sources, recent_month_ends
+
+    ref_date = datetime.strptime(str(ref_date_str)[:10], "%Y-%m-%d").date()
+    target_date = recent_month_ends(1, today=ref_date)[0].isoformat()
+    sources = load_sources()
+    expected = set()
+    excluded = {}
+    for scheme in universe:
+        code = str(scheme["scheme_code"]).strip()
+        amc = amc_key_for_fund_house(scheme["fund_house"], sources)
+        if not code.isdigit():
+            excluded[code] = "not a canonical AMFI code"
+        elif not amc:
+            excluded[code] = "no enabled scheduled disclosure source"
+        else:
+            expected.add(code)
+
+    conn = get_db_connection()
+    cur = conn.cursor()
     try:
-        from core.db.connection import get_db_connection
-        from core.ingestion.mf_portfolio_ingest import load_sources, recent_month_ends
+        cur.execute("""
+            SELECT d.scheme_code, s.as_on_date
+            FROM mf_current_disclosures d
+            JOIN mf_disclosure_snapshots s ON s.snapshot_id = d.snapshot_id
+        """)
+        dates = dict(cur.fetchall())
+    finally:
+        cur.close()
+        conn.close()
 
-        dt = datetime.strptime(str(ref_date_str)[:10], "%Y-%m-%d").date()
-        target_me = recent_month_ends(1, today=dt)[0].isoformat()
-        sources = load_sources()
-        open_amcs = [k for k, cfg in sources.items() if cfg.get("status") == "open"]
-        if not open_amcs:
-            return False
+    missing = sorted(code for code in expected if str(dates.get(code) or "")[:10] != target_date)
+    return {
+        "target_date": target_date,
+        "expected_scheme_codes": sorted(expected),
+        "excluded": excluded,
+        "missing_scheme_codes": missing,
+        "fresh_count": len(expected) - len(missing),
+        "complete": bool(expected) and not missing,
+    }
 
-        conn = get_db_connection()
-        cur = conn.cursor()
-        try:
-            cur.execute(
-                """
-                SELECT s.fund_house, MAX(h.portfolio_date)
-                FROM mutual_fund_schemes s
-                JOIN mutual_fund_holdings h ON s.scheme_code = h.scheme_code
-                GROUP BY s.fund_house;
-                """
-            )
-            fh_dates = {str(r[0] or "").strip().lower(): str(r[1] or "")[:10] for r in cur.fetchall() if r and r[0]}
-        finally:
-            cur.close()
-            conn.close()
 
-        fresh_amcs = 0
-        for amc_key in open_amcs:
-            names = [n.lower() for n in sources[amc_key].get("mf_names", [])]
-            best_dt = max((fh_dates.get(nm, "") for nm in names), default="")
-            if best_dt >= target_me:
-                fresh_amcs += 1
-        return fresh_amcs >= min(12, len(open_amcs))
-    except Exception as exc:
-        logger.debug("Monthly MF freshness precheck notice: %s", exc)
-        return False
+def _are_monthly_mf_portfolios_fresh_for_prior_month(ref_date_str: str) -> bool:
+    from core.ingestion.mf_portfolio_ingest import get_monthly_mf_universe
+
+    return _monthly_mf_coverage(ref_date_str, get_monthly_mf_universe())["complete"]
 
 
 def run_monthly_mf_portfolio_pipeline(
@@ -465,19 +475,33 @@ def run_monthly_mf_portfolio_pipeline(
     except ValueError:
         day_of_month = 0
 
-    if not force and not (4 <= day_of_month <= 12):
+    if not force and day_of_month < 4:
         results["mf_portfolio_sync"] = "SKIPPED_OUTSIDE_SEBI_WINDOW"
         return results
 
-    if not force and _are_monthly_mf_portfolios_fresh_for_prior_month(date_str):
-        logger.info("Monthly SEBI MF portfolios already fresh for prior month-end (%s). Skipping.", date_str)
-        results["mf_portfolio_sync"] = "ALREADY_SYNCED"
-        return results
-
     def _mf_sync():
-        from core.ingestion.mf_portfolio_ingest import ingest_top_funds
+        from core.ingestion.mf_portfolio_ingest import get_monthly_mf_universe, ingest_top_funds
 
-        return ingest_top_funds(target=5000, dry_run=False, audit=False)
+        universe = get_monthly_mf_universe()
+        coverage = _monthly_mf_coverage(date_str, universe)
+        if not force and coverage["complete"]:
+            results["mf_portfolio_coverage"] = coverage
+            return "ALREADY_SYNCED"
+        missing = coverage["missing_scheme_codes"]
+        if not coverage["expected_scheme_codes"]:
+            raise RuntimeError("No canonical schemes in the scheduled portfolio scope")
+        codes = coverage["expected_scheme_codes"] if force else missing
+        outcome = ingest_top_funds(
+            target=len(codes),
+            dry_run=False,
+            audit=False,
+            universe=universe,
+            only_scheme_codes=set(codes),
+            target_month_end=coverage["target_date"],
+        )
+        coverage = _monthly_mf_coverage(date_str, universe)
+        results["mf_portfolio_coverage"] = coverage
+        return {**outcome, "status": "SYNCED" if coverage["complete"] else "PARTIAL"}
 
     _run_leased_phase(
         results,
@@ -509,14 +533,16 @@ def run_morning_pipeline(
     results = {}
     prune_zombie_leases()
 
-    # 0. Monthly SEBI Statutory MF Portfolio Disclosure Window (Days 4–12 of Month)
+    # 0. Monthly MF disclosure refresh and daily catch-up for outstanding schemes.
     try:
         day_of_month = int(str(date_str)[8:10])
     except ValueError:
         day_of_month = 0
-    if 4 <= day_of_month <= 12 and os.environ.get("TESTING") != "1":
+    if day_of_month >= 4 and os.environ.get("TESTING") != "1":
         mf_res = run_monthly_mf_portfolio_pipeline(date_str, force=force)
         results["mf_portfolio_sync"] = mf_res.get("mf_portfolio_sync")
+        if "mf_portfolio_coverage" in mf_res:
+            results["mf_portfolio_coverage"] = mf_res["mf_portfolio_coverage"]
 
     # 1. Daily Catch-Up (25/15-Stock) Ingestion & Mutual Fund Look-Through Saturation
     def _stock_ingestion():

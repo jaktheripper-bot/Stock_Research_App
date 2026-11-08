@@ -11,6 +11,7 @@ import os
 import asyncio
 import json
 import logging
+import time
 import urllib.parse
 import hashlib
 import requests
@@ -607,8 +608,9 @@ async def api_verify_payment(payload: VerifyPaymentRequest, request: Request):
 async def api_razorpay_webhook(request: Request):
     """
     Server-to-server Razorpay Webhook endpoint (`payment.captured` / `order.paid`).
-    Verifies X-Razorpay-Signature against raw request bytes and fulfills the order
-    strictly from the persisted `billing_order_intents` record (never trusting event notes).
+    Verifies X-Razorpay-Signature against raw request bytes, records an immutable
+    `payment_event_receipts` entry, and fulfills the order strictly from the persisted
+    `billing_order_intents` record (never trusting event notes).
     """
     signature = request.headers.get("X-Razorpay-Signature", "")
     raw_body = await request.body()
@@ -620,15 +622,56 @@ async def api_razorpay_webhook(request: Request):
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Malformed webhook JSON.") from exc
 
-    event_type = event.get("event")
-    if event_type not in ("payment.captured", "order.paid"):
-        return json_response_with_cache({"status": "ignored", "event": event_type})
-
+    payload_sha256 = hashlib.sha256(raw_body).hexdigest()
+    event_id = (
+        request.headers.get("X-Razorpay-Event-Id", "").strip()
+        or str(event.get("id") or "").strip()
+        or f"evt_{payload_sha256[:24]}"
+    )
+    event_type = str(event.get("event") or "unknown")
     payment_entity = ((event.get("payload") or {}).get("payment") or {}).get("entity") or {}
     order_id = str(payment_entity.get("order_id") or "").strip()
     payment_id = str(payment_entity.get("id") or "").strip()
+
+    def _record_receipt(processed_status: str) -> None:
+        from core.db.connection import get_db_connection, init_db, is_postgres_connection
+        init_db()
+        conn = get_db_connection()
+        cur = conn.cursor()
+        p = "%s" if is_postgres_connection(conn) else "?"
+        try:
+            cur.execute(
+                f"""
+                INSERT INTO payment_event_receipts (
+                    provider, event_id, event_type, payment_id, order_id,
+                    signature_verified, payload_sha256, received_at, processed_status
+                )
+                VALUES ('razorpay', {p}, {p}, {p}, {p}, 1, {p}, {p}, {p})
+                ON CONFLICT (provider, event_id) DO UPDATE
+                    SET processed_status = EXCLUDED.processed_status
+                """,
+                (
+                    event_id,
+                    event_type,
+                    payment_id or None,
+                    order_id or None,
+                    payload_sha256,
+                    int(time.time()),
+                    processed_status,
+                ),
+            )
+            conn.commit()
+        finally:
+            cur.close()
+            conn.close()
+
+    if event_type not in ("payment.captured", "order.paid"):
+        await asyncio.to_thread(_record_receipt, "IGNORED")
+        return json_response_with_cache({"status": "ignored", "event": event_type})
+
     terms = captured_payment_terms(payment_entity, order_id=order_id, payment_id=payment_id)
     if terms is None:
+        await asyncio.to_thread(_record_receipt, "REJECTED_INCOMPLETE_TERMS")
         raise HTTPException(status_code=400, detail="Incomplete or uncaptured payment entity in webhook.")
     captured_amount, captured_currency = terms
 
@@ -640,8 +683,10 @@ async def api_razorpay_webhook(request: Request):
         verified_currency=captured_currency,
     )
     if not ok:
+        await asyncio.to_thread(_record_receipt, f"REJECTED:{msg[:80]}")
         raise HTTPException(status_code=400, detail=msg)
 
+    await asyncio.to_thread(_record_receipt, "FULFILLED")
     return json_response_with_cache({
         "status": "fulfilled",
         "order_id": order_id,

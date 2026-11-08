@@ -80,15 +80,23 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
     data = _upstream_compute_lookthrough(scheme_code)
 
     genuine_cov = float(data.get("genuine_coverage_pct", 0.0))
-    raw_score = float(data.get("composite_health_score", 70.0)) if data.get("composite_health_score") is not None else 70.0
+    raw_comp_opt = data.get("composite_health_score")
     raw_as_opt = data.get("active_share_pct") if "active_share_pct" in data else data.get("active_share")
     raw_as = float(raw_as_opt) if raw_as_opt is not None else 0.0
 
-    final_score, clamped_as = evaluate_fund_coverage_and_health(
-        genuine_coverage_pct=genuine_cov,
-        raw_composite_health_score=raw_score,
-        raw_active_share=raw_as
-    )
+    if raw_comp_opt is None:
+        _, clamped_as = evaluate_fund_coverage_and_health(
+            genuine_coverage_pct=0.0,
+            raw_composite_health_score=0.0,
+            raw_active_share=raw_as,
+        )
+        final_score = None
+    else:
+        final_score, clamped_as = evaluate_fund_coverage_and_health(
+            genuine_coverage_pct=genuine_cov,
+            raw_composite_health_score=float(raw_comp_opt),
+            raw_active_share=raw_as,
+        )
 
     data["composite_health_score"] = final_score
     data["active_share"] = clamped_as if raw_as_opt is not None else None

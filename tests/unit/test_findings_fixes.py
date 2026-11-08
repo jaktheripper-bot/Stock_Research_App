@@ -52,18 +52,22 @@ class TestFindingsRemediations(unittest.TestCase):
         })
 
         initial_text = "# FORENSIC RESEARCH DOSSIER: Non-empty qualitative research analysis."
+        receipt = {
+            "method_version": "mf-lookthrough-v1",
+            "researched_weight_pct_nav": 80.0,
+            "metrics": {},
+        }
         first_dossier = {
             "scheme_code": test_scheme,
             "dossier_text": initial_text,
             "composite_health_score": 85.0,
             "weighted_moat_score": 75.0,
             "accounting_risk_index": 2.5,
-            "margin_of_safety_pct": 12.0,
-            "promoter_pledge_exposure_pct": 0.0,
             "active_share_pct": 68.0,
             "top_risky_holdings": [],
             "top_quality_holdings": [],
             "audited_by": "Test_Auditor",
+            "evidence_receipt": receipt,
         }
         saved = save_fund_forensic_dossier(first_dossier)
         self.assertTrue(saved)
@@ -81,12 +85,11 @@ class TestFindingsRemediations(unittest.TestCase):
             "composite_health_score": 88.0,
             "weighted_moat_score": 78.0,
             "accounting_risk_index": 2.0,
-            "margin_of_safety_pct": 14.5,
-            "promoter_pledge_exposure_pct": 0.0,
             "active_share_pct": 70.0,
             "top_risky_holdings": [],
             "top_quality_holdings": [],
             "audited_by": "Test_Auditor",
+            "evidence_receipt": receipt,
         }
         saved2 = save_fund_forensic_dossier(recalculated_dossier)
         self.assertTrue(saved2)

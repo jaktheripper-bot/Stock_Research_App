@@ -68,15 +68,15 @@
           </div>
           <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
             <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Weighted Moat</div>
-            <div style="font-size: 20px; font-weight: 800; color: #c084fc;">{{ featured_fund.weighted_moat_score }}<span style="font-size: 12px; color: #64748b;">/100</span></div>
+            <div style="font-size: 20px; font-weight: 800; color: #c084fc;">{% if featured_fund.weighted_moat_score is not none %}{{ featured_fund.weighted_moat_score }}<span style="font-size: 12px; color: #64748b;">/100</span>{% else %}Pending{% endif %}</div>
           </div>
           <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
             <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Solvency Risk (ASRI)</div>
-            <div data-style-color="{% if featured_fund.accounting_risk_index <= 5.0 %}#10b981{% else %}#ef4444{% endif %}" style="font-size: 20px; font-weight: 800;">{{ featured_fund.accounting_risk_index }}%</div>
+            <div data-style-color="{% if featured_fund.accounting_risk_index is not none and featured_fund.accounting_risk_index <= 5.0 %}#10b981{% else %}#ef4444{% endif %}" style="font-size: 20px; font-weight: 800;">{% if featured_fund.accounting_risk_index is not none %}{{ featured_fund.accounting_risk_index }}%{% else %}Pending{% endif %}</div>
           </div>
           <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
-            <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Margin of Safety (DCF)</div>
-            <div data-style-color="{% if featured_fund.margin_of_safety_pct >= 0 %}#10b981{% else %}#f59e0b{% endif %}" style="font-size: 20px; font-weight: 800;">{{ "{:+.1f}".format(featured_fund.margin_of_safety_pct) }}%</div>
+            <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Qualitative Valuation Tilt</div>
+            <div style="font-size: 20px; font-weight: 800;">{% if featured_fund.evidence_receipt and featured_fund.evidence_receipt.metrics.valuation_tilt.value %}{{ featured_fund.evidence_receipt.metrics.valuation_tilt.value|title }}{% else %}Pending{% endif %}</div>
           </div>
           <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
             <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Active Share</div>
@@ -267,6 +267,7 @@
   </div>
 </div>
 
+<script src="/static/js/fund_audit_request.js"></script>
 <script>
 let currentAuditTaskId = null;
 let currentAuditScheme = null;
@@ -322,12 +323,15 @@ async function startOnDemandFundAudit() {
   currentAuditScheme = schemeCode;
 
   try {
-    const res = await fetch("/api/funds/on-demand-audit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scheme_code: schemeCode })
-    });
-    const data = await res.json().catch(() => ({}));
+    const { res, data, key, canceled } = await submitFundAudit(schemeCode, false);
+    if (canceled) {
+      if (spinner) spinner.style.display = "none";
+      if (bar) bar.style.width = "0%";
+      if (pct) pct.innerText = "0%";
+      if (btn) btn.disabled = false;
+      if (msg) msg.innerText = "Audit canceled before charging.";
+      return;
+    }
 
     if (res.status === 401 || res.status === 403) {
       if (spinner) spinner.style.display = "none";
@@ -361,7 +365,7 @@ async function startOnDemandFundAudit() {
     if (bar) bar.style.width = "30%";
     if (pct) pct.innerText = "30%";
     if (msg) msg.innerText = `Audit task queued for ${data.scheme_name || schemeCode}...`;
-    pollAuditStatus(data.task_id);
+    pollAuditStatus(data.task_id, key);
   } catch (err) {
     if (spinner) spinner.style.display = "none";
     if (bar) bar.style.width = "0%";
@@ -374,7 +378,7 @@ async function startOnDemandFundAudit() {
   }
 }
 
-function pollAuditStatus(taskId) {
+function pollAuditStatus(taskId, key) {
   if (auditPollTimer) clearInterval(auditPollTimer);
   const bar = document.getElementById("auditProgressBar");
   const pct = document.getElementById("auditProgressPct");
@@ -405,27 +409,22 @@ function pollAuditStatus(taskId) {
       if (pct) pct.innerText = `${progress}%`;
       if (task.message && msg) msg.innerText = task.message;
 
-      if (task.status === "COMPLETED") {
+      if (task.status === "COMPLETED" || task.status === "FAILED") {
         clearInterval(auditPollTimer);
+        clearPendingFundAudit(key);
         if (spinner) spinner.style.display = "none";
-        if (bar) bar.style.width = "100%";
-        if (pct) pct.innerText = "100%";
-        const targetCode = task.scheme_code || currentAuditScheme;
+        if (btn) btn.disabled = false;
         if (msg) {
-          msg.style.color = "#10b981";
-          msg.innerText = `Audit Complete for ${task.scheme_name || targetCode}! Redirecting to scorecard...`;
+          msg.textContent = task.error || task.message;
+          showFundAuditSettlement(msg, task);
         }
-        if (btn) btn.disabled = false;
-        setTimeout(() => {
-          window.location.href = `/funds/${encodeURIComponent(targetCode)}`;
-        }, 800);
-      } else if (task.status === "FAILED") {
-        clearInterval(auditPollTimer);
-        if (spinner) spinner.style.display = "none";
-        if (btn) btn.disabled = false;
-        if (msg) {
-          msg.style.color = "#ef4444";
-          msg.innerText = `Audit Error: ${task.error || task.message || "Failed to generate fund dossier."}`;
+        const action = document.getElementById("auditResultAction");
+        if (action && task.status === "COMPLETED") {
+          const link = document.createElement("a");
+          link.href = `/funds/${encodeURIComponent(task.scheme_code || currentAuditScheme)}`;
+          link.textContent = "View the saved fund dossier";
+          action.replaceChildren(link);
+          action.style.display = "block";
         }
       }
     } catch (e) {

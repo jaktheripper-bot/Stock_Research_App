@@ -21,6 +21,7 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 
 from fastapi import APIRouter, Request, HTTPException, Query, Body, BackgroundTasks
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from normalizer import clean_ticker
@@ -56,6 +57,18 @@ from core.analysis.fund_overlap_auditor import (
     run_async_fund_audit_job,
     get_fund_audit_task_status,
     ensure_scheme_and_holdings_exist,
+)
+from core.db.fund_audit_jobs import (
+    FundAuditConflict,
+    FundAuditInsufficientCredits,
+    FundAuditUnavailable,
+    FundAuditUnprocessable,
+    enqueue_fund_audit,
+    get_existing_fund_audit_request,
+    get_fund_audit_status_for_owner,
+    list_fund_audits_for_owner,
+    quote_revision,
+    unlock_published_fund_dossier,
 )
 from core.db.telemetry import record_usage_event
 from web.common import (
@@ -395,12 +408,6 @@ async def api_post_on_demand_fund_audit(
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
 
     from web.common import _get_override_fn
-    from core.db import (
-        deduct_user_credits,
-        get_user_credits_balance,
-        is_ticker_unlocked_for_user,
-        unlock_ticker_for_user,
-    )
 
     get_user_fn = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
     web_user = get_user_fn(request)
@@ -410,84 +417,68 @@ async def api_post_on_demand_fund_audit(
     if not web_user and not is_admin and not is_test_anon:
         raise HTTPException(status_code=401, detail="Authentication required to trigger an on-demand fund audit.")
 
-    scheme_code = (payload.get("scheme_code") or "").strip().upper()
+    supplied_scheme_code = payload.get("scheme_code")
+    scheme_code = supplied_scheme_code.strip().upper() if isinstance(supplied_scheme_code, str) else ""
     if not scheme_code:
         raise HTTPException(status_code=400, detail="Missing required 'scheme_code' in payload.")
     if len(scheme_code) > 40 or not re.match(r"^[A-Z0-9_\-]+$", scheme_code):
         raise HTTPException(status_code=400, detail="Invalid 'scheme_code' format.")
-    allow_deep_dive = bool(payload.get("allow_deep_dive", False))
-
-    scheme_info = get_mutual_fund_scheme(scheme_code) or ensure_scheme_and_holdings_exist(scheme_code)
-    if not scheme_info:
-        raise HTTPException(status_code=404, detail=f"Mutual fund scheme '{scheme_code}' not found.")
-
-    billing_user_id: Optional[str] = None
-    layer2_charged = 0.0
-    credits_charged = 0.0
+    allow_deep_dive = payload.get("allow_deep_dive", False)
+    if not isinstance(allow_deep_dive, bool):
+        raise HTTPException(status_code=400, detail="allow_deep_dive must be a boolean.")
 
     if web_user and not is_admin:
         uid = str(web_user.get("id") or "").strip()
         if not uid:
             raise HTTPException(status_code=401, detail="Invalid user session.")
-        quote = calculate_deep_dive_credit_cost(scheme_code)
-        if int(quote.get("total_holdings_count") or 0) == 0:
-            raise HTTPException(
-                status_code=409,
-                detail="Monthly statutory portfolio holdings are pending sync for this scheme. Zero credits charged.",
-            )
-
-        unlock_key = f"FUND:{scheme_code}"
-        already_unlocked = is_ticker_unlocked_for_user(uid, unlock_key)
-        layer1_due = 0.0 if already_unlocked else 1.0
-        layer2_due = float(quote.get("layer2_deep_dive_credits") or 0) if allow_deep_dive else 0.0
-        total_due = layer1_due + layer2_due
-
-        if total_due > 0:
-            bal = get_user_credits_balance(uid)
-            if bal < total_due:
-                raise HTTPException(
-                    status_code=402,
-                    detail=(
-                        f"Insufficient research credits ({bal:.1f} available, {total_due:.1f} required "
-                        f"for this look-through audit). Please top up credits to proceed."
-                    ),
+        request_id = request.headers.get("Idempotency-Key", "")
+        if not re.fullmatch(r"[A-Za-z0-9_-]{16,80}", request_id):
+            raise HTTPException(status_code=400, detail="A valid Idempotency-Key header is required.")
+        accepted_revision = payload.get("quote_revision", "")
+        if not isinstance(accepted_revision, str) or not re.fullmatch(r"[a-f0-9]{64}", accepted_revision):
+            raise HTTPException(status_code=400, detail="Confirm the current credit quote before starting.")
+        try:
+            job = get_existing_fund_audit_request(uid, request_id, scheme_code, allow_deep_dive, accepted_revision)
+            if not job:
+                if os.environ.get("ENABLE_DURABLE_FUND_AUDITS") != "1":
+                    raise HTTPException(status_code=503, detail="New fund audits are paused.")
+                scheme_info, snapshot, quote = _build_paid_fund_quote(scheme_code, uid, allow_deep_dive)
+                if allow_deep_dive and not quote.get("deep_dive_available", True):
+                    raise FundAuditUnprocessable(
+                        quote.get("deep_dive_unavailable_reason")
+                        or "Deep-dive synthesis exceeds single-job SLA bounds. Run Layer-1 look-through first."
+                    )
+                job = enqueue_fund_audit(
+                    uid,
+                    request_id,
+                    scheme_info,
+                    snapshot["snapshot_id"],
+                    allow_deep_dive,
+                    [item["identifier"] for item in quote["billable_constituents"]],
+                    accepted_revision,
                 )
+            return {
+                "success": True,
+                "task_id": job["job_id"],
+                "scheme_code": job["scheme_code"],
+                "credits_charged": job["credits_charged"],
+                "status": job["status"],
+            }
+        except FundAuditUnprocessable as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except FundAuditConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except FundAuditInsufficientCredits as exc:
+            raise HTTPException(status_code=402, detail=str(exc)) from exc
+        except FundAuditUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-        if not already_unlocked:
-            unlock_fn = _get_override_fn("web.main", "unlock_ticker_for_user", unlock_ticker_for_user)
-            ok1, _, msg1 = unlock_fn(user_id=uid, ticker=unlock_key, amount=1.0)
-            if not ok1:
-                raise HTTPException(status_code=402, detail=msg1)
-            credits_charged += 1.0
-
-        if layer2_due > 0:
-            deduct_fn = _get_override_fn("web.main", "deduct_user_credits", deduct_user_credits)
-            ok2, _, msg2 = deduct_fn(
-                user_id=uid,
-                ticker=unlock_key,
-                action_type="FUND_CONSTITUENT_DEEP_DIVE",
-                amount=layer2_due,
-            )
-            if not ok2:
-                raise HTTPException(status_code=402, detail=msg2)
-            layer2_charged = layer2_due
-            credits_charged += layer2_due
-
-        billing_user_id = uid
-
+    # Administrator-only uncharged runs retain the existing diagnostic path.
+    scheme_info = get_mutual_fund_scheme(scheme_code) or ensure_scheme_and_holdings_exist(scheme_code)
+    if not scheme_info:
+        raise HTTPException(status_code=404, detail="Mutual fund scheme not found.")
     task_id = create_async_fund_audit_task(scheme_code, allow_deep_dive=allow_deep_dive)
-    if billing_user_id or layer2_charged > 0:
-        background_tasks.add_task(
-            run_async_fund_audit_job,
-            task_id,
-            scheme_code,
-            allow_deep_dive,
-            billing_user_id=billing_user_id,
-            layer2_charged=layer2_charged,
-        )
-    else:
-        background_tasks.add_task(run_async_fund_audit_job, task_id, scheme_code, allow_deep_dive)
-
+    background_tasks.add_task(run_async_fund_audit_job, task_id, scheme_code, allow_deep_dive)
     scheme_name = scheme_info.get("scheme_name") if scheme_info else None
 
     return {
@@ -495,44 +486,129 @@ async def api_post_on_demand_fund_audit(
         "task_id": task_id,
         "scheme_code": scheme_code,
         "scheme_name": scheme_name,
-        "credits_charged": credits_charged,
+        "credits_charged": 0,
         "status": "QUEUED",
         "message": f"Accounting check enqueued for {scheme_code}."
     }
 
 
 @router.get("/api/funds/audit-status/{task_id}")
-def api_get_fund_audit_status(task_id: str):
-    """Returns real-time progress and completion status for an asynchronous fund audit task."""
+def api_get_fund_audit_status(task_id: str, request: Request, include_dossier: bool = False):
+    """Return an owner-only progress and credit settlement receipt."""
     init_db()
-    status = get_fund_audit_task_status(task_id)
+    if task_id.startswith("paid-"):
+        from web.common import _get_override_fn
+
+        get_user = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
+        user = get_user(request)
+        if not user or not user.get("id"):
+            raise HTTPException(status_code=401, detail="Sign in to view audit progress.")
+        try:
+            status = get_fund_audit_status_for_owner(
+                task_id, str(user["id"]).strip(), include_dossier=include_dossier,
+            )
+        except FundAuditUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+    elif _is_admin_authenticated(request) or os.environ.get("TESTING") == "1":
+        status = get_fund_audit_task_status(task_id)
+    else:
+        status = None
     if not status:
-        raise HTTPException(status_code=404, detail=f"Audit task '{task_id}' not found.")
-    return status
+        raise HTTPException(status_code=404, detail="Audit task not found.")
+    return JSONResponse(jsonable_encoder(status), headers={"Cache-Control": "private, no-store"})
+
+
+@router.get("/api/funds/my-audits")
+def api_list_my_fund_audits(
+    request: Request,
+    scheme_code: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=50),
+):
+    """Return owner-scoped active and recent paid fund audits for cross-device recovery."""
+    init_db()
+    from web.common import _get_override_fn
+
+    get_user = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
+    user = get_user(request)
+    if not user or not user.get("id"):
+        raise HTTPException(status_code=401, detail="Sign in to view your fund audits.")
+    clean_scheme = None
+    if scheme_code:
+        clean_scheme = scheme_code.strip().upper()
+        if len(clean_scheme) > 40 or not re.match(r"^[A-Z0-9_\-]+$", clean_scheme):
+            raise HTTPException(status_code=400, detail="Invalid scheme code format.")
+    try:
+        audits = list_fund_audits_for_owner(str(user["id"]).strip(), scheme_code=clean_scheme, limit=limit)
+    except FundAuditUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return JSONResponse(
+        jsonable_encoder({"success": True, "count": len(audits), "items": audits, "audits": audits}),
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+def _build_paid_fund_quote(scheme_code: str, user_id: str, allow_deep_dive: bool):
+    from core.db.mutual_funds import get_current_fund_disclosure
+    from core.db.users import get_user_credits_balance, is_ticker_unlocked_for_user
+
+    scheme = get_mutual_fund_scheme(scheme_code)
+    if not scheme or scheme.get("scheme_code") != scheme_code:
+        raise HTTPException(status_code=404, detail="Mutual fund scheme not found.")
+    snapshot = get_current_fund_disclosure(scheme_code)
+    if not snapshot or not snapshot["holdings"]:
+        raise HTTPException(status_code=409, detail="Verified portfolio disclosure pending. No credits charged.")
+    quote = calculate_deep_dive_credit_cost(scheme_code, holdings_override=snapshot["holdings"])
+    layer1 = int(bool(user_id) and not is_ticker_unlocked_for_user(user_id, f"FUND:{scheme_code}"))
+    credits_balance = get_user_credits_balance(user_id) if user_id else 0.0
+    items = quote["uncached_stocks"] if allow_deep_dive else []
+    # Only canonical domestic exchange tickers can be handed to the stock synthesis worker.
+    billable = {
+        item["identifier"]: item
+        for item in items
+        if re.fullmatch(r"(?![A-Z]{2}[A-Z0-9]{9}[0-9]$)[A-Z0-9][A-Z0-9&.-]{0,29}", item["identifier"])
+        and clean_ticker(item["identifier"]) == item["identifier"]
+    }
+    metadata = {
+        **(scheme.get("metadata") or {}),
+        "disclosure_snapshot_id": snapshot["snapshot_id"],
+        "holdings_as_on": snapshot["as_on_date"],
+        "holdings_source": snapshot["holdings_source"],
+        "holdings_source_url": snapshot["source_url"],
+    }
+    return {**scheme, "metadata": metadata, "last_portfolio_date": snapshot["as_on_date"]}, snapshot, {
+        **quote,
+        "layer1_credits": layer1,
+        "layer2_deep_dive_credits": len(billable),
+        "total_credits_for_full_audit": layer1 + len(billable),
+        "billable_constituents": list(billable.values()),
+        "quote_revision": quote_revision(user_id, snapshot["snapshot_id"], allow_deep_dive, layer1, billable),
+        "credits_due": layer1 + len(billable),
+        "credits_balance": credits_balance,
+        "portfolio_as_on": snapshot["as_on_date"],
+    }
 
 
 @router.get("/api/funds/deep-dive-quote/{scheme_code}")
-def api_get_fund_deep_dive_quote(scheme_code: str):
+def api_get_fund_deep_dive_quote(scheme_code: str, request: Request, allow_deep_dive: bool = True):
     """Returns token credit cost breakdown: Layer 1 (1 credit) vs Layer 2 Deep Dive."""
     init_db()
     clean = scheme_code.strip().upper()
     if not clean or len(clean) > 40 or not re.match(r"^[A-Z0-9_\-]+$", clean):
         raise HTTPException(status_code=400, detail="Invalid scheme code format.")
-    scheme = get_mutual_fund_scheme(clean)
-    if not scheme and clean.isdigit() and 5 <= len(clean) <= 8:
-        from core.ingestion.amfi import search_amfi_master_directory, save_mutual_fund_scheme
-        amfi_matches = search_amfi_master_directory(clean, limit=1)
-        for m in amfi_matches:
-            if str(m.get("scheme_code", "")).strip().upper() == clean:
-                save_mutual_fund_scheme(m)
-                scheme = get_mutual_fund_scheme(clean) or m
-                break
-    if not scheme:
-        raise HTTPException(status_code=404, detail=f"Mutual fund scheme '{clean}' not found.")
-    try:
-        return calculate_deep_dive_credit_cost(clean)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate credit quote for {clean}: {str(e)}")
+    from web.common import _get_override_fn
+
+    get_user = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
+    user = get_user(request)
+    if _is_admin_authenticated(request):
+        return JSONResponse(
+            jsonable_encoder({"is_admin": True}),
+            headers={"Cache-Control": "private, no-store"},
+        )
+    if not user or not user.get("id"):
+        raise HTTPException(status_code=401, detail="Sign in to request an audit.")
+    uid = str((user or {}).get("id") or "").strip()
+    _, _, quote = _build_paid_fund_quote(clean, uid, allow_deep_dive)
+    return JSONResponse(jsonable_encoder(quote), headers={"Cache-Control": "private, no-store"})
 
 
 @router.get("/api/funds/schemes")
@@ -551,7 +627,12 @@ def api_get_mutual_fund_schemes(
     )
     scheme_codes = [s["scheme_code"] for s in schemes if s.get("scheme_code")]
     holdings_by_scheme = get_holdings_for_schemes_batch(scheme_codes)
-    researched_tickers = get_researched_tickers_set()
+    researched_tickers = get_researched_tickers_set(
+        h.get("identifier")
+        for holdings in holdings_by_scheme.values()
+        for h in holdings
+        if h.get("holding_type", "").upper() in ("EQUITY", "FOREIGN_EQUITY")
+    )
     debt_by_isin = get_debt_securities_map()
 
     results = []
@@ -691,7 +772,37 @@ async def api_unlock_fund_deep_dive(request: Request, scheme_code: str):
         from core.ingestion.amfi import search_amfi_master_directory
         if not search_amfi_master_directory(clean_code, limit=1):
             raise HTTPException(status_code=404, detail="Mutual fund scheme not found.")
-    return _unlock_asset_deep_dive(request, "FUND", clean_code, clean_code)
+    from web.common import _get_override_fn
+
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+    get_user = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
+    user = get_user(request)
+    user_id = str((user or {}).get("id") or "").strip()
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Sign in to unlock the Deep Dive.")
+    try:
+        balance = unlock_published_fund_dossier(
+            user_id,
+            clean_code,
+            allow_charge=os.environ.get("ENABLE_DURABLE_FUND_AUDITS") == "1",
+        )
+    except FundAuditConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except FundAuditInsufficientCredits as exc:
+        raise HTTPException(status_code=402, detail=str(exc)) from exc
+    except FundAuditUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return JSONResponse(
+        jsonable_encoder({
+            "success": True,
+            "asset_kind": "FUND",
+            "asset_id": clean_code,
+            "new_balance": balance,
+            "message": f"Deep Dive unlocked for {clean_code}.",
+        }),
+        headers={"Cache-Control": "private, no-store"},
+    )
 
 
 # ==============================================================================
@@ -882,13 +993,14 @@ async def api_unlock_reit_deep_dive(request: Request, symbol: str):
 # ==============================================================================
 # Opportunity Terminal & Arbitrage Endpoints
 # ==============================================================================
-@router.get("/api/opportunities/universe")
+@router.get("/api/v2/opportunities/universe")
+@router.get("/api/opportunities/universe", deprecated=True)
 def api_opportunities_universe(
     tax_slab: float = Query(30.0),
     cpi_inflation: float = Query(4.5),
     persona: Optional[str] = Query(None)
 ):
-    """Public API: Normalized multi-asset universe with dynamic post-tax yields."""
+    """Public API: Multi-asset inventory with typed, source-dated measures."""
     from core.analysis.opportunity_terminal import get_normalized_opportunity_universe
     init_db()
     items = get_normalized_opportunity_universe(
@@ -896,24 +1008,35 @@ def api_opportunities_universe(
         cpi_inflation=cpi_inflation,
         persona_filter=persona
     )
+    coverage: Dict[str, Dict[str, int]] = {}
+    for item in items:
+        counts = coverage.setdefault(
+            item["asset_class"],
+            {"available": 0, "stale": 0, "unavailable": 0},
+        )
+        counts[item["metric_status"]] += 1
     return json_response_with_cache({
         "success": True,
         "count": len(items),
-        "tax_slab_applied": tax_slab,
-        "cpi_inflation_applied": cpi_inflation,
+        "schema_version": 2,
+        "metric_coverage": coverage,
+        "tax_slab_applied": None,
+        "cpi_inflation_applied": None,
         "items": items
     }, max_age=120)
 
 
-@router.get("/api/opportunities/heatmap")
+@router.get("/api/v2/opportunities/heatmap")
+@router.get("/api/opportunities/heatmap", deprecated=True)
 def api_opportunities_heatmap():
-    """Public API: 2D relative yield spread heatmap matrix over 10Y G-Sec."""
+    """Public API: Debt observations grouped by measure and maturity."""
     from core.analysis.opportunity_terminal import get_heatmap_matrix
     init_db()
-    return json_response_with_cache(get_heatmap_matrix(), max_age=300)
+    return json_response_with_cache({"schema_version": 2, **get_heatmap_matrix()}, max_age=300)
 
 
-@router.post("/api/opportunities/arbitrage")
+@router.post("/api/v2/opportunities/arbitrage")
+@router.post("/api/opportunities/arbitrage", deprecated=True)
 def api_opportunities_arbitrage(payload: ArbitrageDocketRequest):
     """Public API: Side-by-side normalized comparison scorecard for pinned items."""
     from core.analysis.opportunity_terminal import get_arbitrage_comparison
@@ -923,7 +1046,7 @@ def api_opportunities_arbitrage(payload: ArbitrageDocketRequest):
         tax_slab=payload.tax_slab,
         cpi_inflation=payload.cpi_inflation
     )
-    return json_response_with_cache(scorecard, max_age=60)
+    return json_response_with_cache({"schema_version": 2, **scorecard}, max_age=60)
 
 
 # ==============================================================================

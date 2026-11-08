@@ -61,10 +61,54 @@ services:
         sync: false
       - key: ENABLE_BACKGROUND_SCHEDULERS
         value: "1"
+      - key: ENABLE_DURABLE_FUND_AUDITS
+        value: "1"
       - key: GOOGLE_GENAI_USE_VERTEXAI
         value: "true"
       - key: SUPABASE_STORAGE_LIMIT_MB
         value: "2048"
       - key: HOST_MEMORY_LIMIT_MB
         value: "2048"
+
+  - type: worker
+    name: paid-fund-audit-worker
+    env: python
+    buildCommand: "pip install -r requirements.txt && TESTING=1 python3 scripts/verify_reality_audit.py && TESTING=1 pytest -q"
+    startCommand: "python3 -m scripts.run_paid_fund_audit_worker"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.0
+      - key: MALLOC_TRIM_THRESHOLD_
+        value: "65536"
+      - key: PYTHONMALLOC
+        value: malloc
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false
+      - key: SMARTAPI_PROXY_URL
+        sync: false
+      - key: ANGEL_API_KEY
+        sync: false
+      - key: ANGEL_CLIENT_CODE
+        sync: false
+      - key: ANGEL_PIN
+        sync: false
+      - key: ANGEL_TOTP_KEY
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ENABLE_BACKGROUND_SCHEDULERS
+        value: "0"
+      - key: ENABLE_DURABLE_FUND_AUDITS
+        value: "1"
+      - key: GOOGLE_GENAI_USE_VERTEXAI
+        value: "true"
+
 

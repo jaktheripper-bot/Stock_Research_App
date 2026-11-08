@@ -64,7 +64,7 @@
             </div>
             <div class="provenance-cell">
               <div class="provenance-label"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg> Holdings Disclosure Period</div>
-              <div class="provenance-value">AMFI Portfolio: {{ fund_portfolio_date_str|default(scheme.last_portfolio_date|default('Latest Monthly')) }}</div>
+              <div class="provenance-value">Portfolio disclosure {{ fund_portfolio_date_str|default('Pending validated disclosure') }}</div>
               <div class="provenance-sub">Scheme Code: <span class="tnum">{{ scheme.scheme_code }}</span> • {{ lookthrough.holdings|length }} Disclosed Securities</div>
             </div>
           </div>
@@ -108,7 +108,7 @@
           Coverage Pending
         </div>
         <div style="font-size: 13px; font-weight: 600; margin-top: 4px; color: #f59e0b;">
-          {{ lookthrough.genuine_coverage_pct|default(0.0) }}% / 70.0% Verified
+          {{ lookthrough.genuine_coverage_pct|default(0.0) }}% / 70.0% Eligible
         </div>
         {% endif %}
       </div>
@@ -125,7 +125,7 @@
           Look-Through Accounting Check pending underlying constituent coverage. Full holdings breakdown available below.
         </div>
         <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.5;">
-          Under SEBI RA 2014 Sec. 2(u) non-advisory standards, we strictly require verified 7-pillar research on ≥70% of equity holdings (currently {{ lookthrough.genuine_coverage_pct|default(0.0) }}%) before issuing quantitative composite scores or qualitative AI audit narratives.
+          Our methodology requires eligible archived research on at least 70% of disclosed equity weight (currently {{ lookthrough.genuine_coverage_pct|default(0.0) }}%) before publishing aggregate equity research.
         </div>
       </div>
     </div>
@@ -151,6 +151,7 @@
 
   <!-- 7-Pillar Look-Through Workspace -->
   {% if forensic_dossier %}
+  {% set receipt = forensic_dossier.evidence_receipt %}
   <div style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.45) 0%, rgba(15, 23, 42, 0.85) 100%); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 16px; padding: 24px; margin-bottom: 24px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 18px;">
       <div>
@@ -162,7 +163,7 @@
           Constituent Accounting Metrics & Solvency Look-Through
         </h2>
         <div style="font-size: 13.5px; color: #94a3b8; margin-top: 4px;">
-          Aggregated directly from verified 7-pillar stock dossiers.
+          Qualitative signals from eligible archived stock research.
         </div>
       </div>
       <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
@@ -175,7 +176,29 @@
       </div>
     </div>
 
-    {% if lookthrough.has_sufficient_coverage %}
+    {% if receipt %}
+    <section aria-label="Evidence receipt" style="margin-bottom: 20px;">
+      <h3>Evidence Receipt</h3>
+      <dl>
+        <dt>Disclosure date</dt><dd>{{ receipt.as_on_date or 'Pending validated disclosure' }}</dd>
+        <dt>Source</dt><dd>{{ receipt.disclosure_source or 'Pending' }}</dd>
+        {% if receipt.disclosure_source_url and (receipt.disclosure_source_url.startswith('https://') or receipt.disclosure_source_url.startswith('http://')) %}
+        <dt>Source disclosure</dt><dd><a href="{{ receipt.disclosure_source_url }}" rel="noopener noreferrer">Open portfolio disclosure</a></dd>
+        {% endif %}
+        <dt>Analysis date and method</dt><dd>{{ receipt.analyzed_at[:10] }} · {{ receipt.method_version }}</dd>
+        <dt>Eligible research by portfolio NAV</dt><dd>{{ receipt.researched_weight_pct_nav }}%</dd>
+        <dt>Eligible research by disclosed equity weight</dt>
+        <dd>{% if receipt.researched_equity_weight_pct is not none %}{{ receipt.researched_equity_weight_pct }}%{% else %}No eligible equity sleeve{% endif %}</dd>
+      </dl>
+      {% if receipt.top_uncovered_holdings %}
+      <details>
+        <summary>Largest equity positions without eligible research</summary>
+        <ul>{% for h in receipt.top_uncovered_holdings %}<li>{{ h.name }} ({{ h.identifier }}) · {{ h.weight_pct_nav }}% of NAV</li>{% endfor %}</ul>
+      </details>
+      {% endif %}
+    </section>
+    {% endif %}
+    {% if receipt and forensic_dossier.composite_health_score is not none %}
     <!-- 4-Card Accounting Meter Strip -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 14px; margin-bottom: 20px;">
       <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
@@ -184,7 +207,7 @@
           <div style="font-size: 24px; font-weight: 800; color: #c084fc; margin: 2px 0;">{{ forensic_dossier.weighted_moat_score }}<span style="font-size: 13px; color: #64748b;">/100</span></div>
           <div style="font-size: 12px; color: #94a3b8;">Wide & Moderate Moat capital</div>
         </div>
-        <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'moat_index', 'Weighted Moat Index', 'Explain the fund\'s Weighted Moat Index and constituent moat quality')" style="margin-top: 10px; background: none; border: none; color: #38bdf8; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; text-align: left; display: inline-flex; align-items: center; gap: 3px;">
+        <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'moat_index', 'Weighted Moat Index', 'Explain the Weighted Moat Index and constituent moat quality for this fund')" style="margin-top: 10px; background: none; border: none; color: #38bdf8; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; text-align: left; display: inline-flex; align-items: center; gap: 3px;">
           Audit in Desk ↗
         </button>
       </div>
@@ -206,28 +229,18 @@
 
       <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
         <div>
-          <div style="font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Margin of Safety (DCF)</div>
-          <div data-style-color="{% if forensic_dossier.margin_of_safety_pct >= 0 %}#10b981{% elif forensic_dossier.margin_of_safety_pct >= -15 %}#f59e0b{% else %}#ef4444{% endif %}" style="font-size: 24px; font-weight: 800; margin: 2px 0;">
-            {{ "{:+.1f}".format(forensic_dossier.margin_of_safety_pct) }}%
-          </div>
-          <div style="font-size: 12px; color: #94a3b8;">Intrinsic value discount vs price</div>
+          <div style="font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Portfolio Valuation Tilt</div>
+          <div style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 4px 0;">{{ receipt.metrics.valuation_tilt.value|title }}</div>
+          <div style="font-size: 12px; color: #94a3b8;">Qualitative labels cover {{ receipt.metrics.valuation_tilt.coverage_pct_nav }}% of portfolio NAV. DCF aggregate unavailable.</div>
         </div>
-        <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'margin_of_safety', 'Margin of Safety', 'Evaluate the weighted DCF Margin of Safety for this fund\'s portfolio')" style="margin-top: 10px; background: none; border: none; color: #38bdf8; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; text-align: left; display: inline-flex; align-items: center; gap: 3px;">
-          Audit in Desk ↗
-        </button>
       </div>
 
       <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
         <div>
-          <div style="font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Promoter Pledge Exposure</div>
-          <div data-style-color="{% if forensic_dossier.promoter_pledge_exposure_pct <= 2.0 %}#10b981{% else %}#ef4444{% endif %}" style="font-size: 24px; font-weight: 800; margin: 2px 0;">
-            {{ forensic_dossier.promoter_pledge_exposure_pct }}%
-          </div>
-          <div style="font-size: 12px; color: #94a3b8;">Capital in high-pledge promoters</div>
+          <div style="font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Governance and Solvency Watchlist</div>
+          <div style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 4px 0;">{{ receipt.metrics.governance_solvency_watchlist.value_pct_nav }}% of portfolio NAV flagged</div>
+          <div style="font-size: 12px; color: #94a3b8;">Research covers {{ receipt.metrics.governance_solvency_watchlist.coverage_pct_nav }}% of NAV. Measured pledge exposure unavailable.</div>
         </div>
-        <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'promoter_pledge', 'Promoter Pledge Exposure', 'Are there any promoter pledging or corporate governance red flags in underlying holdings?')" style="margin-top: 10px; background: none; border: none; color: #38bdf8; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; text-align: left; display: inline-flex; align-items: center; gap: 3px;">
-          Audit in Desk ↗
-        </button>
       </div>
     </div>
 
@@ -263,10 +276,10 @@
             <a href="/dossier/{{ r.identifier }}" style="color: #fca5a5; text-decoration: none; font-weight: 600;">
               {{ r.name }} ({{ r.identifier }})
             </a>
-            <span style="color: #ef4444; font-weight: 600;">{{ r.weight_pct }}% ({{ "{:+.0f}".format(r.mos_pct) }}% MoS)</span>
+            <span style="color: #ef4444; font-weight: 600;">{{ r.weight_pct }}% of NAV</span>
           </div>
           {% else %}
-          <div style="font-size: 12px; color: #10b981;"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-check"></use></svg> Zero elevated forensic accounting or leverage anomalies detected</div>
+          <div style="font-size: 12px; color: #10b981;"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-check"></use></svg> No watchlist items in eligible research</div>
           {% endfor %}
         </div>
       </div>
@@ -281,20 +294,25 @@
         </h3>
       </div>
       <p style="font-size: 13.5px; color: #94a3b8; margin: 0; line-height: 1.6;">
-        Detailed aggregate metrics (Weighted Moat Index, Accounting Risk ASRI, DCF Margin of Safety, and Promoter Pledge Exposure) require audited 7-pillar research on ≥70% of equity holdings. Current verified constituent coverage is <strong>{{ lookthrough.genuine_coverage_pct|default(0.0) }}%</strong>.
+        Aggregate equity research is withheld until a validated disclosure and sufficient eligible constituent research are available.
       </p>
     </div>
     {% endif %}
   </div>
-  {% elif forensic_locked %}
+  {% elif forensic_locked and has_validated_disclosure %}
   {% set lock_title = 'Look-Through Forensics & Audit Narrative' %}
-  {% set lock_blurb = 'The free report already shows fees, active share, holdings and the headline health score. The Deep Dive opens up what sits underneath the portfolio.' %}
-  {% set lock_points = ['Weighted moat score and the top compounder holdings', 'Look-through accounting risk (ASRI) and promoter pledge exposure, with the flagged holdings named', 'Weighted margin of safety: is the portfolio at a DCF discount or premium', 'The written 7-pillar audit narrative, and the Research Desk can answer questions on all of it'] %}
+  {% set lock_blurb = 'Open the fund analysis and review the research behind eligible holdings.' %}
+  {% set lock_points = ['Research coverage and the largest positions still awaiting eligible research', 'Qualitative valuation tilt and governance watchlist weight, where coverage supports them', 'The dated fund narrative and its evidence receipt'] %}
   {% include "partials/asset_unlock_card.html" %}
   {% endif %}
 
-  <!-- Deep-Dive Stock Audit Option Card (Rendered for both locked & un-synthesized schemes) -->
-  {% if credit_quote %}
+  <!-- Deep-Dive Stock Audit Option Card -->
+  {% if not has_validated_disclosure %}
+  <section class="card" aria-label="Fund audit availability" style="margin-bottom: 24px; padding: 18px 20px;">
+    <h3 style="margin-top: 0;">Monthly Portfolio Disclosure Pending Sync</h3>
+    <p style="margin-bottom: 0;">A paid audit becomes available after a dated source disclosure is validated.</p>
+  </section>
+  {% elif credit_quote %}
   {% set effective_deep_dive_credits = credit_quote.layer2_deep_dive_credits + (1 if forensic_locked else 0) %}
   <div style="background: rgba(15, 23, 42, 0.78); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 14px; padding: 18px 20px; margin-bottom: 24px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
@@ -317,7 +335,9 @@
           <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3);">Layer 1 Active (1 Credit)</span>
           {% endif %}
           {% if credit_quote.uncached_count == 0 %}
-          <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3);"><svg class="glyph" style="width: 11px; height: 11px; vertical-align: -1px;"><use href="#glyph-check"></use></svg> 100% Constituent Coverage Active</span>
+          <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3);"><svg class="glyph" style="width: 11px; height: 11px; vertical-align: -1px;"><use href="#glyph-check"></use></svg> All Disclosed Equity Holdings Researched</span>
+          {% elif credit_quote.deep_dive_available is sameas false %}
+          <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(245, 158, 11, 0.15); color: #fcd34d; font-weight: 700; border: 1px solid rgba(245, 158, 11, 0.3);">Layer 1 Look-Through Available</span>
           {% else %}
           <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(168, 85, 247, 0.15); color: #c084fc; font-weight: 700; border: 1px solid rgba(168, 85, 247, 0.3);">Layer 2 Deep-Dive Available</span>
           {% endif %}
@@ -329,10 +349,15 @@
           {% elif credit_quote.equity_holdings_count == 0 %}
           <strong>Fixed-Income / Money-Market Mandate (0 Equity Constituents):</strong> Portfolio holds sovereign, corporate debt, or money-market instruments evaluated via the Debt &amp; Liquidity Sleeve below.
           {% elif credit_quote.uncached_count == 0 %}
-          <strong>All {{ credit_quote.equity_holdings_count }} equity constituents</strong> have verified 7-pillar dossiers ({{ credit_quote.cached_weight_pct }}% equity weight). {% if not forensic_dossier %}Compile or unlock the fund narrative to view full look-through meters.{% else %}Full look-through meters and accounting narrative are active.{% endif %}
+          <strong>All {{ credit_quote.equity_holdings_count }} equity constituents</strong> have eligible archived research ({{ credit_quote.cached_weight_pct }}% of portfolio NAV). {% if not forensic_dossier %}Compile or unlock the fund narrative to view full look-through meters.{% else %}Full look-through meters and accounting narrative are active.{% endif %}
           {% else %}
-          <strong>{{ credit_quote.cached_count }}</strong> of {{ credit_quote.equity_holdings_count }} equity constituents have full 7-pillar dossiers ({{ credit_quote.cached_weight_pct }}% weight).
-          <strong style="color: #c084fc;">{{ credit_quote.uncached_count }} stocks</strong> ({{ credit_quote.uncached_weight_pct }}% weight) can be synthesized on demand below or via our daily constituent rollout.
+          <strong>{{ credit_quote.cached_count }}</strong> of {{ credit_quote.equity_holdings_count }} equity constituents have eligible archived research ({{ credit_quote.cached_weight_pct }}% of portfolio NAV).
+          <strong style="color: #c084fc;">{{ credit_quote.uncached_count }} domestic stocks</strong> ({{ credit_quote.uncached_weight_pct }}% weight) remain unresearched{% if credit_quote.excluded_foreign_count %} ({{ credit_quote.excluded_foreign_count }} foreign holdings excluded from domestic synthesis billing){% endif %}.
+          {% if credit_quote.deep_dive_available is sameas false %}
+          {{ credit_quote.deep_dive_unavailable_reason }}
+          {% else %}
+          They can be synthesized on demand below or via our daily constituent rollout.
+          {% endif %}
           {% endif %}
         </p>
       </div>
@@ -342,7 +367,7 @@
         <button id="btnDeepDiveAudit" type="button" disabled class="btn btn-sm btn-outline-secondary" style="font-weight: 700; font-size: 12px; padding: 6px 14px; border-radius: 8px; opacity: 0.55; cursor: not-allowed; display: inline-flex; align-items: center; gap: 6px;">
           <span><svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-clock"></use></svg></span> Awaiting SEBI Sync
         </button>
-        {% elif credit_quote.uncached_count > 0 %}
+        {% elif credit_quote.uncached_count > 0 and credit_quote.deep_dive_available is not sameas false %}
         <div style="text-align: right;">
           <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Deep Dive Cost</div>
           <div style="font-size: 18px; font-weight: 800; color: #c084fc;">
@@ -375,7 +400,7 @@
         </div>
         <div style="display: flex; align-items: center; gap: 12px;">
           <div id="deepDiveCountdown" style="font-size: 12px; font-weight: 700; color: #fbbf24; background: rgba(245, 158, 11, 0.12); padding: 3px 10px; border-radius: 9999px; border: 1px solid rgba(245, 158, 11, 0.3);">
-            Estimated: ~{{ credit_quote.layer2_deep_dive_credits * 3 + 3 }}s remaining
+            Waiting for audit status
           </div>
           <span id="deepDivePct" style="font-size: 14px; color: #c084fc; font-weight: 900; min-width: 40px; text-align: right;">8%</span>
         </div>
@@ -1060,25 +1085,20 @@ async function executeDeepDiveAudit(schemeCode, creditCost, allowDeepDive = true
     pStage.innerHTML = `<span class="spinner" style="width: 14px; height: 14px; border: 2px solid rgba(168, 85, 247, 0.2); border-top-color: #c084fc; border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite;"></span> <span>Initializing Constituent Audit Engine...</span>`;
   }
 
-  let estimatedRemaining = Math.max(8, (creditCost || 1) * 3 + 3);
-  let countdownTimer = setInterval(() => {
-    if (estimatedRemaining > 2) {
-      estimatedRemaining--;
-      if (pCountdown) {
-        pCountdown.innerText = `Estimated: ~${estimatedRemaining}s remaining`;
-      }
-    }
-  }, 1000);
-
   try {
-    const res = await fetch("/api/funds/on-demand-audit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scheme_code: schemeCode, allow_deep_dive: Boolean(allowDeepDive) })
-    });
-    const data = await res.json();
+    const { res, data, key, canceled } = await submitFundAudit(schemeCode, Boolean(allowDeepDive), creditCost);
+    if (canceled) {
+      if (pBox) pBox.style.display = "none";
+      if (btn) {
+        btn.disabled = false;
+        btn.style.opacity = "1";
+        btn.innerHTML = allowDeepDive
+          ? `<span><svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-zap"></use></svg></span> Initiate Deep-Dive Audit`
+          : `<span><svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-refresh"></use></svg></span> Compile Look-Through Audit`;
+      }
+      return;
+    }
     if (!res.ok || !data.success) {
-      clearInterval(countdownTimer);
       if (res.status === 401 && typeof openAuthModal === "function") {
         openAuthModal();
       } else if (res.status === 402 && typeof openCheckoutModal === "function") {
@@ -1098,12 +1118,13 @@ async function executeDeepDiveAudit(schemeCode, creditCost, allowDeepDive = true
       return;
     }
 
-    // Representative status polling
+    let pollFailures = 0;
     const pollInterval = setInterval(async () => {
       try {
         const sRes = await fetch(`/api/funds/audit-status/${data.task_id}`);
-        if (!sRes.ok) return;
+        if (!sRes.ok) throw new Error("Audit status is temporarily unavailable.");
         const sData = await sRes.json();
+        pollFailures = 0;
 
         const pct = Math.min(100, Math.max(8, sData.progress_pct || 8));
         if (pBar) pBar.style.width = pct + "%";
@@ -1120,15 +1141,18 @@ async function executeDeepDiveAudit(schemeCode, creditCost, allowDeepDive = true
           pMsg.innerText = sData.message;
         }
 
-        if (sData.estimated_seconds_remaining !== undefined && pCountdown) {
-          if (sData.status === "COMPLETED") {
-            pCountdown.innerText = "✓ Complete";
-            pCountdown.style.background = "rgba(16, 185, 129, 0.15)";
-            pCountdown.style.color = "#10b981";
-            pCountdown.style.borderColor = "rgba(16, 185, 129, 0.3)";
+        if (pCountdown) {
+          if (sData.deadline_unix) {
+            const deadline = new Date(sData.deadline_unix * 1000).toLocaleTimeString();
+            const label = sData.status === "QUEUED" ? "Queue deadline" : "Worker check-in due";
+            pCountdown.textContent = `${label} ${deadline}`;
           } else {
-            const sec = sData.estimated_seconds_remaining;
-            pCountdown.innerText = sec > 0 ? `Estimated: ~${sec}s remaining` : "Finalizing look-through aggregation...";
+            pCountdown.textContent = {
+              COMPLETED: "Complete",
+              FAILED: "Settled",
+              QUEUED: "Queued",
+              PROCESSING: "Research in progress",
+            }[sData.status] || "Waiting for audit status";
           }
         }
 
@@ -1141,25 +1165,27 @@ async function executeDeepDiveAudit(schemeCode, creditCost, allowDeepDive = true
 
         if (sData.status === "COMPLETED") {
           clearInterval(pollInterval);
-          clearInterval(countdownTimer);
           if (pBar) {
             pBar.style.width = "100%";
             pBar.style.background = "#10b981";
           }
           if (pPct) pPct.innerText = "100%";
-          if (pMsg) pMsg.innerText = "Deep-dive constituent audit complete! All look-through meters unpaused. Reloading...";
-          
-          if ("Notification" in window && Notification.permission === "granted") {
-            new Notification("Deep-Dive Look-Through Ready!", {
-              body: `Deep dive audit complete for ${schemeCode}. Dossier reloaded with full constituent coverage.`,
-              icon: "/static/favicon.ico"
-            });
+          clearPendingFundAudit(key);
+          if (pMsg) {
+            pMsg.textContent = sData.message || "Fund audit completed.";
+            showFundAuditSettlement(pMsg, sData);
+            const link = document.createElement("a");
+            link.href = window.location.pathname;
+            link.textContent = "View the saved fund dossier";
+            pMsg.appendChild(link);
           }
-          setTimeout(() => window.location.reload(), 1200);
         } else if (sData.status === "FAILED") {
           clearInterval(pollInterval);
-          clearInterval(countdownTimer);
-          if (pMsg) pMsg.innerText = "Audit Failed: " + (sData.error || "Unknown error");
+          clearPendingFundAudit(key);
+          if (pMsg) {
+            pMsg.textContent = sData.error || "The audit failed.";
+            showFundAuditSettlement(pMsg, sData);
+          }
           if (btn) {
             btn.disabled = false;
             btn.style.opacity = "1";
@@ -1167,12 +1193,19 @@ async function executeDeepDiveAudit(schemeCode, creditCost, allowDeepDive = true
           }
         }
       } catch (pollErr) {
-        console.warn("Poll error", pollErr);
+        if (++pollFailures >= 5) {
+          clearInterval(pollInterval);
+          if (pMsg) pMsg.textContent = "Could not check status. Select the same audit to reconnect.";
+          if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            btn.textContent = "Reconnect to audit";
+          }
+        }
       }
     }, 1000);
 
   } catch (err) {
-    clearInterval(countdownTimer);
     if (pMsg) pMsg.innerText = "Error triggering deep dive: " + err.message;
     if (btn) {
       btn.disabled = false;
@@ -1189,5 +1222,6 @@ async function executeDeepDiveAudit(schemeCode, creditCost, allowDeepDive = true
   window.__CURRENT_TICKER = "{{ scheme.scheme_code }}";
   window.__CURRENT_ASSET_TYPE = "mutual_fund";
 </script>
+<script src="/static/js/fund_audit_request.js"></script>
 <script src="/static/js/copilot.js?v=20261019_1900"></script>
 {% endblock %}

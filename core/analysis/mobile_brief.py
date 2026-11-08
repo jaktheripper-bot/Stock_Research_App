@@ -215,7 +215,6 @@ def _compile_fund(ident: str, is_unlocked: bool) -> Optional[Dict[str, Any]]:
     top10_wt = lookthrough.get("top_10_weight_pct") or meta.get("top_10_weight_pct")
     moat = dossier.get("weighted_moat_score")
     health = dossier.get("composite_health_score") or lookthrough.get("composite_health_score")
-    pledge = dossier.get("promoter_pledge_exposure_pct")
     aum_cr = scheme.get("aum_crores")
     turnover = scheme.get("portfolio_turnover_ratio_pct")
 
@@ -239,8 +238,7 @@ def _compile_fund(ident: str, is_unlocked: bool) -> Optional[Dict[str, Any]]:
     if _present(moat) or _present(health):
         quality_line = (
             f"Look-through Health Score {_num(health, 1, '/100')} · "
-            f"Weighted Moat {_num(moat, 1, '/100')} · "
-            f"Promoter pledge exposure {_num(pledge, 2, '%')}."
+            f"Weighted Moat {_num(moat, 1, '/100')}."
         )
     elif _present(sortino):
         quality_line = (

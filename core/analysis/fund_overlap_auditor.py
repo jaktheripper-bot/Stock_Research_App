@@ -4,8 +4,8 @@ Aggregates constituent equity stock dossiers from reports.db into portfolio-leve
 forensic metrics:
 1. Weighted Economic Moat Index (Wide vs Moderate vs Narrow Moat capital allocation)
 2. Portfolio Accounting & Solvency Risk Index (ASRI: Beneish M-Score and balance sheet leverage exposure)
-3. Portfolio Margin of Safety vs Intrinsic Value (Aggregated DCF intrinsic discount vs market froth)
-4. Promoter Pledging & Governance Risk Exposure (% capital in high-pledge promoters)
+3. Qualitative valuation tilt across researched equity holdings
+4. Governance and solvency watchlist weight
 5. True Active Share vs Benchmark & Closet Indexing Diagnostic
 6. AI-Powered Qualitative Report Generation
 """
@@ -37,14 +37,17 @@ from core.db.mutual_funds import (
 from core.db.agent_sessions import record_autonomous_event
 from core.analysis.mutual_funds_engine import (
     calculate_active_share,
-    EQUITY_HEALTH_DEFAULTS,
 )
-from core.analysis.dossier_report_synthesis import get_light_flash_model
+from core.analysis.fund_research_evidence import (
+    METHOD_VERSION,
+    RESEARCH_MAX_AGE_DAYS,
+    partition_constituent_quote_scope,
+    qualify_fund_research,
+)
 
 logger = logging.getLogger("equity_research.core.analysis.fund_overlap_auditor")
 
 VALUATION_UNDERVALUED_BENCHMARK_SCORE = 88.0
-MOAT_WIDE_BENCHMARK_SCORE = 88.0
 
 
 def parse_stock_report_health_matrix(report_text: str) -> Dict[str, Any]:
@@ -78,26 +81,46 @@ def parse_stock_report_health_matrix(report_text: str) -> Dict[str, Any]:
     return parsed
 
 
-def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
+def compute_fund_forensic_lookthrough(
+    scheme_code: str, *, holdings_override: Optional[List[Dict[str, Any]]] = None, scheme_override: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Traverses constituent portfolio holdings, joins stock dossiers, and calculates aggregate metrics."""
-    scheme = get_mutual_fund_scheme(scheme_code)
+    scheme = scheme_override if scheme_override is not None else get_mutual_fund_scheme(scheme_code)
     if not scheme:
         raise ValueError(f"Scheme not found in database: {scheme_code}")
 
-    holdings = get_scheme_holdings(scheme_code)
+    metadata = scheme.get("metadata") or {}
+    if holdings_override is not None:
+        snapshot_id = metadata.get("disclosure_snapshot_id")
+        holdings = holdings_override
+    else:
+        from core.db.mutual_funds import get_current_fund_disclosure
+
+        snapshot = get_current_fund_disclosure(scheme_code)
+        snapshot_id = snapshot["snapshot_id"] if snapshot else None
+        if snapshot:
+            holdings = snapshot["holdings"]
+            metadata = {
+                **metadata,
+                "holdings_as_on": snapshot["as_on_date"],
+                "holdings_source": snapshot["holdings_source"],
+                "holdings_source_url": snapshot["source_url"],
+            }
+        else:
+            holdings = get_scheme_holdings(scheme_code)
     if not holdings:
         raise ValueError(f"No constituent holdings found for scheme: {scheme_code}")
-
-    total_weight = sum(float(h.get("weight_pct", 0.0)) for h in holdings) or 100.0
 
     equity_weight = 0.0
     equity_covered_weight = 0.0
     genuine_covered_weight = 0.0
     equity_weighted_score = 0.0
     weighted_moat_sum = 0.0
-    weighted_mos_sum = 0.0
     asri_weight = 0.0
-    pledge_weight = 0.0
+    watchlist_nav_weight = 0.0
+    valuation_weights: Dict[str, float] = {}
+    evidence_rows: List[Dict[str, Any]] = []
+    analyzed_at = datetime.now(IST)
 
     evaluated_holdings = []
     top_risky_holdings = []
@@ -111,13 +134,13 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
         sector_or_rating = h.get("sector_or_rating", "General")
 
         is_researched = False
-        stock_score = 72.0
-        moat_label = "Moderate"
-        moat_score = 70.0
-        mos_pct = 0.0
+        stock_score = None
+        moat_label = None
+        moat_score = None
+        valuation_label = None
         is_asri_flagged = False
-        is_pledge_flagged = False
-        gov_label = "Clean"
+        is_governance_flagged = False
+        gov_label = None
 
         if h_type in ("EQUITY", "FOREIGN_EQUITY"):
             equity_weight += w
@@ -129,15 +152,17 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
             except Exception as rep_err:
                 logger.debug("Report lookup notice for %s: %s", ident, rep_err)
 
-            if rep and rep.get("report_text"):
+            evidence = qualify_fund_research(rep, ident, analyzed_at=analyzed_at)
+            if evidence and w > 0:
                 is_researched = True
                 genuine_covered_weight += w
                 equity_covered_weight += w
-                matrix = parse_stock_report_health_matrix(rep["report_text"])
+                evidence_rows.append({**evidence, "weight_pct_nav": w})
+                matrix = evidence["pillar_inputs"]
 
                 # Parse Moat
                 m_val = matrix.get("moat", "Moderate").lower()
-                if "wide" in m_val:
+                if "wide" in m_val or m_val == "strong":
                     moat_label = "Wide"
                     moat_score = 92.0
                 elif "narrow" in m_val:
@@ -149,12 +174,13 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
 
                 # Parse Governance
                 g_val = matrix.get("governance", "Clean").lower()
-                if "high" in g_val or "risk" in g_val:
+                if g_val == "high risk":
                     gov_label = "High Risk"
-                    is_pledge_flagged = True
+                    is_governance_flagged = True
                     gov_score = 40.0
-                elif "caution" in g_val:
+                elif g_val == "caution":
                     gov_label = "Caution"
+                    is_governance_flagged = True
                     gov_score = 65.0
                 else:
                     gov_label = "Clean"
@@ -162,7 +188,7 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
 
                 # Parse Balance Sheet / ASRI
                 b_val = matrix.get("balance_sheet", "Moderate Debt").lower()
-                if "high" in b_val or "debt" in b_val and "high" in b_val:
+                if b_val == "high debt":
                     is_asri_flagged = True
                     bs_score = 45.0
                 elif "debt-free" in b_val:
@@ -170,20 +196,18 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
                 else:
                     bs_score = 75.0
 
-                # Parse Valuation / Margin of Safety
-                v_val = matrix.get("valuation", "Fair").lower()
+                # Qualitative archived labels have no numeric DCF meaning.
+                v_val = matrix["valuation"]
+                valuation_label = v_val
+                valuation_weights[v_val] = valuation_weights.get(v_val, 0.0) + w
                 if "undervalued" in v_val:
-                    mos_pct = 22.0
                     val_score = VALUATION_UNDERVALUED_BENCHMARK_SCORE
                 elif "loss" in v_val:
-                    mos_pct = -35.0
                     val_score = 40.0
                     is_asri_flagged = True
                 elif "stretched" in v_val:
-                    mos_pct = -18.0
                     val_score = 55.0
                 else:
-                    mos_pct = 2.0
                     val_score = 75.0
 
                 # Composite stock health calculation
@@ -192,47 +216,13 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
                     1
                 )
 
-            elif ident in EQUITY_HEALTH_DEFAULTS:
-                # Benchmark constituent baseline proxy
-                base_score = float(EQUITY_HEALTH_DEFAULTS[ident])
-                stock_score = base_score
-                equity_covered_weight += w
-
-                if base_score >= 80:
-                    moat_label = "Wide"
-                    moat_score = MOAT_WIDE_BENCHMARK_SCORE
-                    mos_pct = 5.0
-                    gov_label = "Clean"
-                elif base_score >= 70:
-                    moat_label = "Moderate"
-                    moat_score = 72.0
-                    mos_pct = -4.0
-                    gov_label = "Clean"
-                else:
-                    moat_label = "Narrow"
-                    moat_score = 52.0
-                    mos_pct = -18.0
-                    gov_label = "Caution"
-                    if base_score < 62:
-                        is_asri_flagged = True
-                        is_pledge_flagged = True
-
-            else:
-                # Uncovered equity constituent
-                moat_label = "Moderate"
-                moat_score = 65.0
-                stock_score = 68.0
-                mos_pct = 0.0
-
-            # Accumulate equity forensic totals
-            equity_weighted_score += (stock_score * w)
-            weighted_moat_sum += (moat_score * w)
-            weighted_mos_sum += (mos_pct * w)
-
-            if is_asri_flagged:
-                asri_weight += w
-            if is_pledge_flagged:
-                pledge_weight += w
+            if is_researched and stock_score is not None and moat_score is not None:
+                equity_weighted_score += stock_score * w
+                weighted_moat_sum += moat_score * w
+                if is_governance_flagged or is_asri_flagged:
+                    watchlist_nav_weight += w
+                if is_asri_flagged:
+                    asri_weight += w
 
             holding_item = {
                 "identifier": ident,
@@ -243,17 +233,17 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
                 "score": stock_score,
                 "moat_label": moat_label,
                 "moat_score": moat_score,
-                "mos_pct": mos_pct,
+                "valuation_label": valuation_label,
                 "governance": gov_label,
                 "is_asri_flagged": is_asri_flagged,
-                "is_pledge_flagged": is_pledge_flagged,
+                "is_governance_flagged": is_governance_flagged,
                 "is_researched": is_researched
             }
             evaluated_holdings.append(holding_item)
 
-            if is_asri_flagged or is_pledge_flagged or mos_pct < -15.0:
+            if is_researched and (is_asri_flagged or is_governance_flagged or valuation_label == "stretched"):
                 top_risky_holdings.append(holding_item)
-            elif moat_score >= 85.0 and not is_asri_flagged:
+            elif is_researched and moat_score is not None and moat_score >= 85.0 and not is_asri_flagged:
                 top_quality_holdings.append(holding_item)
 
         elif h_type in ("DEBT", "SDI"):
@@ -272,11 +262,11 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
                 "score": score,
                 "moat_label": "N/A (Debt)",
                 "moat_score": score,
-                "mos_pct": 0.0,
+                "valuation_label": None,
                 "governance": "Clean",
                 "is_asri_flagged": is_asri_flagged,
-                "is_pledge_flagged": False,
-                "is_researched": True
+                "is_governance_flagged": False,
+                "is_researched": False
             }
             evaluated_holdings.append(holding_item)
 
@@ -290,11 +280,11 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
                 "score": 100.0,
                 "moat_label": "Sovereign Collateral",
                 "moat_score": 100.0,
-                "mos_pct": 0.0,
+                "valuation_label": None,
                 "governance": "Clean",
                 "is_asri_flagged": False,
-                "is_pledge_flagged": False,
-                "is_researched": True
+                "is_governance_flagged": False,
+                "is_researched": False
             }
             evaluated_holdings.append(holding_item)
 
@@ -303,24 +293,61 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
     top_quality_holdings.sort(key=lambda x: x["weight_pct"], reverse=True)
 
     # Normalized portfolio aggregates
-    norm_moat_score = round(weighted_moat_sum / equity_weight, 1) if equity_weight > 0 else 70.0
-    norm_mos_pct = round(weighted_mos_sum / equity_weight, 1) if equity_weight > 0 else 0.0
-    asri_pct = round((asri_weight / total_weight) * 100.0, 1)
-    pledge_exposure_pct = round((pledge_weight / total_weight) * 100.0, 1)
+    norm_moat_score = round(weighted_moat_sum / genuine_covered_weight, 1) if genuine_covered_weight > 0 else None
+    asri_pct = round(asri_weight, 1)
     equity_coverage_pct = round((equity_covered_weight / equity_weight) * 100.0, 1) if equity_weight > 0 else 100.0
 
     # Genuine 7-pillar coverage check (minimum 70% threshold)
     MIN_COVERAGE_THRESHOLD = 70.0
-    genuine_coverage_pct = round((genuine_covered_weight / equity_weight * 100.0), 1) if equity_weight > 0 else 100.0
-    has_sufficient_coverage = (genuine_coverage_pct >= MIN_COVERAGE_THRESHOLD)
+    raw_coverage = genuine_covered_weight / equity_weight * 100 if equity_weight > 0 else None
+    genuine_coverage_pct = round(raw_coverage, 1) if raw_coverage is not None else 0.0
+    has_sufficient_coverage = bool(snapshot_id and raw_coverage is not None and raw_coverage >= MIN_COVERAGE_THRESHOLD)
+    lead = max(valuation_weights.values(), default=0)
+    leaders = [label for label, weight in valuation_weights.items() if math.isclose(weight, lead)]
+    valuation_tilt = (
+        (leaders[0] if len(leaders) == 1 and lead > genuine_covered_weight / 2 else "mixed")
+        if evidence_rows
+        else None
+    )
+    top_uncovered_holdings = [
+        {"identifier": h["identifier"], "name": h["name"], "weight_pct_nav": h["weight_pct"]}
+        for h in sorted(evaluated_holdings, key=lambda h: h["weight_pct"], reverse=True)
+        if h["holding_type"] in ("EQUITY", "FOREIGN_EQUITY") and not h["is_researched"] and h["weight_pct"] > 0
+    ][:5]
+    evidence_receipt = {
+        "method_version": METHOD_VERSION,
+        "analyzed_at": analyzed_at.isoformat(),
+        "snapshot_id": snapshot_id,
+        "as_on_date": metadata.get("holdings_as_on") if snapshot_id else None,
+        "disclosure_source": metadata.get("holdings_source") if snapshot_id else None,
+        "disclosure_source_url": metadata.get("holdings_source_url") if snapshot_id else None,
+        "research_max_age_days": RESEARCH_MAX_AGE_DAYS,
+        "eligible_equity_weight_pct_nav": round(equity_weight, 2),
+        "researched_weight_pct_nav": round(genuine_covered_weight, 2),
+        "researched_equity_weight_pct": round(raw_coverage, 2) if raw_coverage is not None else None,
+        "top_uncovered_holdings": top_uncovered_holdings,
+        "constituent_research": evidence_rows,
+        "metrics": {
+            "valuation_tilt": {
+                "kind": "qualitative_research_signal",
+                "value": valuation_tilt if has_sufficient_coverage else None,
+                "coverage_pct_nav": round(genuine_covered_weight, 2),
+                "weight_by_label_pct_nav": {label: round(weight, 2) for label, weight in valuation_weights.items()},
+                "denominator": "researched_equity_weight",
+            },
+            "governance_solvency_watchlist": {
+                "kind": "qualitative_research_signal",
+                "value_pct_nav": round(watchlist_nav_weight, 2) if has_sufficient_coverage else None,
+                "coverage_pct_nav": round(genuine_covered_weight, 2),
+                "denominator": "portfolio_nav",
+            },
+            "dcf_margin_of_safety": {"kind": "sourced_model_metric", "value": None, "coverage_pct_nav": None},
+            "promoter_pledge_exposure": {"kind": "disclosed_metric", "value": None, "coverage_pct_nav": None},
+        },
+    }
 
     # Composite health score
-    norm_equity_score = (equity_weighted_score / equity_weight) if equity_weight > 0 else 72.0
-    composite_health = round(
-        (norm_equity_score * (equity_weight / total_weight)) +
-        (90.0 * ((total_weight - equity_weight) / total_weight)),
-        1
-    )
+    composite_health = round(equity_weighted_score / genuine_covered_weight, 1) if has_sufficient_coverage else None
 
     # Compute Active Share
     bench_name = scheme.get("benchmark_index", "NIFTY 500 TRI")
@@ -341,17 +368,16 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
         "ter_regular_pct": float(scheme.get("ter_regular_pct", 1.50)),
         "portfolio_turnover_ratio_pct": float(scheme.get("portfolio_turnover_ratio_pct", 25.0)),
         "composite_health_score": composite_health if has_sufficient_coverage else None,
-        "weighted_moat_score": norm_moat_score,
-        "accounting_risk_index": asri_pct,
-        "margin_of_safety_pct": norm_mos_pct,
-        "promoter_pledge_exposure_pct": pledge_exposure_pct,
+        "weighted_moat_score": norm_moat_score if has_sufficient_coverage else None,
+        "accounting_risk_index": asri_pct if has_sufficient_coverage else None,
+        "evidence_receipt": evidence_receipt,
         "active_share_pct": active_share_val,
         "equity_coverage_pct": equity_coverage_pct,
         "genuine_coverage_pct": genuine_coverage_pct,
         "has_sufficient_coverage": has_sufficient_coverage,
         "min_coverage_threshold": MIN_COVERAGE_THRESHOLD,
-        "top_risky_holdings": top_risky_holdings[:5],
-        "top_quality_holdings": top_quality_holdings[:5],
+        "top_risky_holdings": top_risky_holdings[:5] if has_sufficient_coverage else [],
+        "top_quality_holdings": top_quality_holdings[:5] if has_sufficient_coverage else [],
         "evaluated_holdings": evaluated_holdings
     }
 
@@ -370,32 +396,28 @@ def synthesize_fund_forensic_narrative(metrics: Dict[str, Any], scheme: Dict[str
     scheme_name = scheme.get("scheme_name", metrics.get("scheme_name", ""))
     scheme_code = metrics.get("scheme_code", "")
 
-    # Source-Grounded Gate: If coverage is below threshold, return honest coverage notice
-    if not metrics.get("has_sufficient_coverage", True):
-        cov = metrics.get("genuine_coverage_pct", 0.0)
-        return f"""# 06: Qualitative Audit Dossier
-
-**Coverage Notice (SEBI Research Analysts Regulations, 2014, Section 2(u)):**
-The underlying equity constituent look-through coverage for **{scheme_name}** currently stands at **{cov}%**, which is below our strict threshold of **70.0%**.
-
-To maintain Source-Grounded integrity and prevent misleading investors with unverified proxy assumptions:
-1. **Composite Health Scoring & Qualitative Moat Narrative are temporarily paused** until verified 7-pillar company dossiers are compiled for the remaining constituents.
-2. **Statutory Non-Look-Through Analytics remain 100% active:**
-   - Full disclosed constituent holdings table (equity, debt, TREPS).
-   - Active Share closet-indexing diagnostic.
-   - 10-year direct vs. regular TER fee drag schedule.
-   - AUM scale and mandate liquidity warnings.
-"""
+    receipt = metrics.get("evidence_receipt") or {}
+    if not receipt or not metrics.get("has_sufficient_coverage"):
+        if not receipt.get("snapshot_id"):
+            detail = "The validated portfolio disclosure is pending."
+        elif receipt.get("researched_equity_weight_pct") is None:
+            detail = "This disclosure has no eligible equity sleeve."
+        else:
+            detail = (
+                f"Eligible constituent research covers {receipt['researched_equity_weight_pct']:.1f}% "
+                f"of disclosed equity weight. The minimum is {metrics['min_coverage_threshold']:.1f}%."
+            )
+        return f"# 06: Qualitative Audit Dossier\n\n**Coverage notice**\n\n{detail} Aggregate equity research is withheld."
 
     cat = scheme.get("category", "")
-    aum = metrics.get("aum_crores", 0.0)
-    ter_dir = metrics.get("ter_direct_pct", 0.75)
-    ter_reg = metrics.get("ter_regular_pct", 1.50)
+    aum = metrics.get("aum_crores", scheme.get("aum_crores", 0.0))
+    ter_dir = metrics.get("ter_direct_pct", scheme.get("ter_direct_pct", 0.75))
+    ter_reg = metrics.get("ter_regular_pct", scheme.get("ter_regular_pct", 1.50))
     as_val = metrics.get("active_share_pct", 65.0)
     moat = metrics.get("weighted_moat_score", 70.0)
     asri = metrics.get("accounting_risk_index", 0.0)
-    mos = metrics.get("margin_of_safety_pct", 0.0)
-    pledge = metrics.get("promoter_pledge_exposure_pct", 0.0)
+    tilt = receipt["metrics"]["valuation_tilt"]["value"]
+    watchlist_weight = receipt["metrics"]["governance_solvency_watchlist"]["value_pct_nav"]
     ptr = metrics.get("portfolio_turnover_ratio_pct", 25.0)
     bench = metrics.get("benchmark_index", "NIFTY 500 TRI")
 
@@ -414,7 +436,7 @@ To maintain Source-Grounded integrity and prevent misleading investors with unve
         "You are the Chief Investment & Accounting Check Officer at Moatnomics. "
         "Write an analytical, zero-condescension Forensic Portfolio Dossier for this mutual fund scheme following the Moatnomics editorial method (Context -> Evidence -> Implication -> Next question). "
         "Strictly avoid patronizing prose, generic fluff, and forward-looking Buy/Sell/Hold verdicts. "
-        "Focus on accounting integrity, accounting manipulation risk (ASRI), true active management, and DCF intrinsic margin of safety. "
+        "Treat the research signals as qualitative labels. Do not invent DCF estimates, promoter pledge figures, or missing source facts. "
         "Follow the prescribed Markdown structure strictly."
     )
 
@@ -424,8 +446,9 @@ Category: {cat} | Benchmark: {bench}
 AUM: ₹{aum:,.0f} Cr | Direct TER: {ter_dir}% | Regular TER: {ter_reg}% | Turnover: {ptr}%
 Active Share: {as_val}% | Weighted Economic Moat Index: {moat}/100
 Accounting & Solvency Risk Index (ASRI): {asri}% of portfolio
-Portfolio Margin of Safety vs Intrinsic DCF: {mos}%
-Promoter Pledging / High-Risk Exposure: {pledge}%
+Qualitative Valuation Tilt among researched equity holdings: {tilt}
+Governance and solvency watchlist: {watchlist_weight}% of disclosed portfolio NAV
+Research coverage: {receipt["researched_weight_pct_nav"]}% of disclosed portfolio NAV
 Top Forensic Risks / Leveraged Holdings: {risky_names}
 Top Economic Moat Compounders: {quality_names}
 
@@ -434,9 +457,9 @@ Required Markdown Structure:
 ## 1. Mandate Integrity vs Ground Reality (Active Share & Style Drift)
 Analyze whether Active Share ({as_val}%) justifies the active expense ratio or indicates closet indexing. Evaluate AUM capacity drag at ₹{aum:,.0f} Cr.
 ## 2. Solvency & Accounting Fragility (ASRI Analysis)
-Analyze the Accounting & Solvency Risk Index ({asri}%) and promoter pledge exposure ({pledge}%). Dissect specific concerns in: {risky_names}.
-## 3. Economic Moat & Intrinsic Margin of Safety (DCF Capital Moat)
-Evaluate portfolio moat score ({moat}/100) and weighted margin of safety ({mos}%). Contrast quality compounders ({quality_names}) against valuation froth.
+Describe the coverage and the limits of the qualitative accounting and solvency watchlist. Use only the supplied signals for these holdings: {risky_names}.
+## 3. Economic Moat & Qualitative Valuation Tilt
+Explain the covered-equity moat score ({moat}/100) and the valuation label mix. Discuss the quality names ({quality_names}) with the stated coverage limits.
 ## 4. Manager Fee Justification vs Passive Index Drag
 Audit the {round(ter_reg - ter_dir, 2)}% commission spread between Direct and Regular plans over a 15-year horizon.
 ## 5. Countercase Scenario: What Breaks in a Severe Market Stress Test?
@@ -474,50 +497,32 @@ Detail the liquidity bottleneck and sector concentration fault lines if liquidit
     # Deterministic fallback is restricted strictly to offline test mode (TESTING=1)
     is_testing = os.environ.get("TESTING") == "1" or bool(os.environ.get("PYTEST_CURRENT_TEST"))
     if not gen_text and is_testing:
-        as_verdict = (
-            f"With an Active Share of {as_val:.1f}% `[CALCULATED METRIC]`, the portfolio diverges meaningfully from {bench}, "
-            f"providing a clearer basis for its active fee structure." if as_val >= 60.0 else
-            f"With an Active Share of {as_val:.1f}% `[CALCULATED METRIC]`, the portfolio tracks {bench} closely, "
-            f"raising the question of whether active management fees are compensated by sufficient differentiation."
+        fee_drag_lakhs = max(
+            0.0,
+            (((1.0 + 0.12 - (float(ter_dir) / 100.0)) ** 15) - ((1.0 + 0.12 - (float(ter_reg) / 100.0)) ** 15)) * 10.0,
         )
-
-        asri_verdict = (
-            f"The portfolio carries a low Accounting & Solvency Risk Index (ASRI) of {asri:.1f}% `[CALCULATED METRIC]`, "
-            f"with minimal capital allocated to businesses showing working-capital stretch or elevated balance sheet leverage." if asri <= 5.0 else
-            f"The portfolio carries an ASRI of {asri:.1f}% `[CALCULATED METRIC]`, indicating that a noticeable share of capital is allocated to businesses "
-            f"with higher balance sheet leverage or governance watchpoints (including {risky_names})."
+        gen_text = (
+            f"# FORENSIC DOSSIER: {scheme_name}\n\n"
+            f"## 1. Evidence coverage\n"
+            f"Research covers {receipt['researched_weight_pct_nav']}% of disclosed portfolio NAV.\n\n"
+            f"## 2. Governance and solvency watchlist\n"
+            f"Qualitative flags cover {watchlist_weight}% of disclosed portfolio NAV.\n\n"
+            f"## 3. Qualitative valuation tilt\n"
+            f"Separating constituent quality from valuation: researched equity weight indicates a {tilt} tilt across core holdings ({quality_names}).\n\n"
+            f"## 4. Fee structure\n"
+            f"Direct TER ({float(ter_dir):.2f}%) versus Regular TER ({float(ter_reg):.2f}%) reduces terminal value by roughly ₹{fee_drag_lakhs:.1f} Lakhs on a ₹10 Lakh 15-year compounding simulation."
         )
-
-        mos_verdict = (
-            f"On a look-through basis, the portfolio trades at an aggregate Margin of Safety of +{mos:.1f}% `[CALCULATED METRIC]` relative to conservative DCF fair values, "
-            f"supported by cash-generative franchises such as {quality_names}." if mos >= 0.0 else
-            f"Separating constituent quality from valuation: while core holdings ({quality_names}) remain operationally credible, the portfolio trades at a -{abs(mos):.1f}% `[CALCULATED METRIC]` Margin of Safety premium to conservative DCF fair values, leaving less room for earnings disappointments."
-        )
-
-        gen_text = f"""# FORENSIC DOSSIER: {scheme_name}
-
-## 1. Mandate Integrity vs Ground Reality (Active Share & Style Drift)
-{as_verdict} At an operating AUM of ₹{aum:,.0f} Cr `[VERIFIED FACT]`, annual portfolio turnover stands at {ptr:.1f}% `[CALCULATED METRIC]`, indicating measured holding periods rather than high-frequency churn. The key question for allocators is whether position sizing remains nimble as asset scale expands.
-
-## 2. Solvency & Accounting Fragility (ASRI Analysis)
-{asri_verdict} Look-through exposure to promoter share pledging stands at {pledge:.1f}% `[CALCULATED METRIC]`. Across the top holdings, operating cash conversion tracks reported earnings without widespread accrual divergence `[MODEL INTERPRETATION]`.
-
-## 3. Economic Moat & Intrinsic Margin of Safety (DCF Capital Moat)
-The capital-weighted Economic Moat Index measures {moat:.1f} out of 100 `[CALCULATED METRIC]`, reflecting durable return on capital and pricing discipline across the core equity sleeve. {mos_verdict}
-
-## 4. Manager Fee Justification vs Passive Index Drag
-The Direct Plan TER of {ter_dir:.2f}% `[VERIFIED FACT]` compares with a Regular Plan TER of {ter_reg:.2f}% `[VERIFIED FACT]`, creating an annual distribution cost spread of {round((ter_reg - ter_dir)*100, 0):.0f} basis points `[CALCULATED METRIC]`. Over a 15-year compounding horizon on a ₹10 Lakh allocation, that recurring fee differential reduces terminal value by roughly ₹4.5 Lakhs to ₹7.2 Lakhs `[MODEL INTERPRETATION]`—a predictable cost drag that compounds regardless of market direction.
-
-## 5. Countercase Scenario: What Breaks in a Severe Market Stress Test?
-In a 25–30% market drawdown accompanied by tighter secondary liquidity, redemption pressure would test the less liquid mid- and small-cap holdings ({risky_names}) first `[MODEL INTERPRETATION]`. The scheme's liquid cash and TREPS buffer of approximately {100.0 - metrics.get('equity_coverage_pct', 85.0):.1f}% `[CALCULATED METRIC]` provides an initial cushion to meet redemptions before core equity positions need to be trimmed at distressed prices.
-"""
 
     return gen_text
 
 
 def audit_single_fund_daily(
     scheme_code: Optional[str] = None,
-    force_refresh_stocks: bool = False
+    force_refresh_stocks: bool = False,
+    *,
+    holdings_override: Optional[List[Dict[str, Any]]] = None,
+    scheme_override: Optional[Dict[str, Any]] = None,
+    persist: bool = True,
 ) -> Dict[str, Any]:
     """Autonomous rotation worker: audits one fund per day, generating metrics and saving dossier."""
     if not scheme_code:
@@ -528,12 +533,18 @@ def audit_single_fund_daily(
 
     logger.info(f"Initiating autonomous look-through audit for scheme: {scheme_code}")
 
-    scheme = ensure_scheme_and_holdings_exist(scheme_code)
+    scheme = scheme_override if scheme_override is not None else ensure_scheme_and_holdings_exist(scheme_code)
     if not scheme:
         raise ValueError(f"Scheme not found in database: {scheme_code}")
 
     # Compute 7-pillar portfolio look-through metrics
-    metrics = compute_fund_forensic_lookthrough(scheme_code)
+    metrics = (
+        compute_fund_forensic_lookthrough(scheme_code)
+        if holdings_override is None and scheme_override is None
+        else compute_fund_forensic_lookthrough(
+            scheme_code, holdings_override=holdings_override, scheme_override=scheme
+        )
+    )
 
     # Generate AI narrative (or honest <70% Coverage Notice)
     dossier_narrative = synthesize_fund_forensic_narrative(metrics, scheme)
@@ -549,13 +560,15 @@ def audit_single_fund_daily(
         "composite_health_score": metrics["composite_health_score"],
         "weighted_moat_score": metrics["weighted_moat_score"],
         "accounting_risk_index": metrics["accounting_risk_index"],
-        "margin_of_safety_pct": metrics["margin_of_safety_pct"],
-        "promoter_pledge_exposure_pct": metrics["promoter_pledge_exposure_pct"],
+        "evidence_receipt": metrics["evidence_receipt"],
         "active_share_pct": metrics["active_share_pct"],
         "top_risky_holdings": metrics["top_risky_holdings"],
         "top_quality_holdings": metrics["top_quality_holdings"],
         "audited_by": "Gemini_Chief_Forensic_Officer"
     }
+
+    if not persist:
+        return {**metrics, "dossier_text": dossier_narrative, "saved": False, "dossier_record": dossier_record}
 
     saved = save_fund_forensic_dossier(dossier_record)
     if not saved:
@@ -688,23 +701,36 @@ def ensure_scheme_and_holdings_exist(scheme_code: str) -> Optional[Dict[str, Any
     return scheme
 
 
-def calculate_deep_dive_credit_cost(scheme_code: str) -> Dict[str, Any]:
+def calculate_deep_dive_credit_cost(
+    scheme_code: str, *, holdings_override: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
     """Calculates the exact token / credit breakdown for auditing a mutual fund:
     - Layer 1 (Standard): 1 credit for deterministic scoring + LLM portfolio synthesis.
-    - Layer 2 (Deep Dive): 1 credit per uncached constituent stock lacking a full forensic report."""
+    - Layer 2 (Deep Dive): 1 credit per uncached domestic constituent stock lacking eligible research."""
+    from core.analysis.financial_invariants import is_synthesizable_domestic_ticker
+
     clean_code = scheme_code.strip().upper()
-    ensure_scheme_and_holdings_exist(clean_code)
-    holdings = get_scheme_holdings(clean_code)
+    if holdings_override is None:
+        ensure_scheme_and_holdings_exist(clean_code)
+        holdings = get_scheme_holdings(clean_code)
+    else:
+        holdings = holdings_override
 
     equity_holdings = [h for h in holdings if h.get("holding_type") in ("EQUITY", "FOREIGN_EQUITY")]
-    cached_stocks = []
-    uncached_stocks = []
+    cached_stocks: List[Dict[str, Any]] = []
+    uncached_stocks: List[Dict[str, Any]] = []
+    excluded_foreign_stocks: List[Dict[str, Any]] = []
+    excluded_unresolved_isin_stocks: List[Dict[str, Any]] = []
 
     cached_weight = 0.0
     uncached_weight = 0.0
+    excluded_foreign_weight = 0.0
+    excluded_unresolved_isin_weight = 0.0
+    cached_symbols = set()
 
     for h in equity_holdings:
         ident = h.get("identifier", "").strip().upper()
+        h_type = str(h.get("holding_type") or "EQUITY").strip().upper()
         w = float(h.get("weight_pct", 0.0))
         rep = None
         try:
@@ -715,24 +741,33 @@ def calculate_deep_dive_credit_cost(scheme_code: str) -> Dict[str, Any]:
         item = {
             "identifier": ident,
             "holding_name": h.get("holding_name", ident),
+            "holding_type": h_type,
             "weight_pct": round(w, 2),
-            "sector": h.get("sector_or_rating", "General")
+            "sector": h.get("sector_or_rating", "General"),
         }
 
-        has_full_dossier = bool(
-            rep
-            and rep.get("report_text")
-            and len(str(rep.get("report_text") or "").strip()) >= 500
-        )
+        has_full_dossier = qualify_fund_research(rep, ident) is not None
         if has_full_dossier:
             cached_stocks.append(item)
             cached_weight += w
+            cached_symbols.add(ident)
+        elif h_type == "FOREIGN_EQUITY":
+            excluded_foreign_stocks.append(item)
+            excluded_foreign_weight += w
+        elif not is_synthesizable_domestic_ticker(ident, h_type):
+            if re.fullmatch(r"^IN[A-Z0-9]{10}$", ident):
+                excluded_unresolved_isin_stocks.append(item)
+                excluded_unresolved_isin_weight += w
+            else:
+                excluded_foreign_stocks.append(item)
+                excluded_foreign_weight += w
         else:
             uncached_stocks.append(item)
             uncached_weight += w
 
     uncached_stocks.sort(key=lambda x: x["weight_pct"], reverse=True)
     cached_stocks.sort(key=lambda x: x["weight_pct"], reverse=True)
+    scope = partition_constituent_quote_scope(holdings, cached_symbols)
 
     layer1_credits = 1
     layer2_credits = len(uncached_stocks)
@@ -746,11 +781,20 @@ def calculate_deep_dive_credit_cost(scheme_code: str) -> Dict[str, Any]:
         "uncached_count": len(uncached_stocks),
         "cached_weight_pct": round(cached_weight, 2),
         "uncached_weight_pct": round(uncached_weight, 2),
+        "excluded_foreign_count": len(excluded_foreign_stocks),
+        "excluded_foreign_weight_pct": round(excluded_foreign_weight, 2),
+        "excluded_foreign_stocks": excluded_foreign_stocks,
+        "excluded_unresolved_isin_count": len(excluded_unresolved_isin_stocks),
+        "excluded_unresolved_isin_weight_pct": round(excluded_unresolved_isin_weight, 2),
+        "excluded_unresolved_isin_stocks": excluded_unresolved_isin_stocks,
+        "deep_dive_available": scope["deep_dive_available"],
+        "deep_dive_unavailable_reason": scope["deep_dive_unavailable_reason"],
+        "max_synthesizable_per_sla": scope["max_synthesizable_per_sla"],
         "layer1_credits": layer1_credits,
         "layer2_deep_dive_credits": layer2_credits,
         "total_credits_for_full_audit": total_deep_dive_credits,
         "uncached_stocks": uncached_stocks,
-        "cached_stocks": cached_stocks
+        "cached_stocks": cached_stocks,
     }
 
 
@@ -1051,6 +1095,8 @@ def run_async_fund_audit_job(
 
         # Run the fund audit & save dossier
         result = audit_single_fund_daily(clean_code)
+        if not result.get("saved"):
+            raise RuntimeError("The fund dossier could not be saved.")
 
         FUND_AUDIT_TASKS[task_id]["progress_pct"] = 95
         FUND_AUDIT_TASKS[task_id]["stage"] = "QUALITATIVE_SYNTHESIS"

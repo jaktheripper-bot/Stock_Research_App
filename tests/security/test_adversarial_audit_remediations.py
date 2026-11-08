@@ -363,15 +363,24 @@ class TestAdversarialAuditRemediations(unittest.TestCase):
         )
 
     def test_round2_med06_deep_dive_quote_blocks_unauthenticated_db_pollution(self):
-        """[MED-06] Verify GET /api/funds/deep-dive-quote/{scheme_code} rejects unknown/malformed codes without DB pollution."""
+        """[MED-06] Verify GET /api/funds/deep-dive-quote/{scheme_code} rejects unauthenticated & unknown/malformed codes without DB pollution."""
+        from unittest import mock
         from core.db.mutual_funds import get_mutual_fund_scheme
 
         fake_code = "POLLUTE_DB_SYNTH_99999"
-        r_not_found = self.client.get(f"/api/funds/deep-dive-quote/{fake_code}")
-        self.assertEqual(r_not_found.status_code, 404)
+        r_unauth = self.client.get(f"/api/funds/deep-dive-quote/{fake_code}")
+        self.assertEqual(r_unauth.status_code, 401)
         self.assertIsNone(
             get_mutual_fund_scheme(fake_code),
             "MEDIUM: Unauthenticated GET /api/funds/deep-dive-quote polluted mutual_fund_schemes with a synthetic row!"
+        )
+
+        with mock.patch("web.main._get_current_web_user", return_value={"id": "med06-user"}):
+            r_not_found = self.client.get(f"/api/funds/deep-dive-quote/{fake_code}")
+        self.assertEqual(r_not_found.status_code, 404)
+        self.assertIsNone(
+            get_mutual_fund_scheme(fake_code),
+            "MEDIUM: Authenticated GET /api/funds/deep-dive-quote for unknown code polluted mutual_fund_schemes!"
         )
 
         r_bad_fmt = self.client.get("/api/funds/deep-dive-quote/BAD$CODE!@#")

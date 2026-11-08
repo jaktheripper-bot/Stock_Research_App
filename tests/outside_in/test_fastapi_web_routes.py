@@ -1010,10 +1010,14 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIsNotNone(soup.find(id="auditStatusMsg"), "Expected #auditStatusMsg")
         self.assertIsNotNone(soup.find(id="auditResultAction"), "Expected #auditResultAction")
 
-        # Verify JS function presence
+        # Verify JS function presence and durable audit helper wiring
         self.assertIn("async function startOnDemandFundAudit()", res.text)
         self.assertIn("function pollAuditStatus(", res.text)
-        self.assertIn("/api/funds/on-demand-audit", res.text)
+        self.assertIn("/static/js/fund_audit_request.js", res.text)
+        self.assertIn("submitFundAudit(", res.text)
+        js_res = self.client.get("/static/js/fund_audit_request.js")
+        self.assertEqual(js_res.status_code, 200)
+        self.assertIn("/api/funds/on-demand-audit", js_res.text)
 
     def test_fund_dossier_page(self):
         # 1. Test PPFAS Flexi Cap
@@ -1391,7 +1395,6 @@ from core.analysis.opportunity_terminal import (
     get_normalized_opportunity_universe,
     get_heatmap_matrix,
     get_arbitrage_comparison,
-    BENCHMARK_10Y_GSEC_YIELD
 )
 
 
@@ -1483,9 +1486,15 @@ class TestOpportunityTerminalEngine(unittest.TestCase):
         for k in required_keys:
             self.assertIn(k, first, f"Missing key '{k}' in OpportunityItem")
 
-        # Verify items are sorted descending by net_yield_pct
-        for i in range(len(universe) - 1):
-            self.assertGreaterEqual(universe[i]["net_yield_pct"], universe[i+1]["net_yield_pct"])
+        groups = {}
+        for item in universe:
+            self.assertIsNone(item["net_yield_pct"])
+            self.assertIsNone(item["real_yield_pct"])
+            self.assertIsNone(item["spread_vs_10y_gsec_bps"])
+            if item["metric_status"] == "available" and item["comparison_group"]:
+                groups.setdefault(item["comparison_group"], []).append(item["gross_yield_pct"])
+        for values in groups.values():
+            self.assertEqual(values, sorted(values, reverse=True))
 
     def test_persona_filtering(self):
         """Verify persona playbooks and Phase 3 scenario aliases correctly isolate matching opportunities."""
@@ -1493,7 +1502,7 @@ class TestOpportunityTerminalEngine(unittest.TestCase):
         self.assertGreater(len(preservation), 0)
         for item in preservation:
             self.assertIn("capital_preservation", item.get("persona_tags", []))
-            self.assertGreaterEqual(item.get("real_yield_pct", 0), 0)
+            self.assertIsNone(item["real_yield_pct"])
 
         cashflow = get_normalized_opportunity_universe(persona_filter="maximum_cashflow")
         self.assertGreater(len(cashflow), 0)
@@ -1509,8 +1518,8 @@ class TestOpportunityTerminalEngine(unittest.TestCase):
         """Verify 2D heatmap matrix construction."""
         matrix = get_heatmap_matrix()
         self.assertEqual(matrix["tenure_buckets"], ["<1Y", "1-3Y", "3-5Y", "5-10Y", "10Y+"])
-        self.assertEqual(len(matrix["rows"]), 7)
-        self.assertEqual(matrix["benchmark_10y_yield"], BENCHMARK_10Y_GSEC_YIELD)
+        self.assertEqual(len(matrix["rows"]), 3)
+        self.assertIsNone(matrix["benchmark_10y_yield"])
 
     def test_get_arbitrage_comparison(self):
         """Verify side-by-side comparison scorecard generation."""
@@ -1536,7 +1545,8 @@ class TestOpportunityTerminalWebEndpoints(unittest.TestCase):
         self.assertIn("arbitrageDocket", resp.text)
         self.assertIn("arbitrageModal", resp.text)
         self.assertIn("copilotModalBackdrop", resp.text)
-        self.assertIn("10% (New Tax Regime Base)", resp.text)
+        self.assertIn("Dated Debt Observations by Maturity", resp.text)
+        self.assertNotIn("taxSlabSelect", resp.text)
 
     def test_get_api_opportunities_universe(self):
         """GET /api/opportunities/universe should return structured JSON."""
@@ -1546,6 +1556,17 @@ class TestOpportunityTerminalWebEndpoints(unittest.TestCase):
         self.assertTrue(data.get("success"))
         self.assertGreater(data.get("count", 0), 20)
         self.assertIsInstance(data.get("items"), list)
+
+    def test_opportunity_v2_declares_coverage_and_nullable_post_tax_fields(self):
+        response = self.client.get("/api/v2/opportunities/universe")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["schema_version"], 2)
+        self.assertEqual(sum(sum(group.values()) for group in body["metric_coverage"].values()), body["count"])
+        self.assertGreater(body["count"], 0)
+        for item in body["items"]:
+            self.assertIsNone(item["net_yield_pct"])
+            self.assertEqual(item["post_tax_status"], "not_calculated")
 
     def test_get_api_opportunities_heatmap(self):
         """GET /api/opportunities/heatmap should return matrix JSON."""

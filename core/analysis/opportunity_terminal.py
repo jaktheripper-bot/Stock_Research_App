@@ -1,33 +1,22 @@
-"""
-Opportunity Terminal Normalization & Multi-Modal Consumption Engine.
+"""Typed opportunity measures and comparable groups for the Opportunity Terminal."""
 
-Aggregates, normalizes, and scores investment opportunities across all six active asset classes:
-1. Corporate Debt & SDIs (core.db.debt)
-2. Alternative Real Assets: Commercial REITs, InvITs, SEBI SM REITs (core.db.reits)
-3. Sovereign Gold Bonds (SGBs) (core.db.reits)
-4. Sovereign Yield Benchmarks & T-Bills (core.db.sovereign)
-5. Mutual Funds (core.db.mutual_funds)
-6. National ETFs (core.db.sovereign etf_matrix)
-7. Fundamental Equities (core.db.reports)
-
-Applies statutory Indian tax waterfalls (Sec 47(viic), Sec 115UA, Sec 50AA, Sec 112A),
-calculates real in-hand return net of MOSPI CPI inflation, and ranks opportunities
-across the 6-tier capital hierarchy seniority ladder (Sovereign -> Equity).
-"""
-
+from datetime import date, datetime
 import logging
-from typing import List, Dict, Any, Optional
+import math
+import re
+from typing import Any, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 
-from core.db.debt import get_active_debt_securities, get_debt_security_by_isin
-from core.db.reits import get_all_reits_and_invits, get_all_sgb_tranches, get_reit_by_symbol, get_sgb_by_symbol
-from core.db.sovereign import get_sovereign_yield_curve, get_etf_matrix
-from core.db.mutual_funds import get_active_mutual_funds, get_mutual_fund_scheme
+from core.analysis.metric_contract import has_forbidden_vendor_token
+from core.db.connection import get_db_connection
+from core.db.debt import get_active_debt_securities
+from core.db.mutual_funds import get_active_mutual_funds
+from core.db.reits import get_all_reits_and_invits, get_all_sgb_tranches
 from core.db.reports import get_archived_reports
+from core.db.sovereign import get_etf_matrix, get_sovereign_yield_curve
 
 logger = logging.getLogger(__name__)
 
-# Statutory 10Y Benchmark Anchor Yield
-BENCHMARK_10Y_GSEC_YIELD: float = 7.10
 DEFAULT_MOSPI_CPI_INFLATION: float = 4.50
 DEFAULT_TAX_SLAB_PCT: float = 30.0
 
@@ -36,10 +25,11 @@ SENIORITY_RANKS = {
     "SOVEREIGN": 0,
     "AAA_PSU": 1,
     "SENIOR_SECURED": 2,
+    "COMMODITY_BACKED_TRUST": 2,
     "SUBORDINATED": 3,
     "SDI": 3,
     "REAL_ASSET": 4,
-    "EQUITY": 5
+    "EQUITY": 5,
 }
 
 
@@ -47,11 +37,11 @@ def calculate_tax_waterfall(
     gross_yield: float,
     asset_class: str,
     tax_slab: float = 30.0,
-    details: Optional[Dict[str, Any]] = None
+    details: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Computes precise statutory post-tax yield under Indian Income Tax Act regimes.
-    
+
     Returns a dict containing:
     - net_yield_pct: float
     - tax_drag_pct: float
@@ -61,20 +51,19 @@ def calculate_tax_waterfall(
     tax_slab = max(0.0, min(float(tax_slab), 45.0))
     gross_yield = float(gross_yield)
     details = details or {}
-    
+
     if gross_yield <= 0:
         return {
             "net_yield_pct": 0.0,
             "tax_drag_pct": 0.0,
             "tax_statute": "N/A",
-            "effective_tax_rate_pct": 0.0
+            "effective_tax_rate_pct": 0.0,
         }
 
     # 1. Sovereign Gold Bonds: Section 47(viic)
     # Capital gains on redemption are 100% tax-free. Only 2.50% annual coupon is taxed at slab.
     if asset_class == "SGB":
         annual_coupon = float(details.get("coupon_rate_pct", 2.50))
-        # Coupon yield component vs capital appreciation component
         coupon_yield = min(annual_coupon, gross_yield)
         capital_yield = max(0.0, gross_yield - coupon_yield)
         taxed_coupon = coupon_yield * (1.0 - (tax_slab / 100.0))
@@ -84,31 +73,27 @@ def calculate_tax_waterfall(
             "net_yield_pct": round(net_yield, 2),
             "tax_drag_pct": round(gross_yield - net_yield, 2),
             "tax_statute": "Sec 47(viic) 100% Tax-Free Capital Gains (Coupon at Slab)",
-            "effective_tax_rate_pct": round(eff_tax_rate, 1)
+            "effective_tax_rate_pct": round(eff_tax_rate, 1),
         }
 
     # 2. REITs & InvITs: Section 115UA Pass-Through Waterfall
-    # Typical statutory distribution split: 40% Interest (slab), 35% Dividend (exempt), 25% Return of Capital (tax-free capital reduction)
     elif asset_class in ("REIT", "INVIT", "SM_REIT"):
         interest_pct = float(details.get("interest_component_pct", 40.0))
         dividend_pct = float(details.get("dividend_component_pct", 35.0))
         roc_pct = float(details.get("roc_component_pct", 25.0))
-        
-        # Interest taxed at slab
+
         interest_yield = gross_yield * (interest_pct / 100.0)
         net_interest = interest_yield * (1.0 - (tax_slab / 100.0))
-        # Dividend under SPV old regime is 100% exempt
         net_dividend = gross_yield * (dividend_pct / 100.0)
-        # RoC is tax-free up to acquisition cost
         net_roc = gross_yield * (roc_pct / 100.0)
-        
+
         net_yield = net_interest + net_dividend + net_roc
         eff_tax_rate = ((gross_yield - net_yield) / gross_yield * 100.0) if gross_yield > 0 else 0.0
         return {
             "net_yield_pct": round(net_yield, 2),
             "tax_drag_pct": round(gross_yield - net_yield, 2),
             "tax_statute": "Sec 115UA Hybrid Pass-Through (Interest at Slab, Dividend/RoC Tax-Sheltered)",
-            "effective_tax_rate_pct": round(eff_tax_rate, 1)
+            "effective_tax_rate_pct": round(eff_tax_rate, 1),
         }
 
     # 3. Equities & Equity Mutual Funds: Section 112A (12.5% Long-Term Capital Gains)
@@ -119,23 +104,22 @@ def calculate_tax_waterfall(
             "net_yield_pct": round(net_yield, 2),
             "tax_drag_pct": round(gross_yield - net_yield, 2),
             "tax_statute": "Sec 112A Long-Term Capital Gains (Flat 12.5% above ₹1.25L)",
-            "effective_tax_rate_pct": ltcg_rate
+            "effective_tax_rate_pct": ltcg_rate,
         }
 
     # 4. Standard Fixed Income & Debt: Section 50AA / Marginal Slab Tax
-    # Corporate bonds, SDIs, T-Bills, and G-Secs taxed at marginal slab rate
     else:
         net_yield = gross_yield * (1.0 - (tax_slab / 100.0))
         return {
             "net_yield_pct": round(net_yield, 2),
             "tax_drag_pct": round(gross_yield - net_yield, 2),
             "tax_statute": "Sec 50AA / General Marginal Income Slab",
-            "effective_tax_rate_pct": tax_slab
+            "effective_tax_rate_pct": tax_slab,
         }
 
 
 def assign_tenure_bucket(years: float) -> str:
-    """Categorizes maturity or duration into tenure buckets."""
+    """Categorize a supplied maturity or duration into tenure bands."""
     if years <= 1.0:
         return "<1Y"
     elif years <= 3.0:
@@ -148,16 +132,222 @@ def assign_tenure_bucket(years: float) -> str:
         return "10Y+"
 
 
+# Maximum publication age in calendar days. These are display policies.
+MEASURE_MAX_AGE = {
+    "CONTRACTUAL_YTM": 7,
+    "AUCTION_CUTOFF_YIELD": 45,
+    "DISTRIBUTION_YIELD_TTM": 7,
+    "HISTORICAL_CAGR_3Y": 45,
+    "EARNINGS_YIELD_TTM": 7,
+    "DIVIDEND_YIELD_TTM": 7,
+}
+
+
+def _number(value: Any) -> Optional[float]:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _observation(
+    yield_type: Optional[str],
+    value: Any = None,
+    as_of: Any = None,
+    source: Any = None,
+) -> Dict[str, Any]:
+    number = _number(value)
+    try:
+        source_date = date.fromisoformat(str(as_of))
+    except ValueError:
+        source_date = None
+    source_name = source.strip() if isinstance(source, str) else ""
+    vendor_blocked = has_forbidden_vendor_token(source_name) if source_name else False
+    if vendor_blocked:
+        source_name = ""
+        source_date = None
+    status = "unavailable"
+    if yield_type and number is not None and source_date and source_name and not vendor_blocked:
+        age = (datetime.now(ZoneInfo("Asia/Kolkata")).date() - source_date).days
+        if age >= 0:
+            status = "available" if age <= MEASURE_MAX_AGE[yield_type] else "stale"
+    return {
+        "yield_type": yield_type,
+        "metric_status": status,
+        "metric_as_of": source_date.isoformat() if source_date else None,
+        "metric_source": source_name or None,
+        "gross_yield_pct": number if status == "available" else None,
+        "last_observed_pct": number if status == "stale" else None,
+        # Retain legacy keys for API consumers during migration.
+        "net_yield_pct": None,
+        "post_tax_status": "not_calculated",
+        "real_yield_pct": None,
+        "spread_vs_10y_gsec_bps": None,
+        "tax_statute": None,
+        "effective_tax_rate_pct": None,
+    }
+
+
+def _source_metadata(row: Dict[str, Any]) -> Dict[str, Any]:
+    meta = row.get("metadata")
+    return meta if isinstance(meta, dict) else {}
+
+
+def _load_latest_debt_quote_observations() -> Dict[str, Dict[str, Any]]:
+    """Load latest reviewed debt quote observation per ISIN from dedicated table."""
+    latest: Dict[str, Dict[str, Any]] = {}
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT isin, ytm_pct, as_of, source_url, years_to_maturity
+            FROM debt_quote_observations
+            ORDER BY as_of DESC, id DESC
+            LIMIT 1000
+            """
+        )
+        for row in cur.fetchall() or []:
+            isin = str(row[0] or "").strip().upper()
+            if not isin or isin in latest:
+                continue
+            latest[isin] = {
+                "quoted_ytm_pct": row[1],
+                "quoted_ytm_as_of": str(row[2]) if row[2] is not None else None,
+                "quoted_ytm_source": row[3],
+                "quoted_years_to_maturity": row[4],
+            }
+    except Exception as exc:
+        logger.debug("Dedicated debt_quote_observations table lookup skipped: %s", exc)
+    finally:
+        if cur is not None:
+            cur.close()
+        if conn is not None:
+            conn.close()
+    return latest
+
+
+def _load_latest_instrument_observations() -> Dict[Tuple[str, str, str], Dict[str, Any]]:
+    """Load latest dated instrument metric observation by (instrument_id, asset_class, measure_type)."""
+    latest: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT instrument_id, asset_class, measure_type, value_pct, as_of, source_name, source_url
+            FROM instrument_metric_observations
+            ORDER BY as_of DESC, id DESC
+            LIMIT 5000
+            """
+        )
+        for row in cur.fetchall() or []:
+            inst_id = str(row[0] or "").strip()
+            asset_cls = str(row[1] or "").strip().upper()
+            m_type = str(row[2] or "").strip().upper()
+            key = (inst_id, asset_cls, m_type)
+            if not inst_id or key in latest:
+                continue
+            latest[key] = {
+                "value_pct": row[3],
+                "as_of": str(row[4]) if row[4] is not None else None,
+                "source": row[6] or row[5],
+            }
+    except Exception as exc:
+        logger.debug("Dedicated instrument_metric_observations lookup skipped: %s", exc)
+    finally:
+        if cur is not None:
+            cur.close()
+        if conn is not None:
+            conn.close()
+    return latest
+
+
+def _equity_observation(
+    row: Dict[str, Any],
+    inst_obs: Optional[Dict[Tuple[str, str, str], Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    ticker = str(row.get("ticker") or "").strip()
+    if inst_obs and ticker:
+        ey_obs = inst_obs.get((ticker, "EQUITY", "EARNINGS_YIELD_TTM"))
+        if ey_obs:
+            candidate = _observation("EARNINGS_YIELD_TTM", ey_obs["value_pct"], ey_obs["as_of"], ey_obs["source"])
+            if candidate["metric_status"] != "unavailable":
+                return candidate
+        dy_obs = inst_obs.get((ticker, "EQUITY", "DIVIDEND_YIELD_TTM"))
+        if dy_obs:
+            candidate = _observation("DIVIDEND_YIELD_TTM", dy_obs["value_pct"], dy_obs["as_of"], dy_obs["source"])
+            if candidate["metric_status"] != "unavailable":
+                return candidate
+
+    inputs = _source_metadata(row)
+    price = _number(inputs.get("metric_close_price"))
+    eps = _number(inputs.get("diluted_eps_ttm"))
+    try:
+        price_date = date.fromisoformat(str(inputs.get("metric_price_as_of")))
+        earnings_end = date.fromisoformat(str(inputs.get("diluted_eps_ttm_period_end")))
+        earnings_usable = 0 <= (price_date - earnings_end).days <= 180
+    except ValueError:
+        earnings_usable = False
+    if price is not None and price > 0 and eps is not None and earnings_usable:
+        return _observation(
+            "EARNINGS_YIELD_TTM",
+            eps / price * 100,
+            inputs.get("metric_price_as_of"),
+            inputs.get("metric_source"),
+        )
+    dividend = _observation(
+        "DIVIDEND_YIELD_TTM",
+        inputs.get("dividend_yield_ttm_pct"),
+        inputs.get("dividend_yield_as_of"),
+        inputs.get("dividend_yield_source"),
+    )
+    if dividend["metric_status"] != "unavailable":
+        return dividend
+    return _observation("EARNINGS_YIELD_TTM")
+
+
+def _comparison_group(item: Dict[str, Any]) -> str:
+    kind = item["yield_type"]
+    if kind in {"CONTRACTUAL_YTM", "AUCTION_CUTOFF_YIELD"}:
+        # Duration and maturity are distinct. The collector uses a declared
+        # years-to-maturity measure for these two groups.
+        tenure = item["tenure_bucket"]
+        if tenure is None:
+            return ""
+        return f"{kind}:{item['asset_class']}:{tenure}"
+    if kind == "HISTORICAL_CAGR_3Y":
+        return f"{kind}:{item['asset_class']}:{item['seniority_tier']}"
+    return kind or ""
+
+
+def _opportunity_order(item: Dict[str, Any]) -> tuple:
+    group = _comparison_group(item)
+    value = item["gross_yield_pct"]
+    ranked = bool(group) and value is not None
+    return (not ranked, group, -value if ranked else 0, str(item["name"]), str(item["id"]))
+
+
 def get_normalized_opportunity_universe(
     tax_slab: float = DEFAULT_TAX_SLAB_PCT,
     cpi_inflation: float = DEFAULT_MOSPI_CPI_INFLATION,
-    persona_filter: Optional[str] = None
+    persona_filter: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Aggregates all active investment offerings across the 6 database repositories
-    and standardizes them into the unified OpportunityItem structure.
+    Keep the inventory visible even when the data needed for a measure is absent.
     """
+    _ = (tax_slab, cpi_inflation)
     items: List[Dict[str, Any]] = []
+    today_ist = datetime.now(ZoneInfo("Asia/Kolkata")).date()
+    debt_obs_map = _load_latest_debt_quote_observations()
+    inst_obs_map = _load_latest_instrument_observations()
 
     # ----------------------------------------------------
     # 1. Corporate Debt & Securitized Debt (SDIs)
@@ -165,13 +355,29 @@ def get_normalized_opportunity_universe(
     try:
         debt_securities = get_active_debt_securities(limit=100)
         for d in debt_securities:
-            gross_ytm = float(d.get("ytm_pct") or d.get("coupon_rate_pct") or 7.0)
-            duration = float(d.get("macaulay_duration_years") or 3.0)
+            isin_key = str(d.get("isin") or "").strip().upper()
+            # Prefer dedicated debt_quote_observations table so metadata_json refreshes cannot wipe quotes;
+            # fall back to row metadata when fresher or in unit-test mocks.
+            inputs = dict(_source_metadata(d))
+            dedicated_quote = debt_obs_map.get(isin_key)
+            if dedicated_quote:
+                meta_date = str(inputs.get("quoted_ytm_as_of") or "")
+                ded_date = str(dedicated_quote.get("quoted_ytm_as_of") or "")
+                if not meta_date or ded_date >= meta_date:
+                    inputs.update(dedicated_quote)
+
+            metric = _observation(
+                "CONTRACTUAL_YTM",
+                inputs.get("quoted_ytm_pct"),
+                inputs.get("quoted_ytm_as_of"),
+                inputs.get("quoted_ytm_source"),
+            )
+            maturity = _number(inputs.get("quoted_years_to_maturity"))
+            duration = _number(d.get("macaulay_duration_years"))
             is_sdi = bool(d.get("is_sdi", False))
-            seniority = d.get("seniority_tier", "SENIOR_SECURED").upper()
-            
-            # Seniority rank mapping
-            if "PSU" in d.get("instrument_type", "").upper() or "SOVEREIGN" in seniority:
+            seniority = (d.get("seniority_tier") or "SENIOR_SECURED").upper()
+
+            if "PSU" in (d.get("instrument_type") or "").upper() or "SOVEREIGN" in seniority:
                 s_tier = "AAA_PSU"
             elif is_sdi:
                 s_tier = "SDI"
@@ -180,15 +386,7 @@ def get_normalized_opportunity_universe(
             else:
                 s_tier = "SENIOR_SECURED"
 
-            tax_info = calculate_tax_waterfall(gross_ytm, "BOND", tax_slab)
-            net_yield = tax_info["net_yield_pct"]
-            real_yield = round(net_yield - cpi_inflation, 2)
-            spread_bps = round((gross_ytm - BENCHMARK_10Y_GSEC_YIELD) * 100)
-
-            # Persona classification
             personas = []
-            if s_tier in ("AAA_PSU", "SENIOR_SECURED") and gross_ytm >= 7.5:
-                personas.append("quarterly_cashflow")
             if s_tier == "AAA_PSU":
                 personas.append("capital_preservation")
 
@@ -198,26 +396,21 @@ def get_normalized_opportunity_universe(
                 "name": d.get("instrument_name", "Corporate Bond"),
                 "asset_class": "SDI" if is_sdi else "BOND",
                 "category_label": "Securitized Debt (SDI)" if is_sdi else f"{d.get('credit_rating', 'AAA')} Bond",
-                "gross_yield_pct": gross_ytm,
-                "net_yield_pct": net_yield,
-                "real_yield_pct": real_yield,
-                "spread_vs_10y_gsec_bps": spread_bps,
+                **metric,
                 "seniority_tier": s_tier,
                 "seniority_rank": SENIORITY_RANKS.get(s_tier, 2),
                 "credit_rating": d.get("credit_rating", "AAA"),
                 "macaulay_duration_years": duration,
-                "tenure_bucket": assign_tenure_bucket(duration),
+                "tenure_bucket": assign_tenure_bucket(maturity) if maturity is not None and maturity > 0 else None,
                 "min_ticket_inr": float(d.get("face_value", 10000.0)),
                 "liquidity_tier": "EXCHANGE_ACTIVE",
-                "tax_statute": tax_info["tax_statute"],
-                "effective_tax_rate_pct": tax_info["effective_tax_rate_pct"],
                 "recovery_recourse": "1.25x First Pari-Passu Asset Charge" if s_tier == "SENIOR_SECURED" else "Subordinated Unsecured Claim",
                 "primary_failure_mode": "Issuer Credit Downgrade / Refinancing Liquidity Shock",
                 "detail_url": f"/debt/{d.get('isin')}",
-                "persona_tags": personas
+                "persona_tags": personas,
             })
     except Exception as e:
-        logger.error(f"Error aggregating corporate debt for Opportunity Terminal: {e}")
+        logger.error("Error aggregating corporate debt for Opportunity Terminal: %s", e)
 
     # ----------------------------------------------------
     # 2. Alternative Real Assets (SM REITs, REITs, InvITs)
@@ -225,20 +418,26 @@ def get_normalized_opportunity_universe(
     try:
         reits = get_all_reits_and_invits()
         for r in reits:
-            yield_pct = float(r.get("distribution_yield_pct", 7.5))
             structure = r.get("structure_type", "PUBLIC_REIT")
-            is_sm_reit = (structure == "SM_REIT")
-            is_invit = (structure == "PUBLIC_INVIT")
-            
+            is_sm_reit = structure == "SM_REIT"
+            is_invit = structure == "PUBLIC_INVIT"
             asset_type = "SM_REIT" if is_sm_reit else ("INVIT" if is_invit else "REIT")
+            sym = str(r.get("symbol") or "").strip()
+
+            inputs = dict(r.get("details") or {})
+            ded_obs = inst_obs_map.get((sym, asset_type, "DISTRIBUTION_YIELD_TTM"))
+            if ded_obs and not inputs.get("distribution_yield_as_of"):
+                metric = _observation("DISTRIBUTION_YIELD_TTM", ded_obs["value_pct"], ded_obs["as_of"], ded_obs["source"])
+            else:
+                metric = _observation(
+                    "DISTRIBUTION_YIELD_TTM",
+                    inputs.get("distribution_yield_ttm_pct"),
+                    inputs.get("distribution_yield_as_of"),
+                    inputs.get("distribution_yield_source"),
+                )
+
             label = "SEBI SM REIT Scheme" if is_sm_reit else ("Infrastructure InvIT" if is_invit else "Commercial REIT")
             min_ticket = 1000000.0 if is_sm_reit else 350.0
-
-            tax_info = calculate_tax_waterfall(yield_pct, asset_type, tax_slab)
-            net_yield = tax_info["net_yield_pct"]
-            real_yield = round(net_yield - cpi_inflation, 2)
-            spread_bps = round((yield_pct - BENCHMARK_10Y_GSEC_YIELD) * 100)
-            wale = float(r.get("wale_years", 6.5))
 
             personas = ["quarterly_cashflow"]
             if is_sm_reit:
@@ -250,39 +449,37 @@ def get_normalized_opportunity_universe(
                 "name": r.get("name", "Real Asset Offering"),
                 "asset_class": asset_type,
                 "category_label": label,
-                "gross_yield_pct": yield_pct,
-                "net_yield_pct": net_yield,
-                "real_yield_pct": real_yield,
-                "spread_vs_10y_gsec_bps": spread_bps,
+                **metric,
                 "seniority_tier": "REAL_ASSET",
                 "seniority_rank": SENIORITY_RANKS["REAL_ASSET"],
                 "credit_rating": "AAA (Crisil)" if not is_sm_reit else "SEBI Registered Scheme",
-                "macaulay_duration_years": wale,
-                "tenure_bucket": assign_tenure_bucket(wale),
+                "macaulay_duration_years": None,
+                "tenure_bucket": None,
                 "min_ticket_inr": min_ticket,
                 "liquidity_tier": "PERIODIC_WINDOW" if is_sm_reit else "EXCHANGE_ACTIVE",
-                "tax_statute": tax_info["tax_statute"],
-                "effective_tax_rate_pct": tax_info["effective_tax_rate_pct"],
                 "recovery_recourse": f"Direct SPV Land/Asset Ownership (Occupancy: {r.get('occupancy_pct', 95)}%)",
                 "primary_failure_mode": "Anchor Tenant Default / Regulatory Concession Cap Drift",
                 "detail_url": f"/reits#{r.get('symbol')}",
-                "persona_tags": personas
+                "persona_tags": personas,
             })
     except Exception as e:
-        logger.error(f"Error aggregating REITs/InvITs for Opportunity Terminal: {e}")
+        logger.error("Error aggregating REITs/InvITs for Opportunity Terminal: %s", e)
 
     # ----------------------------------------------------
-    # 3. Sovereign Gold Bonds (SGBs)
+    # 3. Sovereign Gold Bonds (SGBs) — exclude matured tranches
     # ----------------------------------------------------
     try:
         sgbs = get_all_sgb_tranches()
         for s in sgbs:
-            ytm = float(s.get("ytm_annualized_pct", 8.0))
-            years_left = float(s.get("years_to_maturity", 4.0))
-            tax_info = calculate_tax_waterfall(ytm, "SGB", tax_slab, {"coupon_rate_pct": float(s.get("coupon_rate_pct", 2.50))})
-            net_yield = tax_info["net_yield_pct"]
-            real_yield = round(net_yield - cpi_inflation, 2)
-            spread_bps = round((ytm - BENCHMARK_10Y_GSEC_YIELD) * 100)
+            raw_maturity = s.get("maturity_date")
+            if raw_maturity:
+                try:
+                    if date.fromisoformat(str(raw_maturity)) <= today_ist:
+                        continue
+                except ValueError:
+                    pass
+            # A gold-linked redemption scenario is outside this observed-metric feed.
+            metric = _observation(None)
 
             items.append({
                 "id": s.get("symbol"),
@@ -290,26 +487,21 @@ def get_normalized_opportunity_universe(
                 "name": f"SGB {s.get('series_code', '')} (Mat: {s.get('maturity_date', '2028')})",
                 "asset_class": "SGB",
                 "category_label": "Sovereign Gold Bond",
-                "gross_yield_pct": ytm,
-                "net_yield_pct": net_yield,
-                "real_yield_pct": real_yield,
-                "spread_vs_10y_gsec_bps": spread_bps,
+                **metric,
                 "seniority_tier": "SOVEREIGN",
                 "seniority_rank": SENIORITY_RANKS["SOVEREIGN"],
                 "credit_rating": "SOVEREIGN",
-                "macaulay_duration_years": years_left,
-                "tenure_bucket": assign_tenure_bucket(years_left),
-                "min_ticket_inr": float(s.get("current_price", 7450.0)),
+                "macaulay_duration_years": None,
+                "tenure_bucket": None,
+                "min_ticket_inr": _number(s.get("current_price")),
                 "liquidity_tier": "EXCHANGE_ACTIVE",
-                "tax_statute": tax_info["tax_statute"],
-                "effective_tax_rate_pct": tax_info["effective_tax_rate_pct"],
                 "recovery_recourse": "Reserve Bank of India / Government of India Sovereign Guarantee",
                 "primary_failure_mode": "Global Spot Gold Price Crash / Exchange Secondary Illiquidity",
                 "detail_url": "/reits#sgbSection",
-                "persona_tags": ["capital_preservation"]
+                "persona_tags": ["capital_preservation"],
             })
     except Exception as e:
-        logger.error(f"Error aggregating SGBs for Opportunity Terminal: {e}")
+        logger.error("Error aggregating SGBs for Opportunity Terminal: %s", e)
 
     # ----------------------------------------------------
     # 4. Sovereign Yield Benchmarks & T-Bills
@@ -319,74 +511,83 @@ def get_normalized_opportunity_universe(
         canonical_tenors = ("91D", "364D", "5Y", "10Y", "10Y_SGRB", "30Y")
         for b in sovereign_benchmarks:
             tenor = b.get("tenor_label", "")
-            # Match canonical benchmark points (e.g. 91D_TBILL, 10Y_GSEC, 30Y_GSEC)
-            is_canonical = (tenor in canonical_tenors) or any(tenor.startswith(f"{ct}_") or tenor == ct for ct in canonical_tenors)
+            is_canonical = (tenor in canonical_tenors) or any(
+                tenor.startswith(f"{ct}_") or tenor == ct for ct in canonical_tenors
+            )
             if is_canonical:
-                yield_val = float(b.get("cut_off_yield", 7.0))
-                mat_years = float(b.get("maturity_years", 5.0))
-                tax_info = calculate_tax_waterfall(yield_val, "SOVEREIGN", tax_slab)
-                net_yield = tax_info["net_yield_pct"]
-                real_yield = round(net_yield - cpi_inflation, 2)
-                spread_bps = round((yield_val - BENCHMARK_10Y_GSEC_YIELD) * 100)
+                inst_id = f"GOI_{tenor}"
+                if b.get("source") == "RBI_AUCTION_CUTOFF":
+                    metric = _observation(
+                        "AUCTION_CUTOFF_YIELD",
+                        b.get("cut_off_yield"),
+                        b.get("auction_date"),
+                        b.get("source"),
+                    )
+                else:
+                    ded_sov = inst_obs_map.get((inst_id, "SOVEREIGN", "AUCTION_CUTOFF_YIELD"))
+                    if ded_sov:
+                        metric = _observation("AUCTION_CUTOFF_YIELD", ded_sov["value_pct"], ded_sov["as_of"], ded_sov["source"])
+                    else:
+                        metric = _observation("AUCTION_CUTOFF_YIELD", None, b.get("auction_date"), b.get("source"))
+                mat_years = _number(b.get("maturity_years"))
 
                 clean_label = tenor.replace("_", " ").title()
                 items.append({
-                    "id": f"GOI_{tenor}",
+                    "id": inst_id,
                     "symbol": f"GOI-{tenor}",
                     "name": f"Government of India {b.get('instrument_type', 'Benchmark')} ({clean_label})",
                     "asset_class": "SOVEREIGN",
                     "category_label": "Sovereign G-Sec / T-Bill",
-                    "gross_yield_pct": yield_val,
-                    "net_yield_pct": net_yield,
-                    "real_yield_pct": real_yield,
-                    "spread_vs_10y_gsec_bps": spread_bps,
+                    **metric,
                     "seniority_tier": "SOVEREIGN",
                     "seniority_rank": SENIORITY_RANKS["SOVEREIGN"],
                     "credit_rating": "SOVEREIGN",
-                    "macaulay_duration_years": mat_years,
-                    "tenure_bucket": assign_tenure_bucket(mat_years),
+                    "macaulay_duration_years": None,
+                    "tenure_bucket": assign_tenure_bucket(mat_years) if mat_years is not None and mat_years > 0 else None,
                     "min_ticket_inr": 10000.0,
                     "liquidity_tier": "INSTANT_T1",
-                    "tax_statute": tax_info["tax_statute"],
-                    "effective_tax_rate_pct": tax_info["effective_tax_rate_pct"],
                     "recovery_recourse": "Consolidated Fund of India Statutory Guarantee",
                     "primary_failure_mode": "Domestic Inflation Surge / Interest Rate Policy Hike",
                     "detail_url": "/sovereign",
-                    "persona_tags": ["capital_preservation"]
+                    "persona_tags": ["capital_preservation"],
                 })
     except Exception as e:
-        logger.error(f"Error aggregating sovereign curve for Opportunity Terminal: {e}")
+        logger.error("Error aggregating sovereign curve for Opportunity Terminal: %s", e)
 
     # ----------------------------------------------------
-    # 5. Mutual Funds & ETFs
+    # 5. Mutual Funds
     # ----------------------------------------------------
     try:
         funds = get_active_mutual_funds(limit=20, audited_only=True)
         for f in funds:
             broad = (f.get("broad_category") or "EQUITY").upper()
             cat_name = f.get("category") or ""
-            is_debt = (broad == "DEBT") or any(k in cat_name.lower() for k in ["debt", "liquid", "gilt", "overnight", "money market", "banking and psu", "corporate bond", "credit risk"])
-
+            is_debt = (broad == "DEBT") or any(
+                k in cat_name.lower()
+                for k in ["debt", "liquid", "gilt", "overnight", "money market", "banking and psu", "corporate bond", "credit risk"]
+            )
+            scheme_code = str(f.get("scheme_code") or "").strip()
+            inputs = _source_metadata(f)
+            ded_mf = inst_obs_map.get((scheme_code, "MF", "HISTORICAL_CAGR_3Y"))
+            if ded_mf and not inputs.get("returns_3y_as_of"):
+                metric = _observation("HISTORICAL_CAGR_3Y", ded_mf["value_pct"], ded_mf["as_of"], ded_mf["source"])
+            else:
+                metric = _observation(
+                    "HISTORICAL_CAGR_3Y",
+                    inputs.get("returns_3y_cagr"),
+                    inputs.get("returns_3y_as_of"),
+                    inputs.get("returns_3y_source"),
+                )
             if is_debt:
-                cagr = float(f.get("returns_3y_cagr") or f.get("returns_5y_cagr") or 7.2)
-                tax_info = calculate_tax_waterfall(cagr, "BOND", tax_slab)
                 seniority = "AAA_PSU" if ("gilt" in cat_name.lower() or "psu" in cat_name.lower()) else "SENIOR_SECURED"
                 personas = ["capital_preservation", "quarterly_cashflow"]
                 recourse = "Regulated Underlying Debt Portfolio (AMFI Liquidations / Accrual)"
                 failure = "Credit Rating Downgrade / RBI Repo Rate Shock"
-                dur = 2.5
             else:
-                cagr = float(f.get("returns_3y_cagr") or f.get("returns_5y_cagr") or 14.5)
-                tax_info = calculate_tax_waterfall(cagr, "MF_EQUITY", tax_slab)
                 seniority = "EQUITY"
                 personas = ["compounding", "asymmetric_upside"]
                 recourse = "Diversified Underlying Equity Portfolio (AMFI NAV Liquidation)"
                 failure = "Market-Wide Equity Drawdown / Active Fund Underperformance"
-                dur = 5.0
-
-            net_yield = tax_info["net_yield_pct"]
-            real_yield = round(net_yield - cpi_inflation, 2)
-            spread_bps = round((cagr - BENCHMARK_10Y_GSEC_YIELD) * 100)
 
             items.append({
                 "id": f.get("scheme_code"),
@@ -394,70 +595,90 @@ def get_normalized_opportunity_universe(
                 "name": f.get("scheme_name", "Mutual Fund Scheme"),
                 "asset_class": "MF",
                 "category_label": cat_name or ("Debt Mutual Fund" if is_debt else "Equity Mutual Fund"),
-                "gross_yield_pct": cagr,
-                "net_yield_pct": net_yield,
-                "real_yield_pct": real_yield,
-                "spread_vs_10y_gsec_bps": spread_bps,
+                **metric,
                 "seniority_tier": seniority,
                 "seniority_rank": SENIORITY_RANKS.get(seniority, 5),
                 "credit_rating": "SEBI Monitored Portfolio",
-                "macaulay_duration_years": dur,
-                "tenure_bucket": assign_tenure_bucket(dur),
+                "macaulay_duration_years": None,
+                "tenure_bucket": None,
                 "min_ticket_inr": 500.0,
                 "liquidity_tier": "INSTANT_T1",
-                "tax_statute": tax_info["tax_statute"],
-                "effective_tax_rate_pct": tax_info["effective_tax_rate_pct"],
                 "recovery_recourse": recourse,
                 "primary_failure_mode": failure,
                 "detail_url": f"/funds/{f.get('scheme_code')}",
-                "persona_tags": personas
+                "persona_tags": personas,
             })
     except Exception as e:
-        logger.error(f"Error aggregating mutual funds for Opportunity Terminal: {e}")
+        logger.error("Error aggregating mutual funds for Opportunity Terminal: %s", e)
 
     # ----------------------------------------------------
-    # 6. National ETFs
+    # 6. National ETFs (Commodity ETFs classified as COMMODITY_BACKED_TRUST, never SOVEREIGN)
     # ----------------------------------------------------
     try:
         etfs = get_etf_matrix()
         for e in etfs:
-            category = e.get("category", "EQUITY_INDEX")
-            is_equity = (category == "EQUITY_INDEX")
-            is_gold = (category == "COMMODITY_GOLD")
-            exp_return = 12.8 if is_equity else (10.5 if is_gold else 7.1)
-            tax_info = calculate_tax_waterfall(exp_return, "ETF_EQUITY" if is_equity else "BOND", tax_slab)
-            net_yield = tax_info["net_yield_pct"]
-            real_yield = round(net_yield - cpi_inflation, 2)
-            spread_bps = round((exp_return - BENCHMARK_10Y_GSEC_YIELD) * 100)
+            category = str(e.get("category") or "EQUITY_INDEX").upper()
+            scheme_name = str(e.get("scheme_name") or e.get("fund_name") or e.get("name") or "National ETF")
+            underlying_idx = str(e.get("underlying_index") or "")
+            bullion_probe = f"{scheme_name} {underlying_idx}"
+            is_commodity = (
+                category in ("COMMODITY_GOLD", "COMMODITY_SILVER")
+                or "GOLD" in category
+                or "SILVER" in category
+                or bool(
+                    re.search(r"\b(gold(?!man)\b|silver\b)", bullion_probe, re.IGNORECASE)
+                    and "miner" not in bullion_probe.lower()
+                )
+            )
+            is_equity = category == "EQUITY_INDEX" and not is_commodity
+            sym = str(e.get("symbol") or "").strip()
 
-            personas = ["compounding"] if is_equity else (["capital_preservation"] if is_gold else [])
+            inputs = _source_metadata(e)
+            ded_etf = inst_obs_map.get((sym, "ETF", "HISTORICAL_CAGR_3Y"))
+            if ded_etf and not inputs.get("returns_3y_as_of"):
+                metric = _observation("HISTORICAL_CAGR_3Y", ded_etf["value_pct"], ded_etf["as_of"], ded_etf["source"])
+            else:
+                metric = _observation(
+                    "HISTORICAL_CAGR_3Y",
+                    inputs.get("returns_3y_cagr"),
+                    inputs.get("returns_3y_as_of"),
+                    inputs.get("returns_3y_source"),
+                )
+
+            if is_equity:
+                s_tier = "EQUITY"
+                personas = ["compounding"]
+                recourse = "Index Basket Physical Settlement / Creation Units"
+            elif is_commodity:
+                s_tier = "COMMODITY_BACKED_TRUST"
+                personas = ["capital_preservation"]
+                recourse = "Custodial Physical Bullion / Authorised Participant Creation Units"
+            else:
+                s_tier = "SENIOR_SECURED"
+                personas = []
+                recourse = "Index Basket Physical Settlement / Creation Units"
 
             items.append({
                 "id": e.get("symbol"),
                 "symbol": e.get("symbol"),
-                "name": e.get("scheme_name", "National ETF"),
+                "name": scheme_name,
                 "asset_class": "ETF",
                 "category_label": f"ETF ({category.replace('_', ' ').title()})",
-                "gross_yield_pct": exp_return,
-                "net_yield_pct": net_yield,
-                "real_yield_pct": real_yield,
-                "spread_vs_10y_gsec_bps": spread_bps,
-                "seniority_tier": "EQUITY" if is_equity else ("SOVEREIGN" if is_gold else "SENIOR_SECURED"),
-                "seniority_rank": 5 if is_equity else (0 if is_gold else 2),
+                **metric,
+                "seniority_tier": s_tier,
+                "seniority_rank": SENIORITY_RANKS[s_tier],
                 "credit_rating": "Physical / Benchmark Replication",
-                "macaulay_duration_years": 3.0,
-                "tenure_bucket": "1-3Y",
-                "min_ticket_inr": float(e.get("last_price", 250.0)),
+                "macaulay_duration_years": None,
+                "tenure_bucket": None,
+                "min_ticket_inr": _number(e.get("last_price")),
                 "liquidity_tier": "EXCHANGE_ACTIVE",
-                "tax_statute": tax_info["tax_statute"],
-                "effective_tax_rate_pct": tax_info["effective_tax_rate_pct"],
-                "recovery_recourse": "Index Basket Physical Settlement / Creation Units",
+                "recovery_recourse": recourse,
                 "primary_failure_mode": "Exchange Price vs NAV Divergence / Tracking Error Drag",
-                "detail_url": "/etfs",
-                "persona_tags": personas
+                "detail_url": f"/etfs/{sym}" if sym else "/etfs",
+                "persona_tags": personas,
             })
     except Exception as e:
-        logger.error(f"Error aggregating ETFs for Opportunity Terminal: {e}")
+        logger.error("Error aggregating ETFs for Opportunity Terminal: %s", e)
 
     # ----------------------------------------------------
     # 7. Fundamental Equities (Top Tracked Dossiers)
@@ -465,13 +686,10 @@ def get_normalized_opportunity_universe(
     try:
         equity_reports = get_archived_reports(include_text=False)
         for eq in equity_reports[:10]:
-            ticker = eq.get("ticker", "INFY")
-            # Estimated long term equity cost of capital / expected CAGR: ~14.0%
-            eq_return = 14.0
-            tax_info = calculate_tax_waterfall(eq_return, "EQUITY", tax_slab)
-            net_yield = tax_info["net_yield_pct"]
-            real_yield = round(net_yield - cpi_inflation, 2)
-            spread_bps = round((eq_return - BENCHMARK_10Y_GSEC_YIELD) * 100)
+            ticker = eq.get("ticker")
+            if not ticker:
+                continue
+            metric = _equity_observation(eq, inst_obs_map)
 
             items.append({
                 "id": ticker,
@@ -479,32 +697,27 @@ def get_normalized_opportunity_universe(
                 "name": eq.get("short_name") or ticker,
                 "asset_class": "EQUITY",
                 "category_label": "High-Moat Listed Equity",
-                "gross_yield_pct": eq_return,
-                "net_yield_pct": net_yield,
-                "real_yield_pct": real_yield,
-                "spread_vs_10y_gsec_bps": spread_bps,
+                **metric,
                 "seniority_tier": "EQUITY",
                 "seniority_rank": SENIORITY_RANKS["EQUITY"],
                 "credit_rating": "Forensic 7-Pillar Scored",
-                "macaulay_duration_years": 7.0,
-                "tenure_bucket": "5-10Y",
-                "min_ticket_inr": float(eq.get("baseline_price") or 1500.0),
+                "macaulay_duration_years": None,
+                "tenure_bucket": None,
+                "min_ticket_inr": _number(eq.get("baseline_price")),
                 "liquidity_tier": "INSTANT_T1",
-                "tax_statute": tax_info["tax_statute"],
-                "effective_tax_rate_pct": tax_info["effective_tax_rate_pct"],
                 "recovery_recourse": "Residual Common Equity (Zero Recourse)",
                 "primary_failure_mode": "Governance Failure / Competitive Moat Erosion / SUE Miss",
                 "detail_url": f"/dossier/{ticker}",
-                "persona_tags": ["compounding"]
+                "persona_tags": ["compounding"],
             })
     except Exception as e:
-        logger.error(f"Error aggregating equities for Opportunity Terminal: {e}")
+        logger.error("Error aggregating equities for Opportunity Terminal: %s", e)
 
-    # Filter by persona/scenario if specified
+    # Research categories filter inventory without implying suitability.
     if persona_filter:
         p_clean = persona_filter.strip().lower()
         if p_clean in ("capital_preservation", "preservation"):
-            items = [x for x in items if "capital_preservation" in [p.lower() for p in x.get("persona_tags", [])] and x.get("real_yield_pct", 0) >= 0]
+            items = [x for x in items if "capital_preservation" in [p.lower() for p in x.get("persona_tags", [])]]
         elif p_clean in ("quarterly_cashflow", "maximum_cashflow", "cashflow"):
             items = [x for x in items if "quarterly_cashflow" in [p.lower() for p in x.get("persona_tags", [])]]
         elif p_clean in ("hni_real_assets", "real_assets"):
@@ -514,95 +727,80 @@ def get_normalized_opportunity_universe(
         else:
             items = [x for x in items if p_clean in [p.lower() for p in x.get("persona_tags", [])]]
 
-    # Sort descending by Net Real Yield as primary benchmark
-    items.sort(key=lambda x: x["net_yield_pct"], reverse=True)
+    for item in items:
+        item["comparison_group"] = _comparison_group(item) or None
+    items.sort(key=_opportunity_order)
     return items
 
 
 def get_heatmap_matrix(universe: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
-    """
-    Constructs the 2D Heatmap Matrix spanning:
-    Rows: Asset Subtypes (Sovereign, SGB, PSU AAA, Senior Corporate, SM REITs/InvITs, SDIs, Equities)
-    Columns: Tenure Buckets (<1Y, 1-3Y, 3-5Y, 5-10Y, 10Y+)
-    """
+    """Show only dated debt observations, separated by measure and maturity band."""
     if universe is None:
         universe = get_normalized_opportunity_universe()
 
-    tenure_buckets = ["<1Y", "1-3Y", "3-5Y", "5-10Y", "10Y+"]
-    row_categories = [
-        {"key": "SOVEREIGN", "label": "Sovereign Benchmarks (RBI)"},
-        {"key": "SGB", "label": "Sovereign Gold Bonds (SGB)"},
-        {"key": "AAA_PSU", "label": "PSU & AAA Corporate Bonds"},
-        {"key": "SENIOR_SECURED", "label": "Senior Secured Private Bonds"},
-        {"key": "REAL_ASSET", "label": "SM REITs & Infrastructure InvITs"},
-        {"key": "SDI", "label": "Securitized Debt (SDIs)"},
-        {"key": "EQUITY", "label": "High-Moat Equities & ETFs"}
+    buckets = ["<1Y", "1-3Y", "3-5Y", "5-10Y", "10Y+"]
+    row_specs = [
+        ("SOVEREIGN", "AUCTION_CUTOFF_YIELD", "Sovereign auction cut-off"),
+        ("BOND", "CONTRACTUAL_YTM", "Corporate bond quoted YTM"),
+        ("SDI", "CONTRACTUAL_YTM", "Securitised debt quoted YTM"),
     ]
-
-    matrix_rows = []
-    for cat in row_categories:
-        c_key = cat["key"]
-        row_cells = {}
-        for bucket in tenure_buckets:
-            # Match items in this category and tenure bucket
-            matching = [
-                item for item in universe
-                if (item.get("seniority_tier") == c_key or item.get("asset_class") == c_key)
-                and item.get("tenure_bucket") == bucket
+    rows = []
+    for asset_class, kind, label in row_specs:
+        cells = {}
+        for bucket in buckets:
+            matches = [
+                item
+                for item in universe
+                if item["asset_class"] == asset_class
+                and item["yield_type"] == kind
+                and item["tenure_bucket"] == bucket
+                and item["metric_status"] == "available"
             ]
-            if matching:
-                # Pick the top offering by gross yield or highest liquidity
-                top_item = max(matching, key=lambda x: x["gross_yield_pct"])
-                row_cells[bucket] = {
-                    "has_data": True,
-                    "symbol": top_item["symbol"],
-                    "name": top_item["name"],
-                    "gross_yield_pct": top_item["gross_yield_pct"],
-                    "net_yield_pct": top_item["net_yield_pct"],
-                    "spread_bps": top_item["spread_vs_10y_gsec_bps"],
-                    "detail_url": top_item["detail_url"],
-                    "item_id": top_item["id"],
-                    "rating": top_item.get("credit_rating", "")
-                }
-            else:
-                row_cells[bucket] = {"has_data": False}
-
-        matrix_rows.append({
-            "category_key": c_key,
-            "category_label": cat["label"],
-            "cells": row_cells
-        })
-
-    return {
-        "tenure_buckets": tenure_buckets,
-        "rows": matrix_rows,
-        "benchmark_10y_yield": BENCHMARK_10Y_GSEC_YIELD
-    }
+            best = min(matches, key=_opportunity_order) if matches else None
+            cells[bucket] = {"has_data": best is not None}
+            if best:
+                cells[bucket].update({
+                    key: best[key]
+                    for key in (
+                        "id",
+                        "symbol",
+                        "name",
+                        "gross_yield_pct",
+                        "yield_type",
+                        "metric_as_of",
+                        "metric_status",
+                        "metric_source",
+                        "detail_url",
+                    )
+                })
+        rows.append({"category_label": label, "cells": cells})
+    return {"tenure_buckets": buckets, "rows": rows, "benchmark_10y_yield": None}
 
 
 def get_arbitrage_comparison(
     item_ids: List[str],
     tax_slab: float = DEFAULT_TAX_SLAB_PCT,
-    cpi_inflation: float = DEFAULT_MOSPI_CPI_INFLATION
+    cpi_inflation: float = DEFAULT_MOSPI_CPI_INFLATION,
 ) -> Dict[str, Any]:
     """
-    Builds the normalized side-by-side comparison scorecard for 2 to 4 pinned items.
+    Builds the normalized side-by-side comparison scorecard for pinned items.
     """
     universe = get_normalized_opportunity_universe(tax_slab=tax_slab, cpi_inflation=cpi_inflation)
     id_map = {item["id"]: item for item in universe}
-    
-    selected_items = []
-    for i_id in item_ids:
-        if i_id in id_map:
-            selected_items.append(id_map[i_id])
-        else:
-            # Fallback direct lookup
-            pass
+
+    selected_items = [id_map[item_id] for item_id in dict.fromkeys(item_ids) if item_id in id_map]
 
     return {
         "count": len(selected_items),
-        "tax_slab_applied": tax_slab,
-        "cpi_inflation_applied": cpi_inflation,
-        "benchmark_10y_yield": BENCHMARK_10Y_GSEC_YIELD,
-        "items": selected_items
+        "tax_slab_applied": None,
+        "cpi_inflation_applied": None,
+        "benchmark_10y_yield": None,
+        "same_comparison_group": len(selected_items) >= 2
+        and selected_items[0]["comparison_group"] is not None
+        and all(
+            item["comparison_group"] == selected_items[0]["comparison_group"]
+            and item["metric_status"] == "available"
+            for item in selected_items
+        ),
+        "items": selected_items,
     }

@@ -19,6 +19,7 @@ Strict Fail-Closed & Zero-Bypass Invariant:
 
 import concurrent.futures
 import csv
+import hashlib
 import io
 import json
 import logging
@@ -37,11 +38,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from core.db.connection import IST, get_db_connection, get_placeholder
 from core.db.mutual_funds import (
     clean_dict_row,
+    get_current_fund_disclosure,
     get_mutual_fund_scheme,
-    get_scheme_holdings,
+    parse_fund_disclosure_date,
+    publish_mutual_fund_disclosure,
     resolve_legacy_slug_twins,
-    save_mutual_fund_holdings,
-    save_mutual_fund_scheme,
 )
 from core.ingestion.amfi import _get_ssl_context, fetch_amfi_nav_raw, parse_amfi_nav_feed
 from core.ingestion.mf_portfolio_parser import (
@@ -166,7 +167,7 @@ def _pack_files_into_zip(named_blobs: List[Tuple[str, bytes]]) -> Optional[bytes
                 stem, _, ext = clean_name.rpartition(".")
                 clean_name = f"{stem}_{idx}.{ext or 'xlsx'}"
             used_names.add(clean_name)
-            zf.writestr(clean_name, blob)
+            zf.writestr(zipfile.ZipInfo(clean_name), blob)
     return buf.getvalue()
 
 
@@ -742,6 +743,7 @@ def get_amc_workbook(
     today: Optional[date] = None,
     inbox_dir: Path = INBOX_DIR,
     cache_dir: Path = CACHE_DIR,
+    target_month_end: Optional[date] = None,
 ) -> Optional[Tuple[bytes, str]]:
     """Returns `(workbook_or_zip_bytes, source_label)` for an AMC, or None if unavailable."""
     folder = inbox_dir / key
@@ -765,12 +767,13 @@ def get_amc_workbook(
 
     cache_amc = cache_dir / key
     cache_amc.mkdir(parents=True, exist_ok=True)
-    for me in recent_month_ends(3, today):
+    months = [target_month_end] if target_month_end else recent_month_ends(3, today)
+    for me in months:
         cached = cache_amc / f"{me.isoformat()}.bin"
         meta_file = cache_amc / f"{me.isoformat()}.meta.txt"
-        if cached.exists() and (time.time() - cached.stat().st_mtime) < 14 * 86400:
+        if not target_month_end and cached.exists() and (time.time() - cached.stat().st_mtime) < 14 * 86400:
             src_lbl = meta_file.read_text(encoding="utf-8").strip() if meta_file.exists() else f"cache:{key}:{me.isoformat()}"
-            return cached.read_bytes(), f"cache:{src_lbl}"
+            return cached.read_bytes(), src_lbl
 
         if template:
             url = render_url(template, me)
@@ -797,7 +800,9 @@ def get_amc_workbook(
     return None
 
 
-def _fetch_mfforecast_holdings_if_configured(scheme_code: str, isin_map: Dict[str, str]) -> Optional[Tuple[List[Dict[str, Any]], str]]:
+def _fetch_mfforecast_holdings_if_configured(
+    scheme_code: str, isin_map: Dict[str, str]
+) -> Optional[Tuple[List[Dict[str, Any]], str, str, str]]:
     """Optional sanctioned RapidAPI holdings fallback for WAF-gated AMCs when MFFORECAST_RAPIDAPI_KEY is configured."""
     api_key = os.environ.get("MFFORECAST_RAPIDAPI_KEY", "").strip()
     if not api_key:
@@ -823,10 +828,18 @@ def _fetch_mfforecast_holdings_if_configured(scheme_code: str, isin_map: Dict[st
     except Exception as pay_err:
         logger.debug("MFForecast JSON decode error for %s: %s", scheme_code, pay_err)
         return None
+    if not isinstance(payload, dict):
+        return None
     items = payload.get("holdings") or payload.get("data") or []
     if not isinstance(items, list) or not items:
         return None
-    as_on = str(payload.get("portfolio_date") or payload.get("as_on_date") or datetime.now(IST).date().isoformat())[:10]
+    reported_dates = [payload[key] for key in ("portfolio_date", "as_on_date") if payload.get(key)]
+    dates = {parse_fund_disclosure_date(value) for value in reported_dates}
+    if None in dates or len(dates) != 1:
+        return None
+    as_on = dates.pop()
+    if not as_on or as_on > datetime.now(IST).date().isoformat():
+        return None
     raw_rows = []
     for it in items:
         isin = str(it.get("isin") or "").strip().upper()
@@ -845,7 +858,7 @@ def _fetch_mfforecast_holdings_if_configured(scheme_code: str, isin_map: Dict[st
     holdings = build_holdings({"as_on_date": as_on, "holdings": raw_rows}, isin_map)
     if validate_holdings(holdings) is not None:
         return None
-    return holdings, as_on
+    return holdings, as_on, url, hashlib.sha256(raw).hexdigest()
 
 
 # --------------------------------------------------------------------------- #
@@ -960,7 +973,7 @@ def _canonical_holdings_source(label: str) -> str:
 
 def build_holdings(parsed: Dict[str, Any], isin_map: Dict[str, str]) -> List[Dict[str, Any]]:
     """Converts a parsed sheet into rows for `save_mutual_fund_holdings` (merging duplicate lines)."""
-    as_on = parsed.get("as_on_date") or datetime.now(IST).date().isoformat()
+    as_on = parse_fund_disclosure_date(parsed.get("as_on_date"))
     merged: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for h in parsed["holdings"]:
         htype = h["holding_type"]
@@ -1008,13 +1021,16 @@ def validate_holdings(holdings: List[Dict[str, Any]]) -> Optional[str]:
     return None
 
 
-def _upsert_scheme_master(
+def _publish_scheme_disclosure(
     row: Dict[str, Any],
     amfi_lookup: Dict[str, Dict[str, Any]],
     holdings: List[Dict[str, Any]],
     as_on: str,
     source: str,
-) -> bool:
+    source_type: str,
+    source_hash: str,
+    sheet_name: Optional[str] = None,
+) -> str:
     existing = get_mutual_fund_scheme(row["scheme_code"])
     if existing and existing.get("scheme_code", "").upper() == row["scheme_code"].upper():
         scheme = dict(existing)
@@ -1031,17 +1047,18 @@ def _upsert_scheme_master(
         scheme["aum_crores"] = row["aum_crores"]
     scheme["last_portfolio_date"] = as_on
     top10 = round(sum(h["weight_pct"] for h in holdings[:10]), 1)
-    canonical_src = _canonical_holdings_source(source)
     meta.update({
-        "holdings_source": canonical_src,
+        "holdings_source": source_type,
         "holdings_source_url": source,
+        "holdings_source_sha256": source_hash,
+        "holdings_source_sheet": sheet_name,
         "holdings_as_on": as_on,
         "aum_rank": row.get("aum_rank"),
         "aum_source": "AMFI average AUM (scheme-wise)",
         "top_10_weight_pct": top10,
     })
     scheme["metadata"] = meta
-    return save_mutual_fund_scheme(scheme)
+    return publish_mutual_fund_disclosure(scheme, holdings)
 
 
 def sync_legacy_slug_twins_from_verified_numeric(isin_map: Optional[Dict[str, str]] = None) -> Dict[str, int]:
@@ -1065,36 +1082,25 @@ def sync_legacy_slug_twins_from_verified_numeric(isin_map: Optional[Dict[str, st
         slug_scheme = by_code.get(slug_code)
         if not num_scheme or not slug_scheme:
             continue
-        num_meta = num_scheme.get("metadata") if isinstance(num_scheme.get("metadata"), dict) else {}
-        h_src = str(num_meta.get("holdings_source") or "").strip().lower()
-        num_holdings = get_scheme_holdings(num_code)
-        total_w = sum(float(h.get("weight_pct") or 0.0) for h in num_holdings)
-        if not num_holdings or total_w < MIN_WEIGHT_SUM:
+        snapshot = get_current_fund_disclosure(num_code)
+        if not snapshot or validate_holdings(snapshot["holdings"]):
             continue
-        if h_src not in ("sebi_monthly_disclosure", "mfforecast_api", "manual_inbox"):
-            # Stamp legacy Nippon verified portfolios if already >= 90% weight
-            h_src = "sebi_monthly_disclosure"
 
         clean_rows = []
-        as_on = str(num_scheme.get("last_portfolio_date") or datetime.now(IST).date().isoformat())[:10]
-        for h in num_holdings:
-            ident = str(h.get("identifier") or "").strip().upper()
-            if h.get("holding_type") == "EQUITY" and _ISIN_EQUITY_RE.match(ident) and isin_map:
-                ident = resolve_equity_identifier(ident, str(h.get("holding_name") or ""), isin_map)
-            clean_rows.append({
-                "holding_type": h.get("holding_type", "EQUITY"),
-                "identifier": ident,
-                "holding_name": h.get("holding_name") or ident,
-                "weight_pct": float(h.get("weight_pct") or 0.0),
-                "sector_or_rating": h.get("sector_or_rating") or "Unclassified",
-                "portfolio_date": h.get("portfolio_date") or as_on,
-                "instrument_details": h.get("details") or {},
-            })
+        as_on = snapshot["as_on_date"]
+        for holding in snapshot["holdings"]:
+            ident = holding["identifier"]
+            if holding["holding_type"] == "EQUITY" and _ISIN_EQUITY_RE.match(ident) and isin_map:
+                ident = resolve_equity_identifier(ident, holding["holding_name"], isin_map)
+            clean_rows.append({**holding, "identifier": ident})
 
         updated_slug = dict(slug_scheme)
         slug_meta = dict(slug_scheme.get("metadata") or {})
         slug_meta.update({
-            "holdings_source": h_src,
+            "holdings_source": snapshot["holdings_source"],
+            "holdings_source_url": snapshot["source_url"],
+            "holdings_source_sha256": snapshot.get("source_sha256"),
+            "holdings_source_sheet": snapshot.get("source_sheet"),
             "canonical_amfi_code": num_code,
             "holdings_as_on": as_on,
             "top_10_weight_pct": round(sum(r["weight_pct"] for r in clean_rows[:10]), 1),
@@ -1104,8 +1110,14 @@ def sync_legacy_slug_twins_from_verified_numeric(isin_map: Optional[Dict[str, st
         updated_slug["last_portfolio_date"] = as_on
         updated_slug["metadata"] = slug_meta
 
-        if save_mutual_fund_scheme(updated_slug) and save_mutual_fund_holdings(slug_code, clean_rows):
-            upgraded += 1
+        try:
+            publish_mutual_fund_disclosure(
+                updated_slug, clean_rows, canonical_snapshot_id=snapshot["snapshot_id"],
+            )
+        except (ValueError, RuntimeError) as error:
+            logger.warning("Legacy scheme %s disclosure was not published: %s", slug_code, error)
+            continue
+        upgraded += 1
 
     return {"mapped_twins": len(slug_to_num), "upgraded_slugs": upgraded}
 
@@ -1119,7 +1131,11 @@ def backfill_existing_raw_equity_isins(isin_map: Optional[Dict[str, str]] = None
     updated = 0
     try:
         cur.execute(
-            "SELECT id, identifier, holding_name FROM mutual_fund_holdings WHERE holding_type = 'EQUITY' AND identifier LIKE 'IN%'"
+            """
+            SELECT h.id, h.identifier, h.holding_name FROM mutual_fund_holdings h
+            WHERE h.holding_type = 'EQUITY' AND h.identifier LIKE 'IN%'
+              AND NOT EXISTS (SELECT 1 FROM mf_current_disclosures d WHERE d.scheme_code = h.scheme_code)
+            """
         )
         for row_id, ident, hname in cur.fetchall():
             raw_id = str(ident or "").strip().upper()
@@ -1172,6 +1188,13 @@ def _merge_db_numeric_schemes_into_universe(ranked: List[Dict[str, Any]]) -> Lis
     return merged
 
 
+def get_monthly_mf_universe() -> List[Dict[str, Any]]:
+    ranked = rank_funds_by_aum()
+    if not ranked:
+        raise RuntimeError("AMFI AUM universe unavailable")
+    return _merge_db_numeric_schemes_into_universe(ranked)
+
+
 # --------------------------------------------------------------------------- #
 # Orchestrator
 # --------------------------------------------------------------------------- #
@@ -1184,6 +1207,8 @@ def ingest_top_funds(
     isin_map: Optional[Dict[str, str]] = None,
     audit: bool = False,
     sync_twins: bool = True,
+    only_scheme_codes: Optional[set[str]] = None,
+    target_month_end: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Ingests real SEBI statutory portfolios across AMCs up to `target` funds."""
     t0 = time.time()
@@ -1191,12 +1216,21 @@ def ingest_top_funds(
     if universe is not None:
         ranked = list(universe)
     else:
-        ranked = _merge_db_numeric_schemes_into_universe(rank_funds_by_aum())
-    provider = workbook_provider or get_amc_workbook
+        ranked = get_monthly_mf_universe()
+    if target_month_end is not None and not parse_fund_disclosure_date(target_month_end):
+        raise ValueError("Invalid target month-end")
+
+    def provider(key: str, config: Dict[str, Any]):
+        if workbook_provider:
+            return workbook_provider(key, config)
+        if target_month_end:
+            return get_amc_workbook(key, config, target_month_end=date.fromisoformat(target_month_end))
+        return get_amc_workbook(key, config)
+
     isin_map = isin_map if isin_map is not None else load_isin_symbol_map()
 
     aaum_stats = {"numeric_updated": 0, "slug_twins_updated": 0}
-    if not dry_run and universe is None and workbook_provider is None:
+    if not dry_run and (universe is None or target_month_end) and workbook_provider is None:
         try:
             aaum_stats = backfill_scheme_aaum_to_db()
         except Exception as aaum_err:
@@ -1239,20 +1273,22 @@ def ingest_top_funds(
             amc_status[key] = f"unparseable workbook: {e}"
             workbook_cache[key] = None
             return None
-        fallback_dt = parse_as_on_date(label)
-        if fallback_dt:
-            for p in sheets.values():
-                if not p.get("as_on_date"):
-                    p["as_on_date"] = fallback_dt
         titles = {n: p["scheme_name"] or n for n, p in sheets.items()}
         amc_status[key] = f"ok: {len(sheets)} scheme sheets from {label}"
-        workbook_cache[key] = {"sheets": sheets, "titles": titles, "source": label}
+        workbook_cache[key] = {
+            "sheets": sheets,
+            "titles": titles,
+            "source": label,
+            "source_hash": hashlib.sha256(data).hexdigest(),
+        }
         amc_sheet_claims[key] = match_schemes_to_workbook_sheets(schemes_by_amc.get(key, []), sheets)
         return workbook_cache[key]
 
     for row in ranked:
         if len(ingested) >= target:
             break
+        if only_scheme_codes is not None and str(row["scheme_code"]).strip() not in only_scheme_codes:
+            continue
         key = amc_key_for_fund_house(row["fund_house"], sources)
         if not key or (only_amcs and key not in only_amcs):
             skipped.append({**_brief(row), "reason": "AMC not in scope" if key else "AMC not in registry"})
@@ -1262,14 +1298,18 @@ def ingest_top_funds(
             # Check optional sanctioned MFFORECAST_RAPIDAPI_KEY fallback before skipping
             fb = _fetch_mfforecast_holdings_if_configured(str(row["scheme_code"]), isin_map) if workbook_provider is None else None
             if fb:
-                holdings, as_on = fb
-                if not dry_run:
-                    if _upsert_scheme_master(row, amfi_lookup, holdings, as_on, "mfforecast_api") and save_mutual_fund_holdings(row["scheme_code"], holdings):
-                        ingested.append({**_brief(row), "holdings_count": len(holdings), "as_on": as_on, "source": "mfforecast_api"})
-                        continue
-                else:
-                    ingested.append({**_brief(row), "holdings_count": len(holdings), "as_on": as_on, "source": "mfforecast_api"})
+                holdings, as_on, source, source_hash = fb
+                if target_month_end and as_on != target_month_end:
+                    skipped.append({**_brief(row), "reason": "vendor disclosure is for a different month"})
                     continue
+                try:
+                    if not dry_run:
+                        _publish_scheme_disclosure(row, amfi_lookup, holdings, as_on, source, "mfforecast_api", source_hash)
+                except (ValueError, RuntimeError) as error:
+                    skipped.append({**_brief(row), "reason": str(error)})
+                    continue
+                ingested.append({**_brief(row), "holdings_count": len(holdings), "as_on": as_on, "source": source})
+                continue
             skipped.append({**_brief(row), "reason": amc_status[key]})
             continue
 
@@ -1279,19 +1319,33 @@ def ingest_top_funds(
             continue
 
         parsed = book["sheets"][sheet_key]
+        as_on = parse_fund_disclosure_date(parsed.get("as_on_date"))
+        if not as_on or as_on > datetime.now(IST).date().isoformat():
+            skipped.append({**_brief(row), "reason": "missing, invalid, conflicting or future disclosure date"})
+            continue
+        if target_month_end and as_on != target_month_end:
+            skipped.append({**_brief(row), "reason": "disclosure is for a different month"})
+            continue
         holdings = build_holdings(parsed, isin_map)
         problem = validate_holdings(holdings)
         if problem:
             skipped.append({**_brief(row), "reason": f"validation failed: {problem}"})
             continue
 
-        as_on = parsed.get("as_on_date") or datetime.now(IST).date().isoformat()
         if not dry_run:
-            if not _upsert_scheme_master(row, amfi_lookup, holdings, as_on, book["source"]):
-                skipped.append({**_brief(row), "reason": "scheme master save failed"})
-                continue
-            if not save_mutual_fund_holdings(row["scheme_code"], holdings):
-                skipped.append({**_brief(row), "reason": "holdings save failed"})
+            try:
+                _publish_scheme_disclosure(
+                    row,
+                    amfi_lookup,
+                    holdings,
+                    as_on,
+                    book["source"],
+                    _canonical_holdings_source(book["source"]),
+                    book["source_hash"],
+                    sheet_name=sheet_key,
+                )
+            except (ValueError, RuntimeError) as error:
+                skipped.append({**_brief(row), "reason": str(error)})
                 continue
         ingested.append({**_brief(row), "holdings_count": len(holdings), "as_on": as_on, "source": book["source"]})
 

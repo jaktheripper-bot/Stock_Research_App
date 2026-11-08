@@ -533,6 +533,29 @@ def fulfill_razorpay_order(
             (owner_user_id, f"TOPUP_{pack_type}", -credits_to_add, new_balance),
         )
 
+        # 5. Append credit_settlement_operations (atomic idempotent capture receipt)
+        cur.execute(
+            f"""
+            INSERT INTO credit_settlement_operations (
+                operation_id, user_id, operation_type, credits_delta, balance_after,
+                idempotency_key, payment_id, order_id, metadata_json, created_at
+            )
+            VALUES ({p}, {p}, 'PAYMENT_CAPTURE_CREDIT', {p}, {p}, {p}, {p}, {p}, {p}, {p})
+            ON CONFLICT (idempotency_key) DO NOTHING
+            """,
+            (
+                f"cso_{tx_id}",
+                owner_user_id,
+                credits_to_add,
+                new_balance,
+                f"paycap:{clean_payment_id}",
+                clean_payment_id,
+                clean_order_id,
+                json.dumps({"invoice_number": inv_number, "plan_id": intent_plan_id, "amount_inr": amount_inr}),
+                now_epoch,
+            ),
+        )
+
         conn.commit()
         return True, new_balance, inv_number, f"Payment confirmed! Added {credits_to_add} credits to your account."
     except AuthoritativeDatabaseUnavailable:

@@ -3,8 +3,7 @@
 Aggregates company-level reports from `reports.db` to derive:
 - Weighted Economic Moat Index
 - Accounting & Solvency Risk Index (ASRI)
-- Portfolio Margin of Safety vs Intrinsic DCF
-- Promoter Pledging Exposure & Style Drift Tracking
+- Qualitative valuation tilt and governance/solvency watchlist
 """
 
 import json
@@ -34,10 +33,9 @@ def audit_fund_lookthrough(scheme_code: str) -> Dict[str, Any]:
         "composite_health_score": lookthrough.get("composite_health_score"),
         "has_sufficient_coverage": lookthrough.get("has_sufficient_coverage", False),
         "genuine_coverage_pct": lookthrough.get("genuine_coverage_pct", 0.0),
-        "weighted_moat_score": lookthrough.get("weighted_moat_score", 70.0),
-        "accounting_risk_index": lookthrough.get("accounting_risk_index", 0.0),
-        "margin_of_safety_pct": lookthrough.get("margin_of_safety_pct", 0.0),
-        "promoter_pledge_exposure_pct": lookthrough.get("promoter_pledge_exposure_pct", 0.0),
+        "weighted_moat_score": lookthrough.get("weighted_moat_score"),
+        "accounting_risk_index": lookthrough.get("accounting_risk_index"),
+        "evidence_receipt": lookthrough.get("evidence_receipt"),
         "top_quality_holdings": lookthrough.get("top_quality_holdings", []),
         "top_risky_holdings": lookthrough.get("top_risky_holdings", []),
         "sebi_safe_harbor": "Under SEBI (Mutual Funds) Regulations, 1996 and SEBI RA 2014 Sec. 2(u).",

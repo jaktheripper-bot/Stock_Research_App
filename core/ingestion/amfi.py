@@ -269,7 +269,7 @@ def parse_amfi_nav_feed(
             "active_share_pct": 70.0 if broad_cat == "EQUITY" else 0.0,
             "risk_grade": "Very High" if broad_cat == "EQUITY" else "Moderate",
             "fund_manager": "Senior Fund Manager",
-            "last_portfolio_date": datetime.now(IST).date().isoformat()
+            "last_portfolio_date": None
         })
 
         # Early termination: exact code match or limit reached

@@ -1360,25 +1360,21 @@ class TestOrchestratorSkipAndReplace(unittest.TestCase):
 
     @patch("core.ingestion.mf_portfolio_ingest.fetch_amfi_nav_raw", return_value="")
     def test_dry_run_writes_nothing(self, _):
-        with patch("core.ingestion.mf_portfolio_ingest.save_mutual_fund_holdings") as save_h, \
-             patch("core.ingestion.mf_portfolio_ingest.save_mutual_fund_scheme") as save_s:
+        with patch("core.ingestion.mf_portfolio_ingest.publish_mutual_fund_disclosure") as pub_disc:
             ingest_top_funds(target=2, dry_run=True, universe=self._universe(),
                              workbook_provider=self._provider(), isin_map={})
-            save_h.assert_not_called()
-            save_s.assert_not_called()
+            pub_disc.assert_not_called()
 
     @patch("core.ingestion.mf_portfolio_ingest.fetch_amfi_nav_raw", return_value="")
     def test_real_run_saves_holdings_and_scheme(self, _):
-        with patch("core.ingestion.mf_portfolio_ingest.save_mutual_fund_holdings", return_value=True) as save_h, \
-             patch("core.ingestion.mf_portfolio_ingest.save_mutual_fund_scheme", return_value=True) as save_s, \
+        with patch("core.ingestion.mf_portfolio_ingest.publish_mutual_fund_disclosure", return_value="snap-9001") as pub_disc, \
              patch("core.ingestion.mf_portfolio_ingest.get_mutual_fund_scheme", return_value=None):
             ingest_top_funds(target=1, dry_run=False, universe=self._universe(),
                              workbook_provider=self._provider(), isin_map={"INE040A01034": "HDFCBANK"})
-            self.assertEqual(save_h.call_count, 1)
-            code, holdings = save_h.call_args[0]
-            self.assertEqual(code, "9001")
+            self.assertEqual(pub_disc.call_count, 1)
+            saved_scheme, holdings = pub_disc.call_args[0]
+            self.assertEqual(saved_scheme["scheme_code"], "9001")
             self.assertIn("HDFCBANK", [h["identifier"] for h in holdings])
-            saved_scheme = save_s.call_args[0][0]
             self.assertEqual(saved_scheme["aum_crores"], 900.0)
             self.assertEqual(saved_scheme["metadata"]["holdings_as_on"], "2026-08-31")
 

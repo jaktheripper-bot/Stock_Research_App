@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def job_monthly_mf_portfolio_sync() -> dict:
-    """Runs during the SEBI statutory disclosure window (days 4-12 at 07:45 IST) to ingest fresh month-end portfolios."""
+    """Runs daily from the 4th at 07:45 IST and retries outstanding scheme disclosures."""
     today_str = datetime.now(IST).strftime("%Y-%m-%d")
     try:
         from scripts.run_scheduled_pipeline import run_monthly_mf_portfolio_pipeline
@@ -27,9 +27,9 @@ def job_monthly_mf_portfolio_sync() -> dict:
 
 
 def register_jobs(scheduler):
-    """Register monthly scheduled jobs (MSME Ministry on Day 1 @ 07:30 IST; SEBI MF Portfolios on Days 4-12 @ 07:45 IST)."""
+    """Register monthly scheduled jobs (MSME Ministry on Day 1 @ 07:30 IST; MF Portfolios from Day 4 @ 07:45 IST)."""
     msme_trigger = CronTrigger(day="1", hour="7", minute="30", second="0", timezone="Asia/Kolkata")
     scheduler.add_job(run_monthly_job, msme_trigger, id="msme_monthly_ingest", replace_existing=True)
 
-    mf_trigger = CronTrigger(day="4-12", hour="7", minute="45", second="0", timezone="Asia/Kolkata")
+    mf_trigger = CronTrigger(day="4-31", hour="7", minute="45", second="0", timezone="Asia/Kolkata")
     scheduler.add_job(job_monthly_mf_portfolio_sync, mf_trigger, id="sebi_mf_monthly_portfolio_sync", replace_existing=True)

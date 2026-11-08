@@ -389,7 +389,11 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
     overall = metrics["overall_score"]
     status = metrics["status"]
     crit_count = len(metrics["critical_violations"])
-    tests_total = metrics["test_results"].get("total_tests", 0)
+    test_results = metrics["test_results"]
+    tests_total = test_results.get("total_tests", 0)
+    selected_tests = ", ".join(test_results.get("selected_files", [])) or "No explicit file selection"
+    omitted_tests = ", ".join(test_results.get("omitted_patterns", [])) or "None recorded"
+    phrase_scan = metrics["terms_results"]
     endpoints_total = metrics["endpoint_results"].get("total_checked", 0)
     latest_migration = metrics.get("latest_migration") or get_latest_schema_migration_version()
     total_silent_swallows = (
@@ -418,33 +422,34 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
 
 | Audit Pillar | Score | Status | Key Evaluation Criteria |
 | :--- | :---: | :---: | :--- |
-| **Pillar 1: Strategy & Regulatory** | **{metrics['strategy_score']}/100** | {'PASS' if metrics['strategy_score'] >= 80 else 'WARN'} | SEBI Safe Harbor Section 2(u), Tone Neutrality, 7-Pillar Alignment |
+| **Pillar 1: Strategy & Regulatory** | **{metrics['strategy_score']}/100** | {'PASS' if metrics['strategy_score'] >= 80 else 'WARN'} | Phrasing scan, disclaimer text, 7-Pillar Alignment |
 | **Pillar 2: Technical & Code** | **{metrics['implementation_score']}/100** | {'PASS' if metrics['implementation_score'] >= 80 else 'WARN'} | Unit Tests ({tests_total}), Dual-Binding DB ({latest_migration}), Zero-Hallucination AST, API Contracts |
-| **Pillar 3: UI/UX & Front-End** | **{metrics['uiux_score']}/100** | {'PASS' if metrics['uiux_score'] >= 80 else 'WARN'} | {endpoints_total} Live Routes, Tabular Lining Numerals, Click Wiring, Design Tokens |
+| **Pillar 3: UI/UX & Front-End** | **{metrics['uiux_score']}/100** | {'PASS' if metrics['uiux_score'] >= 80 else 'WARN'} | {endpoints_total} In-Process Route Checks, Tabular Lining Numerals, Click Wiring, Design Tokens |
 | **Composite Project Health** | **{overall}/100** | **{status}** | Weighted Aggregate (35% Strategy, 35% Impl, 30% UI/UX) |
 
 ---
 
 ## 2. Pillar 1: Strategy & Regulatory Guardrails
-- **SEBI Safe Harbor Status:** {'100% Compliant — Zero prescriptive buy/sell recommendations detected.' if metrics['terms_results'].get('violations_count') == 0 else f"Violations detected: {metrics['terms_results'].get('violations_count')} prohibited items."}
-- **Statutory Section 2(u) Disclaimer:** {'Verified present in base web templates.' if metrics['terms_results'].get('has_statutory_disclaimer') else 'MISSING in base web templates.'}
+- **Prohibited Phrasing Scan:** `{phrase_scan.get('violations_count', 'Unknown')}` matches across `{phrase_scan.get('scanned_templates', 'Unknown')}` files read out of `{phrase_scan.get('files_considered', 'Unknown')}` considered.
+- **Disclaimer Text:** {'Found in the base template.' if phrase_scan.get('has_statutory_disclaimer') else 'Missing from the base template.'}
 - **Tone Neutrality & Editorial Standard:** Adheres to institutional, objective diagnostic phrasing. Conversational baby talk filter active.
 - **Upstream Data Licensing:** Commercial monetization active (Razorpay); {smartapi_status}
 
 ---
 
 ## 3. Pillar 2: Technical Architecture & Implementation
-- **Automated Test Suite:** `{metrics['test_results'].get('passed')}/{tests_total}` tests passing in `{metrics['test_results'].get('duration_s')}s` (`{metrics['test_results'].get('status')}`).
-- **Database Dual-Binding:** PostgreSQL (Supabase) and SQLite (`reports.db`) schema migrations verified up to `{latest_migration}`.
+- **Automated Test Suite:** `{test_results.get('scope', 'Unknown')}` scope. `{test_results.get('passed')}/{tests_total}` passed among executed tests, `{test_results.get('skipped', 'Unknown')}` skipped, status `{test_results.get('status')}`.
+- **File selection:** {selected_tests}.
+- **Omitted scope:** {omitted_tests}.
+- **Schema Migration:** `{latest_migration}` reported by the configured database.
 - **Zero-Hallucination AST Inspection:**
   - Scanned Python Files: `{metrics['hygiene_results'].get('scanned_python_files')}`
   - Silent Exception Swallows (unhandled `except` blocks): `{total_silent_swallows}` instances tracked for refactoring.
-  - Hardcoded Valuation Metrics: Zero detected. All metrics grounded in exchange data.
 
 ---
 
 ## 4. Pillar 3: UI/UX, Design Aesthetics & Ergonomics
-- **Live Endpoint Verification:** `{metrics['endpoint_results'].get('healthy_count')}/{endpoints_total}` endpoints healthy (HTTP 200 OK).
+- **In-Process TestClient Route Checks:** `{metrics['endpoint_results'].get('healthy_count')}/{endpoints_total}` returned HTTP 200.
 - **Primary <h1> Heading Coverage:** {'🟢 100% of HTML views contain valid <h1> tags.' if not [e for e in metrics['endpoint_results'].get('endpoints', []) if e.get('has_h1') is False] else f"🔴 {[e['path'] for e in metrics['endpoint_results'].get('endpoints', []) if e.get('has_h1') is False]} missing <h1> tag(s)."}
 - **Endpoint Latency Bounds:** {'🟢 All endpoints respond within 1500ms threshold.' if not [e for e in metrics['endpoint_results'].get('endpoints', []) if e.get('latency_ms', 0) > 1500.0] else f"⚠️ High latency endpoints (>1500ms): {[e['path'] for e in metrics['endpoint_results'].get('endpoints', []) if e.get('latency_ms', 0) > 1500.0]}"}
 - **Tabular Lining Numerals (`tabular-nums`):** {'Verified active in style.css to eliminate ocular drift.' if metrics['design_results'].get('has_tabular_nums') else 'Not detected.'}

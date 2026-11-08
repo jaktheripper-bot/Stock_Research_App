@@ -1175,7 +1175,7 @@ class TestCompetitiveEnhancements(unittest.TestCase):
 
         # 3. Verify scenario filters
         pres = get_normalized_opportunity_universe(persona_filter="capital_preservation")
-        self.assertTrue(all(x.get("real_yield_pct", 0) >= 0 for x in pres))
+        self.assertTrue(all("capital_preservation" in x["persona_tags"] for x in pres))
 
         cash = get_normalized_opportunity_universe(persona_filter="maximum_cashflow")
         self.assertTrue(len(cash) > 0)

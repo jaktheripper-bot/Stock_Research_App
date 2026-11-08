@@ -399,6 +399,7 @@ class TestPhase2CacheAndDossierAllocations(unittest.TestCase):
                         "holding_name": "Infosys Ltd",
                         "weight_pct": 10.0,
                         "sector_or_rating": "IT",
+                        "portfolio_date": "2025-09-30",
                     }
                 ],
             )
@@ -411,6 +412,7 @@ class TestPhase2CacheAndDossierAllocations(unittest.TestCase):
                         "holding_name": "Infosys Ltd",
                         "weight_pct": 10.0,
                         "sector_or_rating": "IT",
+                        "portfolio_date": "2025-09-30",
                     }
                 ],
             )

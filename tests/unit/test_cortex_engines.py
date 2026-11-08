@@ -671,15 +671,23 @@ class TestMoatnomicsBrandHouse(unittest.TestCase):
         # 4. Mutual Fund Dossier narrative uses calm trade-off language
         mf_md = synthesize_fund_forensic_narrative(
             {
+                "has_sufficient_coverage": True,
                 "active_share_pct": 68.0,
                 "weighted_moat_score": 76.0,
                 "accounting_risk_index": 3.5,
-                "margin_of_safety_pct": -8.0,
-                "promoter_pledge_exposure_pct": 0.5,
                 "portfolio_turnover_ratio_pct": 22.0,
                 "benchmark_index": "NIFTY 500 TRI",
                 "top_risky_holdings": [],
                 "top_quality_holdings": [{"name": "Infosys Ltd"}],
+                "evidence_receipt": {
+                    "snapshot_id": "snap-brand-test-01",
+                    "researched_weight_pct_nav": 82.0,
+                    "researched_equity_weight_pct": 88.0,
+                    "metrics": {
+                        "valuation_tilt": {"value": "premium"},
+                        "governance_solvency_watchlist": {"value_pct_nav": 0.0},
+                    },
+                },
             },
             {
                 "scheme_code": "TEST_MF_01",

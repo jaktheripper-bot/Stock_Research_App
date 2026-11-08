@@ -525,10 +525,11 @@ def _load_live_mf_highlight(date_str: str) -> Dict[str, Any]:
                 SELECT s.scheme_code, s.scheme_name, s.category, s.nav, s.ter_direct_pct,
                        s.last_portfolio_date, s.last_updated,
                        d.active_share_pct, d.composite_health_score,
-                       d.weighted_moat_score, d.promoter_pledge_exposure_pct,
-                       d.margin_of_safety_pct, d.last_audited_at
+                       CASE WHEN d.evidence_receipt_json IS NOT NULL AND d.weighted_moat_score >= 0
+                            THEN d.weighted_moat_score END AS weighted_moat_score,
+                       d.last_audited_at
                 FROM mutual_fund_schemes s
-                LEFT JOIN fund_forensic_dossiers d ON s.scheme_code = d.scheme_code
+                LEFT JOIN fund_forensic_dossiers d ON s.scheme_code = d.scheme_code AND d.evidence_receipt_json IS NOT NULL
                 ORDER BY (d.weighted_moat_score IS NULL) ASC, d.weighted_moat_score DESC, s.scheme_code ASC
                 """
             )
@@ -546,10 +547,12 @@ def _load_live_mf_highlight(date_str: str) -> Dict[str, Any]:
         picked = pool[_date_index("mf", date_str, len(pool))]
 
         active_share = picked.get("active_share_pct")
+        if active_share is not None and float(active_share) < 0:
+            active_share = None
         ter = picked.get("ter_direct_pct")
         moat = picked.get("weighted_moat_score")
-        pledge = picked.get("promoter_pledge_exposure_pct")
         health = picked.get("composite_health_score")
+        health = health if health is not None and float(health) >= 0 else None
         nav_val = picked.get("nav")
 
         amfi_as_of = str(
@@ -565,10 +568,7 @@ def _load_live_mf_highlight(date_str: str) -> Dict[str, Any]:
         nav_str = f"₹{float(nav_val):.2f}" if nav_val is not None else "N/A"
 
         if moat is not None:
-            takeaway = (
-                f"Look-through weighted Moat Score of {float(moat):.1f}/100 with "
-                f"{float(pledge or 0.0):.2f}% promoter-pledge exposure across underlying holdings (NAV {nav_str})."
-            )
+            takeaway = f"Researched-equity weighted moat score of {float(moat):.1f}/100 (NAV {nav_str})."
         elif health is not None:
             takeaway = (
                 f"{picked.get('category', 'Equity')} mandate scoring {float(health):.1f}/100 composite "

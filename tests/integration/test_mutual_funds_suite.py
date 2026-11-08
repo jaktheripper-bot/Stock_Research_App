@@ -10,13 +10,15 @@ Unifies:
 import json
 import os
 import unittest
+from datetime import datetime, timedelta
+from uuid import uuid4
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 os.environ["TESTING"] = "1"
 
 from web.main import app
-from core.db.connection import init_db
+from core.db.connection import IST, get_db_connection, get_placeholder, init_db
 from core.db.mutual_funds import (
     seed_default_mutual_funds,
     get_active_mutual_funds,
@@ -27,6 +29,7 @@ from core.db.mutual_funds import (
     get_fund_forensic_dossier,
     get_featured_daily_fund_dossier,
     get_next_fund_for_daily_audit,
+    publish_mutual_fund_disclosure,
 )
 from core.analysis.mutual_funds_engine import (
     calculate_active_share,
@@ -48,6 +51,50 @@ from core.analysis.fund_overlap_auditor import (
     audit_and_archive_constituent_stock,
 )
 from core.analysis.parser import wrap_fund_dossier_with_collapsible_dimensions, FUND_DIMENSION_METADATA
+
+FIXTURE_DISCLOSURE_DATE = "2025-11-30"
+
+
+def _dated_holdings(holdings):
+    return [{**holding, "portfolio_date": FIXTURE_DISCLOSURE_DATE} for holding in holdings]
+
+
+def _eligible_research(ticker):
+    return {
+        "ticker": ticker,
+        "timestamp": (datetime.now(IST) - timedelta(minutes=1)).isoformat(),
+        "report_text": f"""# Test fixture for {ticker}
+
+### Health Matrix
+- Macro: Stable
+- Moat: Wide
+- Governance: Clean
+- Diagnostic: Neutral
+- Valuation: Undervalued
+- Balance Sheet: Debt-Free
+- Capital Allocation: Disciplined
+
+## Research evidence
+"""
+        + "Fixture commentary for the research eligibility integration test. " * 8,
+        "citations": [{"uri": "https://www.nseindia.com/fixture/company-filing.pdf"}],
+    }
+
+
+def _with_disclosure_evidence(test_case, scheme_code):
+    holdings = get_scheme_holdings(scheme_code)
+    test_case.assertTrue(holdings)
+    fixture_disclosure = {
+        "snapshot_id": "fixture-disclosure-revision",
+        "as_on_date": FIXTURE_DISCLOSURE_DATE,
+        "holdings_source": "sebi_monthly_disclosure",
+        "source_url": "https://example.invalid/fixture/disclosure.xlsx",
+        "holdings": _dated_holdings(holdings),
+    }
+    with patch("core.db.mutual_funds.get_current_fund_disclosure", return_value=fixture_disclosure), patch(
+        "core.analysis.fund_overlap_auditor.get_report_by_ticker", side_effect=_eligible_research
+    ):
+        return compute_fund_forensic_lookthrough(scheme_code)
 
 NEW_19_SCHEME_CODES = [
     # Flexi Cap (5)
@@ -385,24 +432,15 @@ class TestMutualFundTop50Expansion(unittest.TestCase):
             "JM_FLEXICAP_DIR",
             "NIPPON_GROWTH_MIDCAP_DIR",
             "QUANT_SMALLCAP_DIR",
-            "MIRAE_LARGEMID_DIR"
+            "MIRAE_LARGEMID_DIR",
         ]
-        with patch("core.analysis.fund_overlap_auditor.get_report_by_ticker") as mock_rep:
-            mock_rep.return_value = {
-                "report_text": "### Health Matrix\nMoat: Wide\nGovernance: Clean\nValuation: Undervalued\nBalance Sheet: Debt-Free\n"
-            }
-            for code in representatives:
-                lookthrough = compute_fund_forensic_lookthrough(code)
-                self.assertIsNotNone(lookthrough)
-                self.assertIn("weighted_moat_score", lookthrough)
-                self.assertIn("composite_health_score", lookthrough)
-                self.assertIn("genuine_coverage_pct", lookthrough)
-                self.assertGreaterEqual(
-                    lookthrough["genuine_coverage_pct"],
-                    70.0,
-                    f"Scheme {code} genuine coverage {lookthrough['genuine_coverage_pct']} < 70.0"
-                )
+        for code in representatives:
+            with self.subTest(scheme_code=code):
+                lookthrough = _with_disclosure_evidence(self, code)
+                self.assertEqual(lookthrough["evidence_receipt"]["as_on_date"], FIXTURE_DISCLOSURE_DATE)
+                self.assertGreaterEqual(lookthrough["genuine_coverage_pct"], 70.0)
                 self.assertTrue(lookthrough["has_sufficient_coverage"])
+                self.assertIsNotNone(lookthrough["weighted_moat_score"])
                 self.assertIsNotNone(lookthrough["composite_health_score"])
 
     def test_portfolio_overlap_between_new_and_existing_schemes(self):
@@ -488,22 +526,13 @@ class TestMutualFundTop100Expansion(unittest.TestCase):
             "CANARA_ROBECO_BLUECHIP_DIR",
             "ICICI_TECH_DIR",
         ]
-        with patch("core.analysis.fund_overlap_auditor.get_report_by_ticker") as mock_rep:
-            mock_rep.return_value = {
-                "report_text": "### Health Matrix\nMoat: Wide\nGovernance: Clean\nValuation: Fair\nBalance Sheet: Robust\n"
-            }
-            for code in representatives:
-                lookthrough = compute_fund_forensic_lookthrough(code)
-                self.assertIsNotNone(lookthrough)
-                self.assertIn("weighted_moat_score", lookthrough)
-                self.assertIn("composite_health_score", lookthrough)
-                self.assertIn("genuine_coverage_pct", lookthrough)
-                self.assertGreaterEqual(
-                    lookthrough["genuine_coverage_pct"],
-                    70.0,
-                    f"Scheme {code} genuine coverage {lookthrough['genuine_coverage_pct']} < 70.0"
-                )
+        for code in representatives:
+            with self.subTest(scheme_code=code):
+                lookthrough = _with_disclosure_evidence(self, code)
+                self.assertEqual(lookthrough["evidence_receipt"]["as_on_date"], FIXTURE_DISCLOSURE_DATE)
+                self.assertGreaterEqual(lookthrough["genuine_coverage_pct"], 70.0)
                 self.assertTrue(lookthrough["has_sufficient_coverage"])
+                self.assertIsNotNone(lookthrough["weighted_moat_score"])
                 self.assertIsNotNone(lookthrough["composite_health_score"])
 
     def test_portfolio_overlap_between_thematic_funds(self):
@@ -663,49 +692,75 @@ class TestFundForensicAuditor(unittest.TestCase):
         self.assertEqual(matrix["balance_sheet"], "Debt-Free")
 
     def test_compute_ppfas_lookthrough(self):
-        metrics = compute_fund_forensic_lookthrough("PPFAS_FLEXICAP_DIR")
+        with patch("core.db.mutual_funds.get_current_fund_disclosure", return_value=None):
+            metrics = compute_fund_forensic_lookthrough("PPFAS_FLEXICAP_DIR")
         self.assertEqual(metrics["scheme_code"], "PPFAS_FLEXICAP_DIR")
         self.assertFalse(metrics["has_sufficient_coverage"])
         self.assertIsNone(metrics["composite_health_score"])
-        self.assertGreaterEqual(metrics["weighted_moat_score"], 70.0)
-        self.assertLessEqual(metrics["accounting_risk_index"], 5.0)
+        self.assertIsNone(metrics["weighted_moat_score"])
+        self.assertIsNone(metrics["accounting_risk_index"])
         self.assertGreaterEqual(metrics["active_share_pct"], 60.0)
 
-        with patch("core.analysis.fund_overlap_auditor.get_report_by_ticker") as mock_rep:
-            mock_rep.return_value = {
-                "report_text": "### Health Matrix\nMoat: Wide\nGovernance: Clean\nValuation: Undervalued\nBalance Sheet: Debt-Free\n"
-            }
-            unlocked_metrics = compute_fund_forensic_lookthrough("PPFAS_FLEXICAP_DIR")
-            self.assertTrue(unlocked_metrics["has_sufficient_coverage"])
-            self.assertIsNotNone(unlocked_metrics["composite_health_score"])
-            self.assertGreaterEqual(unlocked_metrics["composite_health_score"], 75.0)
+        unlocked = _with_disclosure_evidence(self, "PPFAS_FLEXICAP_DIR")
+        self.assertTrue(unlocked["has_sufficient_coverage"])
+        self.assertGreaterEqual(unlocked["composite_health_score"], 75.0)
+        self.assertEqual(unlocked["evidence_receipt"]["metrics"]["valuation_tilt"]["value"], "undervalued")
 
     def test_dossier_persistence_and_featured_retrieval(self):
-        mock_dossier = {
-            "scheme_code": "PPFAS_FLEXICAP_DIR",
-            "dossier_text": "# TEST DOSSIER\nMandate integrity verified.",
+        scheme_code = "PPFAS_FLEXICAP_DIR"
+        old_record = {
+            "scheme_code": scheme_code,
+            "dossier_text": "# LEGACY DOSSIER",
             "composite_health_score": 85.0,
             "weighted_moat_score": 86.5,
             "accounting_risk_index": 0.0,
             "margin_of_safety_pct": 5.2,
             "promoter_pledge_exposure_pct": 0.0,
             "active_share_pct": 68.0,
-            "top_risky_holdings": [],
-            "top_quality_holdings": [{"name": "HDFC Bank Ltd", "identifier": "HDFCBANK", "weight_pct": 8.4}],
-            "audited_by": "Test_Forensic_Auditor"
         }
-        saved = save_fund_forensic_dossier(mock_dossier)
-        self.assertTrue(saved)
+        self.assertTrue(save_fund_forensic_dossier(old_record))
+        legacy = get_fund_forensic_dossier(scheme_code)
+        self.assertIsNone(legacy["composite_health_score"])
+        self.assertIsNone(legacy["weighted_moat_score"])
+        self.assertNotIn("margin_of_safety_pct", legacy)
+        self.assertNotIn("promoter_pledge_exposure_pct", legacy)
 
-        retrieved = get_fund_forensic_dossier("PPFAS_FLEXICAP_DIR")
-        self.assertIsNotNone(retrieved)
-        self.assertEqual(retrieved["scheme_code"], "PPFAS_FLEXICAP_DIR")
-        self.assertEqual(retrieved["composite_health_score"], 85.0)
-        self.assertEqual(retrieved["weighted_moat_score"], 86.5)
+        metrics = _with_disclosure_evidence(self, scheme_code)
+        receipt = metrics["evidence_receipt"]
+        snapshot = {"snapshot_id": receipt["snapshot_id"]}
+        with patch("core.db.mutual_funds.get_current_fund_disclosure", return_value=snapshot):
+            self.assertTrue(
+                save_fund_forensic_dossier(
+                    {
+                        **metrics,
+                        "dossier_text": "# EVIDENCE-BACKED DOSSIER",
+                        "audited_by": "Test_Forensic_Auditor",
+                    }
+                )
+            )
+        retrieved = get_fund_forensic_dossier(scheme_code)
+        self.assertEqual(retrieved["evidence_receipt"], receipt)
+        self.assertEqual(retrieved["composite_health_score"], metrics["composite_health_score"])
+        self.assertEqual(retrieved["weighted_moat_score"], metrics["weighted_moat_score"])
+        self.assertIsNone(retrieved["evidence_receipt"]["metrics"]["dcf_margin_of_safety"]["value"])
+
+        # Order this record explicitly so other dossiers written in the same second do not tie.
+        conn = get_db_connection()
+        p = get_placeholder()
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                f"UPDATE fund_forensic_dossiers SET last_audited_at = {p} WHERE scheme_code = {p}",
+                (datetime.now(IST).isoformat(sep=" "), scheme_code),
+            )
+            conn.commit()
+        finally:
+            cur.close()
+            conn.close()
 
         featured = get_featured_daily_fund_dossier()
         self.assertIsNotNone(featured)
-        self.assertEqual(featured["scheme_code"], "PPFAS_FLEXICAP_DIR")
+        self.assertEqual(featured["scheme_code"], scheme_code)
         self.assertIn("scheme_name", featured)
 
     def test_rotation_queue_selection(self):
@@ -718,32 +773,47 @@ class TestFundForensicAuditor(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Featured Daily Fund Report", resp.text)
 
-        resp_dos = self.client.get("/funds/PPFAS_FLEXICAP_DIR", headers={"x-unlock-preview": "1"})
-        self.assertEqual(resp_dos.status_code, 200)
-        self.assertIn("7-Pillar Equity Look-Through", resp_dos.text)
-        self.assertIn("Weighted Moat Index", resp_dos.text)
+        scheme_code = "PPFAS_FLEXICAP_DIR"
+        metrics = _with_disclosure_evidence(self, scheme_code)
+        record = {**metrics, "dossier_text": "# EVIDENCE-BACKED DOSSIER"}
+        with patch("web.main.get_fund_forensic_dossier", return_value=record), patch(
+            "web.routers.markets.get_fund_forensic_dossier", return_value=record
+        ):
+            resp_dos = self.client.get(f"/funds/{scheme_code}", headers={"x-unlock-preview": "1"})
+            self.assertEqual(resp_dos.status_code, 200)
+            self.assertIn("7-Pillar Equity Look-Through", resp_dos.text)
+            self.assertIn("Evidence Receipt", resp_dos.text)
+            self.assertIn("Weighted Moat Index", resp_dos.text)
 
-        resp_api = self.client.get("/api/funds/dossier/PPFAS_FLEXICAP_DIR", headers={"x-unlock-preview": "1"})
-        self.assertEqual(resp_api.status_code, 200)
-        data = resp_api.json()
-        self.assertEqual(data["scheme_code"], "PPFAS_FLEXICAP_DIR")
-        self.assertIn("weighted_moat_score", data)
-        self.assertIn("accounting_risk_index", data)
+            resp_api = self.client.get(f"/api/funds/dossier/{scheme_code}", headers={"x-unlock-preview": "1"})
+            self.assertEqual(resp_api.status_code, 200)
+            data = resp_api.json()
+            self.assertEqual(data["scheme_code"], scheme_code)
+            self.assertIn("weighted_moat_score", data)
+            self.assertIn("accounting_risk_index", data)
+            self.assertNotIn("margin_of_safety_pct", data)
+            self.assertIsNone(data["evidence_receipt"]["metrics"]["dcf_margin_of_safety"]["value"])
+
+            locked_api = self.client.get(f"/api/funds/dossier/{scheme_code}")
+            self.assertEqual(locked_api.status_code, 200)
+            self.assertTrue(locked_api.json()["deep_dive_locked"])
+            self.assertNotIn("evidence_receipt", locked_api.json())
 
     def test_deep_dive_quote_and_cost(self):
-        quote = calculate_deep_dive_credit_cost("PPFAS_FLEXICAP_DIR")
-        self.assertEqual(quote["scheme_code"], "PPFAS_FLEXICAP_DIR")
+        scheme_code = "PPFAS_FLEXICAP_DIR"
+        quote = calculate_deep_dive_credit_cost(scheme_code)
+        self.assertEqual(quote["scheme_code"], scheme_code)
         self.assertGreaterEqual(quote["total_holdings_count"], 10)
         self.assertEqual(quote["layer1_credits"], 1)
         self.assertGreaterEqual(quote["uncached_count"], 1)
         self.assertEqual(quote["total_credits_for_full_audit"], 1 + quote["layer2_deep_dive_credits"])
 
-        resp = self.client.get("/api/funds/deep-dive-quote/PPFAS_FLEXICAP_DIR")
-        self.assertEqual(resp.status_code, 200)
-        q_data = resp.json()
-        self.assertEqual(q_data["scheme_code"], "PPFAS_FLEXICAP_DIR")
-        self.assertIn("layer2_deep_dive_credits", q_data)
-        self.assertIn("uncached_stocks", q_data)
+        url = f"/api/funds/deep-dive-quote/{scheme_code}"
+        self.assertEqual(self.client.get(url).status_code, 401)
+        with patch("web.main._get_current_web_user", return_value={"id": "quote-fixture"}), patch(
+            "core.db.mutual_funds.get_current_fund_disclosure", return_value=None
+        ):
+            self.assertEqual(self.client.get(url).status_code, 409)
 
     def test_on_demand_audit_api_and_status(self):
         resp = self.client.post("/api/funds/on-demand-audit", json={"scheme_code": "PPFAS_FLEXICAP_DIR"})
@@ -786,9 +856,12 @@ class TestFundForensicAuditor(unittest.TestCase):
 
         resp_dos = self.client.get("/funds/PPFAS_FLEXICAP_DIR", headers={"x-unlock-preview": "1"})
         self.assertEqual(resp_dos.status_code, 200)
-        self.assertIn("Constituent Stock Accounting Look-Through", resp_dos.text)
-        self.assertIn("Layer 1 Active (1 Credit)", resp_dos.text)
-        self.assertIn("Initiate Deep-Dive Audit", resp_dos.text)
+        with patch("core.db.mutual_funds.get_current_fund_disclosure", return_value=None):
+            resp_unval = self.client.get("/funds/PPFAS_FLEXICAP_DIR", headers={"x-unlock-preview": "1"})
+            self.assertEqual(resp_unval.status_code, 200)
+            self.assertIn("A paid audit becomes available after a dated source disclosure is validated.", resp_unval.text)
+            self.assertNotIn("Layer 1 Active (1 Credit)", resp_unval.text)
+            self.assertNotIn('id="btnDeepDiveAudit"', resp_unval.text)
 
     @patch("core.ingestion.amfi.search_amfi_master_directory", return_value=[])
     @patch("urllib.request.urlopen")
@@ -923,123 +996,150 @@ Cash reserve of 12% cushions against broad equity sell-offs.
             self.assertIn("AMFI Monthly Portfolio Disclosure", resp_dos.text)
             self.assertIn("toggleAllFundPillars", resp_dos.text)
 
-    def test_deep_dive_audit_constituent_synthesis_and_meter_unpausing(self):
-        """Verifies that allow_deep_dive=True executes constituent stock auditing, archives reports, and unpauses meters."""
-        from core.db.connection import get_db_connection
-        from core.db.reports import get_report_by_ticker
-        from core.db.mutual_funds import save_mutual_fund_scheme, save_mutual_fund_holdings
-        from core.analysis.fund_overlap_auditor import (
-            create_async_fund_audit_task,
-            run_async_fund_audit_job,
-            get_fund_audit_task_status,
-            calculate_deep_dive_credit_cost
-        )
-        from core.analysis.mutual_funds_engine import evaluate_mutual_fund_comprehensive
+    def _published_portfolio_fixture(self, holdings, scheme_code=None):
+        scheme_code = scheme_code or f"TEST_EVIDENCE_{uuid4().hex[:10].upper()}"
+        self.addCleanup(self._delete_published_portfolio_fixture, scheme_code)
+        scheme = {
+            "scheme_code": scheme_code,
+            "scheme_name": "Test Dated Fund - Direct Plan - Growth",
+            "fund_house": "Test AMC",
+            "category": "Flexi Cap Fund",
+            "broad_category": "EQUITY",
+            "aum_crores": 2500.0,
+            "nav": 34.5,
+            "last_portfolio_date": FIXTURE_DISCLOSURE_DATE,
+            "metadata": {
+                "holdings_source": "sebi_monthly_disclosure",
+                "holdings_source_url": "https://example.invalid/fixture/disclosure.xlsx",
+            },
+        }
+        publish_mutual_fund_disclosure(scheme, _dated_holdings(holdings))
+        return scheme_code
 
-        scheme_code = "TEST_MIDCAP_GROWTH_DIR"
-
-        def _cleanup():
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("DELETE FROM mutual_fund_schemes WHERE scheme_code = 'TEST_MIDCAP_GROWTH_DIR';")
-            c.execute("DELETE FROM mutual_fund_holdings WHERE scheme_code = 'TEST_MIDCAP_GROWTH_DIR';")
-            c.execute("DELETE FROM fund_forensic_dossiers WHERE scheme_code = 'TEST_MIDCAP_GROWTH_DIR';")
-            c.execute("DELETE FROM reports WHERE ticker IN ('TESTUNCACHED1', 'TESTUNCACHED2');")
-            c.execute("DELETE FROM report_revisions WHERE ticker IN ('TESTUNCACHED1', 'TESTUNCACHED2');")
-            conn.commit()
-            get_report_by_ticker.cache_clear()
-
-        _cleanup()
+    def _delete_published_portfolio_fixture(self, scheme_code):
+        conn = get_db_connection()
+        p = get_placeholder()
+        cur = conn.cursor()
         try:
-            scheme_data = {
-                "scheme_code": scheme_code,
-                "scheme_name": "Test Midcap Growth Fund - Direct",
-                "fund_house": "Test AMC",
-                "category": "Mid Cap Fund",
-                "broad_category": "EQUITY",
-                "benchmark_index": "NIFTY MIDCAP 150 TRI",
-                "aum_crores": 3200.0,
-                "nav": 45.0,
-                "ter_direct_pct": 0.65,
-                "ter_regular_pct": 1.45,
-                "portfolio_turnover_ratio_pct": 28.0,
-                "active_share_pct": 74.0,
-                "risk_grade": "Very High",
-                "fund_manager": "Forensic Quant",
-                "last_portfolio_date": "2026-10-10"
-            }
-            save_mutual_fund_scheme(scheme_data)
+            cur.execute(
+                f"DELETE FROM fund_audit_items WHERE job_id IN (SELECT job_id FROM fund_audit_jobs WHERE scheme_code = {p})",
+                (scheme_code,),
+            )
+            for table in (
+                "fund_audit_jobs",
+                "fund_forensic_dossiers",
+                "mutual_fund_holdings",
+                "mf_current_disclosures",
+                "mf_disclosure_snapshots",
+                "mutual_fund_schemes",
+            ):
+                cur.execute(f"DELETE FROM {table} WHERE scheme_code = {p}", (scheme_code,))
+            conn.commit()
+        finally:
+            cur.close()
+            conn.close()
 
-            # 2 uncached constituents (80% equity weight total)
-            holdings = [
-                {
-                    "holding_type": "EQUITY",
-                    "identifier": "TESTUNCACHED1",
-                    "holding_name": "Test Uncached Stock One Ltd",
-                    "weight_pct": 45.0,
-                    "sector_or_rating": "Industrial Technology"
-                },
-                {
-                    "holding_type": "EQUITY",
-                    "identifier": "TESTUNCACHED2",
-                    "holding_name": "Test Uncached Stock Two Ltd",
-                    "weight_pct": 35.0,
-                    "sector_or_rating": "Healthcare Diagnostics"
-                },
-                {
-                    "holding_type": "CASH_EQUIVALENT",
-                    "identifier": "TREPS",
-                    "holding_name": "Tri-Party Repo Cash Collateral",
-                    "weight_pct": 20.0,
-                    "sector_or_rating": "CASH"
-                }
+    def _create_paid_fixture_user(self):
+        from core.db.users import get_or_create_user
+
+        user_id = f"fund-integration-{uuid4().hex}"
+        user = get_or_create_user(user_id, f"{user_id}@example.invalid")
+        self.addCleanup(self._delete_paid_fixture_user, user_id)
+        return user
+
+    def _delete_paid_fixture_user(self, user_id):
+        conn = get_db_connection()
+        p = get_placeholder()
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                f"DELETE FROM fund_audit_items WHERE job_id IN (SELECT job_id FROM fund_audit_jobs WHERE user_id = {p})",
+                (user_id,),
+            )
+            for table in (
+                "fund_audit_jobs",
+                "credit_settlement_operations",
+                "user_unlocked_dossiers",
+                "credit_usage_ledger",
+                "credit_transactions",
+            ):
+                cur.execute(f"DELETE FROM {table} WHERE user_id = {p}", (user_id,))
+            cur.execute(f"DELETE FROM user_accounts WHERE id = {p}", (user_id,))
+            conn.commit()
+        finally:
+            cur.close()
+            conn.close()
+
+    def test_deep_dive_audit_constituent_synthesis_and_meter_unpausing(self):
+        """Paid synthesis must produce eligible evidence before coverage and credits are released."""
+        from core.db.fund_audit_jobs import claim_fund_audit, record_worker_heartbeat
+        from core.db.reports import get_report_by_ticker, save_report_to_archive
+        from scripts.run_paid_fund_audit_worker import run_claim
+
+        user = self._create_paid_fixture_user()
+        ticker = f"TESTDEEP{uuid4().hex[:8].upper()}"
+        scheme_code = self._published_portfolio_fixture(
+            [
+                {"holding_type": "EQUITY", "identifier": ticker, "weight_pct": 80.0},
+                {"holding_type": "CASH_EQUIVALENT", "identifier": "TREPS", "weight_pct": 20.0},
             ]
-            save_mutual_fund_holdings(scheme_code, holdings)
+        )
 
-            # Verify quote before deep dive shows 2 uncached stocks
-            quote_before = calculate_deep_dive_credit_cost(scheme_code)
-            self.assertEqual(quote_before["uncached_count"], 2)
-            self.assertEqual(quote_before["layer2_deep_dive_credits"], 2)
+        def synthesize(symbol, *, use_grounding):
+            self.assertEqual(symbol, ticker)
+            self.assertTrue(use_grounding)
+            report = _eligible_research(ticker)
+            save_report_to_archive(
+                {"ticker": ticker, "short_name": "Test Constituent Ltd"},
+                report["report_text"],
+                citations=report["citations"],
+            )
 
-            # Verify dossier before shows 0% coverage and paused meters
-            dossier_before = evaluate_mutual_fund_comprehensive(scheme_code)
-            self.assertLess(dossier_before["lookthrough"]["genuine_coverage_pct"], 70.0)
-
-            # Run async deep dive task with allow_deep_dive=True
-            task_id = create_async_fund_audit_task(scheme_code, allow_deep_dive=True)
-            self.assertIn(f"TASK-FUND-{scheme_code}", task_id)
-
-            run_async_fund_audit_job(task_id, scheme_code, allow_deep_dive=True)
-
-            # Check task completion status
-            status = get_fund_audit_task_status(task_id)
-            self.assertIsNotNone(status)
+        with patch.dict(os.environ, {"ENABLE_DURABLE_FUND_AUDITS": "1"}), patch(
+            "web.main._get_current_web_user", return_value=user
+        ):
+            record_worker_heartbeat()
+            url = f"/api/funds/deep-dive-quote/{scheme_code}"
+            quote = self.client.get(url)
+            self.assertEqual(quote.status_code, 200, quote.text)
+            self.assertEqual(quote.json()["uncached_count"], 1)
+            self.assertEqual(quote.json()["credits_due"], 2)
+            self.assertEqual(quote.json()["portfolio_as_on"], FIXTURE_DISCLOSURE_DATE)
+            self.assertFalse(compute_fund_forensic_lookthrough(scheme_code)["has_sufficient_coverage"])
+            queued = self.client.post(
+                "/api/funds/on-demand-audit",
+                json={
+                    "scheme_code": scheme_code,
+                    "allow_deep_dive": True,
+                    "quote_revision": quote.json()["quote_revision"],
+                },
+                headers={"Idempotency-Key": uuid4().hex},
+            )
+            self.assertEqual(queued.status_code, 200, queued.text)
+            task_id = queued.json()["task_id"]
+            claimed = claim_fund_audit()
+            self.assertEqual(claimed["job_id"], task_id)
+            with patch("scripts.run_paid_fund_audit_worker.generate_stock_report", side_effect=synthesize) as mock:
+                run_claim(claimed)
+                mock.assert_called_once_with(ticker, use_grounding=True)
+            result = self.client.get(f"/api/funds/audit-status/{task_id}?include_dossier=true")
+            self.assertEqual(result.status_code, 200, result.text)
+            status = result.json()
             self.assertEqual(status["status"], "COMPLETED")
             self.assertEqual(status["progress_pct"], 100)
-            self.assertEqual(status["stage"], "COMPLETE")
-            self.assertIn("Deep-dive constituent audit complete", status["message"])
+            self.assertEqual(status["audit_settlement"]["credits_charged"], 2)
+            self.assertEqual(status["audit_settlement"]["credits_refunded"], 0)
+            receipt = status["dossier"]["evidence_receipt"]
+            self.assertEqual(receipt["researched_equity_weight_pct"], 100.0)
+            self.assertEqual(receipt["researched_weight_pct_nav"], 80.0)
+            self.assertTrue(get_report_by_ticker(ticker))
+            self.assertEqual(self.client.get(url).json()["credits_due"], 0)
 
-            # Verify quote after shows 0 uncached stocks (100% cached)
-            quote_after = calculate_deep_dive_credit_cost(scheme_code)
-            self.assertEqual(quote_after["uncached_count"], 0)
-            self.assertEqual(quote_after["layer2_deep_dive_credits"], 0)
-            self.assertEqual(quote_after["cached_count"], 2)
-
-            # Verify dossier after has 80% genuine coverage (100% of equity sleeve) and unpaused
-            dossier_after = evaluate_mutual_fund_comprehensive(scheme_code)
-            self.assertGreaterEqual(dossier_after["lookthrough"]["genuine_coverage_pct"], 70.0)
-
-            # Verify web page reflects unpaused state and modal markup
-            resp = self.client.get(f"/funds/{scheme_code}", headers={"x-unlock-preview": "1"})
+            resp = self.client.get(f"/funds/{scheme_code}")
             self.assertEqual(resp.status_code, 200)
-            self.assertNotIn("Look-Through Meters Paused", resp.text)
-            self.assertIn("100% Constituent Coverage Active", resp.text)
+            self.assertIn("Evidence Receipt", resp.text)
+            self.assertIn("Weighted Moat Index", resp.text)
             self.assertIn("deepDiveModal", resp.text)
-            self.assertIn("deepDiveProgressBox", resp.text)
-            self.assertIn("deepDiveCountdown", resp.text)
-
-        finally:
-            _cleanup()
 
     @patch("web.main.audit_single_fund_daily")
     @patch("web.main.get_fund_forensic_dossier")
@@ -1047,16 +1147,16 @@ Cash reserve of 12% cushions against broad equity sell-offs.
         """Action 1.1: Never trigger synchronous audit_single_fund_daily on GET, and do not query forensic narrative if locked."""
         mock_get_forensic.return_value = None
         # Unlocked request
-        resp_unlocked = self.client.get("/funds/119551", headers={"x-unlock-preview": "1"})
+        resp_unlocked = self.client.get("/funds/PPFAS_FLEXICAP_DIR", headers={"x-unlock-preview": "1"})
         self.assertEqual(resp_unlocked.status_code, 200)
         mock_audit.assert_not_called()
-        mock_get_forensic.assert_called_with("119551")
+        mock_get_forensic.assert_called_with("PPFAS_FLEXICAP_DIR")
 
         mock_get_forensic.reset_mock()
         mock_audit.reset_mock()
 
         # Locked request (no unlock preview or session)
-        resp_locked = self.client.get("/funds/119551")
+        resp_locked = self.client.get("/funds/PPFAS_FLEXICAP_DIR")
         self.assertEqual(resp_locked.status_code, 200)
         mock_audit.assert_not_called()
         # In locked request, should not even query or synthesize full forensic dossier
@@ -1126,7 +1226,7 @@ Cash reserve of 12% cushions against broad equity sell-offs.
             self.assertIn("Awaiting 36M NAV Windows", resp.text)
             self.assertIn("Pending 3Y Rolling Series", resp.text)
             self.assertIn("Monthly Portfolio Disclosure Pending Sync", resp.text)
-            self.assertIn("Holdings Awaiting AMFI Ingestion", resp.text)
+            self.assertIn("A paid audit becomes available after a dated source disclosure is validated.", resp.text)
             self.assertNotIn("Fixed-Income &amp; Money-Market Portfolio Sleeve", resp.text)
             self.assertNotIn("Fixed-Income & Money-Market Portfolio Sleeve", resp.text)
         finally:
@@ -1265,8 +1365,14 @@ Cash reserve of 12% cushions against broad equity sell-offs.
             "active_share_pct": 62.0,
             "weighted_moat_score": 75.0,
             "accounting_risk_index": 2.5,
-            "margin_of_safety_pct": 12.0,
-            "promoter_pledge_exposure_pct": 0.1,
+            "evidence_receipt": {
+                "snapshot_id": "fixture-disclosure-revision",
+                "researched_weight_pct_nav": 82.0,
+                "metrics": {
+                    "valuation_tilt": {"value": "undervalued"},
+                    "governance_solvency_watchlist": {"value_pct_nav": 2.5},
+                },
+            },
             "portfolio_turnover_ratio_pct": 18.0,
             "benchmark_index": "NIFTY 50 TRI",
             "top_risky_holdings": [],
@@ -1279,7 +1385,7 @@ Cash reserve of 12% cushions against broad equity sell-offs.
         with patch.dict(os.environ, {"TESTING": "1", "PYTEST_CURRENT_TEST": "", "GEMINI_API_KEY": ""}):
             narrative = synthesize_fund_forensic_narrative(metrics_mock, scheme_mock)
             self.assertIn("# FORENSIC DOSSIER:", narrative)
-            self.assertIn("## 1. Mandate Integrity vs Ground Reality", narrative)
+            self.assertIn("## 1. Evidence coverage", narrative)
 
         # 2. Outside TESTING mode: Fallback strictly disabled (returns empty string)
         with patch.dict(os.environ, {"TESTING": "", "PYTEST_CURRENT_TEST": "", "GEMINI_API_KEY": ""}):
@@ -1425,11 +1531,13 @@ Cash reserve of 12% cushions against broad equity sell-offs.
             })
             save_mutual_fund_holdings(
                 dup_test_code,
-                [
-                    {"holding_type": "EQUITY", "identifier": "HDFCBANK", "holding_name": "HDFC Bank", "weight_pct": 8.4},
-                    {"holding_type": "EQUITY", "identifier": "HDFCBANK", "holding_name": "HDFC Bank", "weight_pct": 8.4},
-                    {"holding_type": "EQUITY", "identifier": "INFY", "holding_name": "Infosys", "weight_pct": 6.8},
-                ],
+                _dated_holdings(
+                    [
+                        {"holding_type": "EQUITY", "identifier": "HDFCBANK", "holding_name": "HDFC Bank", "weight_pct": 8.4},
+                        {"holding_type": "EQUITY", "identifier": "HDFCBANK", "holding_name": "HDFC Bank", "weight_pct": 8.4},
+                        {"holding_type": "EQUITY", "identifier": "INFY", "holding_name": "Infosys", "weight_pct": 6.8},
+                    ]
+                ),
             )
             deduped = get_scheme_holdings(dup_test_code)
             self.assertEqual(len(deduped), 2)
@@ -1469,11 +1577,13 @@ Cash reserve of 12% cushions against broad equity sell-offs.
 
         _cleanup()
         try:
-            shared_holdings = [
-                {"holding_type": "EQUITY", "identifier": "HDFCBANK", "holding_name": "HDFC Bank", "weight_pct": 55.0},
-                {"holding_type": "EQUITY", "identifier": "INFY", "holding_name": "Infosys", "weight_pct": 41.0},
-                {"holding_type": "CASH_EQUIVALENT", "identifier": "TREPS", "holding_name": "TREPS", "weight_pct": 4.0},
-            ]
+            shared_holdings = _dated_holdings(
+                [
+                    {"holding_type": "EQUITY", "identifier": "HDFCBANK", "holding_name": "HDFC Bank", "weight_pct": 55.0},
+                    {"holding_type": "EQUITY", "identifier": "INFY", "holding_name": "Infosys", "weight_pct": 41.0},
+                    {"holding_type": "CASH_EQUIVALENT", "identifier": "TREPS", "holding_name": "TREPS", "weight_pct": 4.0},
+                ]
+            )
             save_mutual_fund_scheme({
                 "scheme_code": slug_code,
                 "scheme_name": "Test L1 Flexi Cap Fund - Direct Plan - Growth",
@@ -1564,11 +1674,16 @@ Cash reserve of 12% cushions against broad equity sell-offs.
                     "nav": 45.0,
                     "metadata": meta,
                 })
-                save_mutual_fund_holdings(sc, [
-                    {"holding_type": "EQUITY", "identifier": custom_sym, "holding_name": "L6 Test Listed Co", "weight_pct": 10.0},
-                    {"holding_type": "EQUITY", "identifier": unmapped_isin, "holding_name": "Unlisted Special Purpose Trust", "weight_pct": 5.0},
-                    {"holding_type": "CASH_EQUIVALENT", "identifier": "TREPS", "holding_name": "TREPS", "weight_pct": 85.0},
-                ])
+                save_mutual_fund_holdings(
+                    sc,
+                    _dated_holdings(
+                        [
+                            {"holding_type": "EQUITY", "identifier": custom_sym, "holding_name": "L6 Test Listed Co", "weight_pct": 10.0},
+                            {"holding_type": "EQUITY", "identifier": unmapped_isin, "holding_name": "Unlisted Special Purpose Trust", "weight_pct": 5.0},
+                            {"holding_type": "CASH_EQUIVALENT", "identifier": "TREPS", "holding_name": "TREPS", "weight_pct": 85.0},
+                        ]
+                    ),
+                )
 
             queue = get_uncovered_mutual_fund_holdings_queue(limit=500)
             tickers_in_q = {item["ticker"]: item for item in queue}
@@ -1613,70 +1728,46 @@ Cash reserve of 12% cushions against broad equity sell-offs.
             self.assertIsNone(get_mutual_fund_scheme(ghost_code))
 
     def test_fund_dossier_renders_deep_dive_card_when_locked_and_enforces_credits(self):
-        """L7 & L10 Guards: /funds/{code} renders Constituent Deep-Dive card even when locked/un-synthesized, and POST /api/funds/on-demand-audit enforces auth + 402 credit checks."""
-        from core.db.connection import get_db_connection, is_postgres_connection
-        from core.db.mutual_funds import save_mutual_fund_holdings, save_mutual_fund_scheme
+        from core.db.fund_audit_jobs import record_worker_heartbeat
+        from core.db.users import deduct_user_credits, get_user_credits_balance
 
-        test_code = "99885544"
-        uncached_sym = "ZZZ_UNCACHED_CONSTITUENT_99"
+        user = self._create_paid_fixture_user()
+        ticker = f"TESTUNCACHED{uuid4().hex[:8].upper()}"
+        scheme_code = self._published_portfolio_fixture(
+            [
+                {"holding_type": "EQUITY", "identifier": ticker, "weight_pct": 95.0},
+                {"holding_type": "CASH_EQUIVALENT", "identifier": "TREPS", "weight_pct": 5.0},
+            ]
+        )
 
-        def _cleanup():
-            conn = get_db_connection()
-            p = "%s" if is_postgres_connection(conn) else "?"
-            cur = conn.cursor()
-            try:
-                cur.execute(f"DELETE FROM fund_forensic_dossiers WHERE scheme_code = {p}", (test_code,))
-                cur.execute(f"DELETE FROM mutual_fund_holdings WHERE scheme_code = {p}", (test_code,))
-                cur.execute(f"DELETE FROM mutual_fund_schemes WHERE scheme_code = {p}", (test_code,))
-                cur.execute(f"DELETE FROM reports WHERE ticker = {p}", (uncached_sym,))
-                conn.commit()
-            finally:
-                cur.close()
-                conn.close()
+        page = self.client.get(f"/funds/{scheme_code}")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn('id="btnDeepDiveAudit"', page.text)
+        self.assertIn('id="deepDiveModal"', page.text)
+        self.assertIn("Constituent Stock Accounting Look-Through", page.text)
+        self.assertIn("Layer 2 Deep-Dive Available", page.text)
 
-        _cleanup()
-        try:
-            save_mutual_fund_scheme({
-                "scheme_code": test_code,
-                "scheme_name": "Test Locked Deep Dive Fund - Direct Plan - Growth",
-                "fund_house": "Test AMC",
-                "category": "Flexi Cap Fund",
-                "broad_category": "EQUITY",
-                "aum_crores": 2500.0,
-                "nav": 34.5,
-                "metadata": {"holdings_source": "sebi_monthly_disclosure"},
-            })
-            save_mutual_fund_holdings(test_code, [
-                {"holding_type": "EQUITY", "identifier": "TCS", "holding_name": "Tata Consultancy Services", "weight_pct": 55.0},
-                {"holding_type": "EQUITY", "identifier": uncached_sym, "holding_name": "Uncached Test Equity Ltd", "weight_pct": 40.0},
-                {"holding_type": "CASH_EQUIVALENT", "identifier": "TREPS", "holding_name": "TREPS", "weight_pct": 5.0},
-            ])
+        payload = {"scheme_code": scheme_code, "allow_deep_dive": True}
+        with patch.dict(os.environ, {"TESTING": "0", "PYTEST_CURRENT_TEST": ""}):
+            unauthorized = self.client.post("/api/funds/on-demand-audit", json=payload)
+        self.assertEqual(unauthorized.status_code, 401)
 
-            # 1. Anonymous GET /funds/{code} (no forensic_dossier row yet!) MUST render #btnDeepDiveAudit and #deepDiveModal
-            page_resp = self.client.get(f"/funds/{test_code}")
-            self.assertEqual(page_resp.status_code, 200)
-            self.assertIn('id="btnDeepDiveAudit"', page_resp.text)
-            self.assertIn('id="deepDiveModal"', page_resp.text)
-            self.assertIn("Constituent Stock Accounting Look-Through", page_resp.text)
-            self.assertIn("Layer 2 Deep-Dive Available", page_resp.text)
-
-            # 2. Unauthenticated POST /api/funds/on-demand-audit in production mode -> 401
-            with patch.dict(os.environ, {"TESTING": "0", "PYTEST_CURRENT_TEST": ""}):
-                unauth_res = self.client.post("/api/funds/on-demand-audit", json={"scheme_code": test_code, "allow_deep_dive": True})
-                self.assertEqual(unauth_res.status_code, 401)
-
-            # 3. Authenticated user with 0.5 credits (< 2.0 required) -> 402 Insufficient credits
-            fake_user = {"id": "usr_test_low_bal", "email": "investor@example.internal"}
-            with patch("web.main._get_current_web_user", return_value=fake_user), \
-                 patch("web.routers.markets._get_current_web_user", return_value=fake_user), \
-                 patch("web.routers.markets._is_admin_authenticated", return_value=False), \
-                 patch("core.db.is_ticker_unlocked_for_user", return_value=False), \
-                 patch("core.db.get_user_credits_balance", return_value=0.5):
-                low_bal_res = self.client.post("/api/funds/on-demand-audit", json={"scheme_code": test_code, "allow_deep_dive": True})
-                self.assertEqual(low_bal_res.status_code, 402)
-                self.assertIn("Insufficient research credits", low_bal_res.json().get("detail", ""))
-        finally:
-            _cleanup()
+        self.assertTrue(deduct_user_credits(user["id"], ticker, "FIXTURE_DEBIT", 1.5))
+        with patch.dict(os.environ, {"ENABLE_DURABLE_FUND_AUDITS": "1"}), patch(
+            "web.main._get_current_web_user", return_value=user
+        ):
+            record_worker_heartbeat()
+            quote = self.client.get(f"/api/funds/deep-dive-quote/{scheme_code}")
+            self.assertEqual(quote.status_code, 200, quote.text)
+            self.assertEqual(quote.json()["credits_due"], 2)
+            response = self.client.post(
+                "/api/funds/on-demand-audit",
+                json={**payload, "quote_revision": quote.json()["quote_revision"]},
+                headers={"Idempotency-Key": uuid4().hex},
+            )
+        self.assertEqual(response.status_code, 402, response.text)
+        self.assertIn("Insufficient research credits", response.json()["detail"])
+        self.assertEqual(get_user_credits_balance(user["id"]), 0.5)
 
 
 if __name__ == "__main__":

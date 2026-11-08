@@ -61,14 +61,18 @@ def get_configured_supabase_url() -> str | None:
     hosted_prod = is_hosted_production_runtime()
     if not hosted_prod and os.environ.get("FORCE_LOCAL_SQLITE") == "1":
         return None
-    if "SUPABASE_DB_URL" in os.environ and not os.environ["SUPABASE_DB_URL"].strip():
+    if "SUPABASE_DB_URL" in os.environ:
+        explicit_url = os.environ["SUPABASE_DB_URL"].strip()
+        if not explicit_url:
+            return None
+        if _is_unit_test_runtime() and os.environ.get("TEST_SUPABASE") != "1":
+            if "127.0.0.1" in explicit_url or "localhost" in explicit_url:
+                return explicit_url
+            return None
+        return explicit_url
+    if _is_unit_test_runtime() and os.environ.get("TEST_SUPABASE") != "1":
         return None
     if not hosted_prod and os.environ.get("TESTING") == "1" and os.environ.get("TEST_SUPABASE") != "1":
-        return None
-    if not hosted_prod and _is_unit_test_runtime() and os.environ.get("TEST_SUPABASE") != "1":
-        explicit_url = os.environ.get("SUPABASE_DB_URL", "")
-        if explicit_url and ("127.0.0.1" in explicit_url or "localhost" in explicit_url):
-            return explicit_url
         return None
     global _CACHED_SUPABASE_URL, _SUPABASE_URL_RESOLVED
     if not _SUPABASE_URL_RESOLVED:
@@ -2548,6 +2552,381 @@ def init_db(force: bool = False):
                 )
                 cursor.execute(
                     "INSERT INTO schema_migrations (version) VALUES ('v043_p0_billing_intents_and_admin_proposals') ON CONFLICT DO NOTHING;"
+                )
+                conn.commit()
+
+            # Migration v044: Immutable MF Disclosure Snapshots, Current Disclosure Pointer & Dossier Evidence Receipt
+            if "v044_mf_disclosure_snapshots_and_evidence" not in applied:
+                logger.info("Applying schema migration: v044_mf_disclosure_snapshots_and_evidence...")
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS mf_disclosure_snapshots (
+                        snapshot_id TEXT PRIMARY KEY,
+                        scheme_code TEXT NOT NULL,
+                        as_on_date TEXT NOT NULL,
+                        payload_json TEXT NOT NULL,
+                        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_mf_snapshots_scheme_date
+                        ON mf_disclosure_snapshots (scheme_code, as_on_date DESC);
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS mf_current_disclosures (
+                        scheme_code TEXT PRIMARY KEY,
+                        snapshot_id TEXT NOT NULL REFERENCES mf_disclosure_snapshots(snapshot_id),
+                        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+                if supabase_url:
+                    cursor.execute(
+                        "ALTER TABLE fund_forensic_dossiers ADD COLUMN IF NOT EXISTS evidence_receipt_json TEXT;"
+                    )
+                else:
+                    cursor.execute("PRAGMA table_info(fund_forensic_dossiers);")
+                    existing_ffd_cols = {c[1] for c in cursor.fetchall()}
+                    if "evidence_receipt_json" not in existing_ffd_cols:
+                        cursor.execute("ALTER TABLE fund_forensic_dossiers ADD COLUMN evidence_receipt_json TEXT;")
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version) VALUES ('v044_mf_disclosure_snapshots_and_evidence') ON CONFLICT DO NOTHING;"
+                )
+                conn.commit()
+
+            # Migration v045: Durable Paid Fund Audit Queue v2 (Split Lease vs SLA & Per-Instance Worker Capacity)
+            if "v045_durable_fund_audit_queue_v2" not in applied:
+                logger.info("Applying schema migration: v045_durable_fund_audit_queue_v2...")
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS fund_audit_jobs (
+                        job_id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL REFERENCES user_accounts(id),
+                        request_id TEXT NOT NULL,
+                        quote_revision TEXT NOT NULL,
+                        scheme_code TEXT NOT NULL,
+                        snapshot_id TEXT NOT NULL,
+                        scheme_json TEXT NOT NULL,
+                        deep_dive INTEGER NOT NULL CHECK (deep_dive IN (0, 1)),
+                        credits_charged INTEGER NOT NULL CHECK (credits_charged >= 0),
+                        status TEXT NOT NULL CHECK (status IN ('QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED')),
+                        deadline BIGINT NOT NULL,
+                        queue_expires_at BIGINT NOT NULL,
+                        claim_lease_expires_at BIGINT,
+                        job_deadline_at BIGINT NOT NULL,
+                        settled_at BIGINT,
+                        delivery_policy_version TEXT NOT NULL DEFAULT 'fund-audit-sla-v2',
+                        created_at BIGINT NOT NULL,
+                        worker_token TEXT,
+                        error_message TEXT,
+                        dossier_json TEXT,
+                        UNIQUE (user_id, request_id)
+                    );
+                """)
+                cursor.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_fund_audit_active_owner_scheme
+                        ON fund_audit_jobs (user_id, scheme_code)
+                        WHERE status IN ('QUEUED', 'PROCESSING');
+                """)
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_fund_audit_queue ON fund_audit_jobs (status, deadline, created_at);"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_fund_audit_jobs_owner ON fund_audit_jobs (user_id, created_at DESC);"
+                )
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS fund_audit_items (
+                        job_id TEXT NOT NULL REFERENCES fund_audit_jobs(job_id) ON DELETE CASCADE,
+                        ticker TEXT NOT NULL,
+                        layer INTEGER NOT NULL CHECK (layer IN (1, 2)),
+                        status TEXT NOT NULL CHECK (status IN ('PENDING', 'DELIVERED', 'REFUNDED')),
+                        report_revision TEXT,
+                        settled_at BIGINT,
+                        PRIMARY KEY (job_id, layer, ticker)
+                    );
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS fund_audit_worker_health (
+                        worker_type TEXT PRIMARY KEY,
+                        touched_at BIGINT NOT NULL
+                    );
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS fund_audit_worker_instances (
+                        worker_id TEXT PRIMARY KEY,
+                        worker_type TEXT NOT NULL DEFAULT 'paid',
+                        touched_at BIGINT NOT NULL,
+                        active_claims INTEGER NOT NULL DEFAULT 0 CHECK (active_claims >= 0),
+                        max_concurrency INTEGER NOT NULL DEFAULT 1 CHECK (max_concurrency >= 1),
+                        max_queue_depth INTEGER NOT NULL DEFAULT 8 CHECK (max_queue_depth >= 1)
+                    );
+                """)
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version) VALUES ('v045_durable_fund_audit_queue_v2') ON CONFLICT DO NOTHING;"
+                )
+                conn.commit()
+
+            # Migration v046: Payment Event Receipts & Credit Settlement Operations Ledger
+            if "v046_payment_receipts_and_settlement_ledger" not in applied:
+                logger.info("Applying schema migration: v046_payment_receipts_and_settlement_ledger...")
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS payment_event_receipts (
+                        provider TEXT NOT NULL,
+                        event_id TEXT NOT NULL,
+                        event_type TEXT NOT NULL,
+                        payment_id TEXT,
+                        order_id TEXT,
+                        signature_verified INTEGER NOT NULL CHECK (signature_verified = 1),
+                        payload_sha256 TEXT NOT NULL,
+                        received_at BIGINT NOT NULL,
+                        processed_status TEXT NOT NULL,
+                        PRIMARY KEY (provider, event_id)
+                    );
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS credit_settlement_operations (
+                        operation_id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        operation_type TEXT NOT NULL CHECK (
+                            operation_type IN (
+                                'PAYMENT_CAPTURE_CREDIT',
+                                'AUDIT_RESERVE',
+                                'AUDIT_REFUND',
+                                'ADMIN_GRANT',
+                                'DIRECT_UNLOCK'
+                            )
+                        ),
+                        credits_delta REAL NOT NULL,
+                        balance_after REAL NOT NULL,
+                        idempotency_key TEXT NOT NULL UNIQUE,
+                        payment_id TEXT,
+                        order_id TEXT,
+                        job_id TEXT,
+                        line_key TEXT,
+                        actor_id TEXT,
+                        reason_code TEXT,
+                        metadata_json TEXT,
+                        created_at BIGINT NOT NULL
+                    );
+                """)
+                cursor.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_credit_op_payment_capture
+                        ON credit_settlement_operations (payment_id)
+                        WHERE operation_type = 'PAYMENT_CAPTURE_CREDIT' AND payment_id IS NOT NULL;
+                """)
+                cursor.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_credit_op_job_item_refund
+                        ON credit_settlement_operations (job_id, line_key)
+                        WHERE operation_type = 'AUDIT_REFUND' AND job_id IS NOT NULL AND line_key IS NOT NULL;
+                """)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_credit_op_admin_target_24h
+                        ON credit_settlement_operations (user_id, created_at DESC)
+                        WHERE operation_type = 'ADMIN_GRANT';
+                """)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_credit_op_admin_actor_24h
+                        ON credit_settlement_operations (actor_id, created_at DESC)
+                        WHERE operation_type = 'ADMIN_GRANT';
+                """)
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version) VALUES ('v046_payment_receipts_and_settlement_ledger') ON CONFLICT DO NOTHING;"
+                )
+                conn.commit()
+
+            # Migration v047: Dedicated Terminal Market Observation Tables (Surviving Catalogue Refreshes)
+            if "v047_terminal_market_observations" not in applied:
+                logger.info("Applying schema migration: v047_terminal_market_observations...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS debt_quote_observations (
+                            id SERIAL PRIMARY KEY,
+                            isin TEXT NOT NULL REFERENCES corporate_debt_securities(isin) ON DELETE CASCADE,
+                            ytm_pct REAL NOT NULL,
+                            as_of TEXT NOT NULL,
+                            source_url TEXT NOT NULL,
+                            years_to_maturity REAL,
+                            clean_price REAL,
+                            accrued_interest REAL,
+                            settlement_date TEXT,
+                            recorded_at TEXT NOT NULL,
+                            UNIQUE (isin, as_of, source_url)
+                        );
+                    """)
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS instrument_metric_observations (
+                            id SERIAL PRIMARY KEY,
+                            instrument_id TEXT NOT NULL,
+                            asset_class TEXT NOT NULL,
+                            measure_type TEXT NOT NULL,
+                            value_pct REAL NOT NULL,
+                            unit TEXT NOT NULL DEFAULT '%',
+                            as_of TEXT NOT NULL,
+                            source_name TEXT NOT NULL,
+                            source_url TEXT,
+                            methodology_version TEXT NOT NULL DEFAULT 'terminal-v2',
+                            recorded_at TEXT NOT NULL,
+                            UNIQUE (instrument_id, asset_class, measure_type, as_of, source_name)
+                        );
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS debt_quote_observations (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            isin TEXT NOT NULL REFERENCES corporate_debt_securities(isin) ON DELETE CASCADE,
+                            ytm_pct REAL NOT NULL,
+                            as_of TEXT NOT NULL,
+                            source_url TEXT NOT NULL,
+                            years_to_maturity REAL,
+                            clean_price REAL,
+                            accrued_interest REAL,
+                            settlement_date TEXT,
+                            recorded_at TEXT NOT NULL,
+                            UNIQUE (isin, as_of, source_url)
+                        );
+                    """)
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS instrument_metric_observations (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            instrument_id TEXT NOT NULL,
+                            asset_class TEXT NOT NULL,
+                            measure_type TEXT NOT NULL,
+                            value_pct REAL NOT NULL,
+                            unit TEXT NOT NULL DEFAULT '%',
+                            as_of TEXT NOT NULL,
+                            source_name TEXT NOT NULL,
+                            source_url TEXT,
+                            methodology_version TEXT NOT NULL DEFAULT 'terminal-v2',
+                            recorded_at TEXT NOT NULL,
+                            UNIQUE (instrument_id, asset_class, measure_type, as_of, source_name)
+                        );
+                    """)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_debt_quote_obs_latest
+                        ON debt_quote_observations (isin, as_of DESC);
+                """)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_inst_metric_obs_latest
+                        ON instrument_metric_observations (instrument_id, asset_class, measure_type, as_of DESC);
+                """)
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version) VALUES ('v047_terminal_market_observations') ON CONFLICT DO NOTHING;"
+                )
+                conn.commit()
+
+            # Migration v048: Additive Column Contract Reconciliation for Pre-Existing Draft v1 Tables on PostgreSQL
+            if "v048_reconcile_v2_column_contracts" not in applied:
+                logger.info("Applying schema migration: v048_reconcile_v2_column_contracts...")
+                if supabase_url:
+                    def _pg_table_cols(table_name: str) -> set[str]:
+                        cursor.execute(
+                            "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = %s;",
+                            (table_name,),
+                        )
+                        return {r[0] for r in cursor.fetchall()}
+
+                    wh_cols = _pg_table_cols("fund_audit_worker_health")
+                    if "worker_name" in wh_cols and "worker_type" not in wh_cols:
+                        cursor.execute(
+                            "ALTER TABLE fund_audit_worker_health RENAME COLUMN worker_name TO worker_type;"
+                        )
+
+                    faj_cols = _pg_table_cols("fund_audit_jobs")
+                    if "allow_deep_dive" in faj_cols and "deep_dive" not in faj_cols:
+                        cursor.execute(
+                            "ALTER TABLE fund_audit_jobs RENAME COLUMN allow_deep_dive TO deep_dive;"
+                        )
+                    if "credits_reserved" in faj_cols and "credits_charged" not in faj_cols:
+                        cursor.execute(
+                            "ALTER TABLE fund_audit_jobs RENAME COLUMN credits_reserved TO credits_charged;"
+                        )
+                    cursor.execute(
+                        "ALTER TABLE fund_audit_jobs ADD COLUMN IF NOT EXISTS scheme_json TEXT NOT NULL DEFAULT '{}';"
+                    )
+                    if "portfolio_date" in faj_cols:
+                        cursor.execute("ALTER TABLE fund_audit_jobs ALTER COLUMN portfolio_date DROP NOT NULL;")
+                    if "updated_at" in faj_cols:
+                        cursor.execute("ALTER TABLE fund_audit_jobs ALTER COLUMN updated_at DROP NOT NULL;")
+                    cursor.execute("ALTER TABLE fund_audit_jobs DROP CONSTRAINT IF EXISTS fund_audit_jobs_status_check;")
+                    cursor.execute(
+                        "ALTER TABLE fund_audit_jobs ADD CONSTRAINT fund_audit_jobs_status_check CHECK (status IN ('QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED'));"
+                    )
+                    cursor.execute(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS idx_fund_audit_active_owner_scheme ON fund_audit_jobs (user_id, scheme_code) WHERE status IN ('QUEUED', 'PROCESSING');"
+                    )
+                    cursor.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_fund_audit_queue ON fund_audit_jobs (status, deadline, created_at);"
+                    )
+                    cursor.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_fund_audit_jobs_owner ON fund_audit_jobs (user_id, created_at DESC);"
+                    )
+
+                    fai_cols = _pg_table_cols("fund_audit_items")
+                    if "target_id" in fai_cols and "ticker" not in fai_cols:
+                        cursor.execute("ALTER TABLE fund_audit_items RENAME COLUMN target_id TO ticker;")
+                    cursor.execute(
+                        "ALTER TABLE fund_audit_items ADD COLUMN IF NOT EXISTS layer INTEGER NOT NULL DEFAULT 1;"
+                    )
+                    if "line_key" in fai_cols:
+                        cursor.execute("ALTER TABLE fund_audit_items DROP CONSTRAINT IF EXISTS fund_audit_items_pkey;")
+                        cursor.execute("ALTER TABLE fund_audit_items ALTER COLUMN line_key DROP NOT NULL;")
+                    if "item_type" in fai_cols:
+                        cursor.execute("ALTER TABLE fund_audit_items DROP CONSTRAINT IF EXISTS fund_audit_items_item_type_check;")
+                        cursor.execute("ALTER TABLE fund_audit_items ALTER COLUMN item_type DROP NOT NULL;")
+                    if "credits" in fai_cols:
+                        cursor.execute("ALTER TABLE fund_audit_items ALTER COLUMN credits DROP NOT NULL;")
+                    cursor.execute("ALTER TABLE fund_audit_items DROP CONSTRAINT IF EXISTS fund_audit_items_status_check;")
+                    cursor.execute(
+                        "ALTER TABLE fund_audit_items ADD CONSTRAINT fund_audit_items_status_check CHECK (status IN ('PENDING', 'DELIVERED', 'REFUNDED'));"
+                    )
+                    cursor.execute(
+                        "SELECT 1 FROM pg_constraint WHERE conrelid = 'fund_audit_items'::regclass AND conname = 'fund_audit_items_pkey';"
+                    )
+                    if not cursor.fetchone():
+                        cursor.execute(
+                            "ALTER TABLE fund_audit_items ADD CONSTRAINT fund_audit_items_pkey PRIMARY KEY (job_id, layer, ticker);"
+                        )
+
+                    dqo_cols = _pg_table_cols("debt_quote_observations")
+                    cursor.execute("ALTER TABLE debt_quote_observations ADD COLUMN IF NOT EXISTS id SERIAL;")
+                    for old_c, new_c in (
+                        ("quoted_ytm_pct", "ytm_pct"),
+                        ("quoted_ytm_as_of", "as_of"),
+                        ("quoted_ytm_source", "source_url"),
+                        ("quoted_years_to_maturity", "years_to_maturity"),
+                        ("imported_at", "recorded_at"),
+                    ):
+                        if old_c in dqo_cols and new_c not in dqo_cols:
+                            cursor.execute(f"ALTER TABLE debt_quote_observations RENAME COLUMN {old_c} TO {new_c};")
+                    cursor.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_debt_quote_obs_latest ON debt_quote_observations (isin, as_of DESC);"
+                    )
+
+                    imo_cols = _pg_table_cols("instrument_metric_observations")
+                    cursor.execute("ALTER TABLE instrument_metric_observations ADD COLUMN IF NOT EXISTS id SERIAL;")
+                    for old_c, new_c in (
+                        ("value_num", "value_pct"),
+                        ("observation_date", "as_of"),
+                        ("source_ref", "source_name"),
+                    ):
+                        if old_c in imo_cols and new_c not in imo_cols:
+                            cursor.execute(
+                                f"ALTER TABLE instrument_metric_observations RENAME COLUMN {old_c} TO {new_c};"
+                            )
+                    cursor.execute("ALTER TABLE instrument_metric_observations ADD COLUMN IF NOT EXISTS source_url TEXT;")
+                    if "value_num" in imo_cols:
+                        cursor.execute(
+                            "ALTER TABLE instrument_metric_observations DROP CONSTRAINT IF EXISTS instrument_metric_observations_pkey;"
+                        )
+                        cursor.execute(
+                            "ALTER TABLE instrument_metric_observations ADD CONSTRAINT instrument_metric_observations_pkey PRIMARY KEY (id);"
+                        )
+                    cursor.execute(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_inst_metric_obs_key ON instrument_metric_observations (instrument_id, asset_class, measure_type, as_of, source_name);"
+                    )
+                    cursor.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_inst_metric_obs_latest ON instrument_metric_observations (instrument_id, asset_class, measure_type, as_of DESC);"
+                    )
+
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version) VALUES ('v048_reconcile_v2_column_contracts') ON CONFLICT DO NOTHING;"
                 )
                 conn.commit()
 

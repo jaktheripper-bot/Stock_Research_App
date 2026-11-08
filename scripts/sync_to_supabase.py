@@ -24,6 +24,24 @@ from core.db.connection import get_db_path
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("sync_to_supabase")
 
+# Authoritative PostgreSQL-only user, entitlement, billing, and queue tables.
+# Offline SQLite -> Supabase sync MUST NEVER overwrite or truncate these tables.
+AUTHORITATIVE_PG_ONLY_TABLES = frozenset({
+    "user_accounts",
+    "user_unlocked_dossiers",
+    "billing_order_intents",
+    "payment_event_receipts",
+    "credit_transactions",
+    "credit_usage_ledger",
+    "credit_settlement_operations",
+    "admin_audit_log",
+    "admin_action_proposals",
+    "fund_audit_jobs",
+    "fund_audit_items",
+    "fund_audit_worker_health",
+    "fund_audit_worker_instances",
+})
+
 def get_local_reports(sqlite_path: str = None) -> List[Dict[str, Any]]:
     """Fetches all rows from local SQLite reports table."""
     path = sqlite_path or get_db_path()
@@ -150,15 +168,19 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
     sqlite_cur = sqlite_conn.cursor()
 
     # Tables to sync: (table_name, conflict_target, update_on_conflict, ts_col)
+    # Parent tables precede dependent child tables to preserve PostgreSQL FK constraints.
     sync_targets = [
         ("reports", "ticker", True, "timestamp"),
         ("report_revisions", "__natural_revision__", False, "timestamp"),
         ("cached_fundamentals", "ticker", True, "updated_at"),
         ("discovery_reel", "__natural_discovery__", True, "created_at"),
         ("mutual_fund_schemes", "scheme_code", True, "last_updated"),
+        ("mf_disclosure_snapshots", "snapshot_id", False, "created_at"),
         ("mutual_fund_holdings", "__scheme_holdings__", True, "created_at"),
+        ("mf_current_disclosures", "scheme_code", True, "updated_at"),
         ("fund_forensic_dossiers", "scheme_code", True, "last_audited_at"),
         ("corporate_debt_securities", "isin", True, "last_updated"),
+        ("debt_quote_observations", "isin, as_of, source_url", True, "recorded_at"),
         ("sovereign_benchmarks", "tenor_label", True, "updated_at"),
         ("sovereign_curve_history", "snapshot_key, tenor_label", True, None),
         ("sovereign_sdl_spreads", "state_name", True, "updated_at"),
@@ -169,7 +191,13 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
         ("etf_matrix", "symbol", True, "updated_at"),
         ("msme_firms", "uin", True, "last_updated"),
         ("equity_price_history_cache", "ticker, period", True, "updated_at"),
+        ("instrument_metric_observations", "instrument_id, asset_class, measure_type, as_of, source_name", True, "recorded_at"),
     ]
+    forbidden_overlap = AUTHORITATIVE_PG_ONLY_TABLES.intersection({t[0] for t in sync_targets})
+    if forbidden_overlap:
+        raise RuntimeError(
+            f"Refusing offline sync: authoritative PostgreSQL-only tables in sync_targets: {sorted(forbidden_overlap)}"
+        )
 
     def _transform_cell(val: Any, dt: str) -> Any:
         if val is None:
@@ -337,7 +365,7 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
                 if do_update and conflict_col:
                     conflict_targets = [c.strip() for c in conflict_col.split(",")]
                     conflict_target_sql = ", ".join(conflict_targets)
-                    preserve_non_empty_cols = {"report_text", "citations_json", "dossier_text"}
+                    preserve_non_empty_cols = {"report_text", "citations_json", "dossier_text", "evidence_receipt_json"}
                     update_parts = []
                     for c in cols:
                         if c in conflict_targets:

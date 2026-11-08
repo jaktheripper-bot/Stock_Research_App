@@ -470,21 +470,44 @@ def calculate_fee_drag(
     }
 
 
-def get_researched_tickers_set() -> set:
-    """Fetches all researched equity ticker symbols in a single lightweight query without loading full report markdown."""
-    try:
-        from core.db.connection import get_db_connection
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute("SELECT DISTINCT UPPER(TRIM(ticker)) FROM reports WHERE report_text IS NOT NULL AND report_text != ''")
-            return {str(row[0]).strip().upper() for row in cursor.fetchall() if row and row[0]}
-        finally:
-            cursor.close()
-            conn.close()
-    except Exception as e:
-        logger.debug("Batch researched tickers lookup notice: %s", e)
+def get_researched_tickers_set(tickers: Optional[Any] = None) -> set:
+    """Check the same archived research evidence used by the paid quote."""
+    import json
+    from core.analysis.fund_research_evidence import qualify_fund_research
+    from core.db.connection import get_db_connection, is_postgres_connection
+    from normalizer import extract_citations_from_report
+
+    symbols = sorted({str(t).strip().upper() for t in tickers if t}) if tickers is not None else None
+    if symbols == []:
         return set()
+    batches = [None] if symbols is None else [symbols[i:i + 250] for i in range(0, len(symbols), 250)]
+    eligible = set()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    placeholder = "%s" if is_postgres_connection(conn) else "?"
+    try:
+        for batch in batches:
+            sql = "SELECT ticker, report_text, timestamp, citations_json FROM reports WHERE report_text IS NOT NULL"
+            if batch is not None:
+                sql += f" AND ticker IN ({', '.join([placeholder] * len(batch))})"
+            cursor.execute(sql, batch or ())
+            for ticker, text, timestamp, citations_json in cursor:
+                try:
+                    citations = json.loads(citations_json) if citations_json else []
+                except (TypeError, ValueError):
+                    citations = []
+                if not citations:
+                    citations = extract_citations_from_report(text)
+                report = {"ticker": ticker, "report_text": text, "timestamp": timestamp, "citations": citations}
+                if qualify_fund_research(report, ticker):
+                    eligible.add(str(ticker).strip().upper())
+    except Exception as err:
+        logger.warning("Failed to check fund research eligibility: %s", err)
+        return set()
+    finally:
+        cursor.close()
+        conn.close()
+    return eligible
 
 
 def get_debt_securities_map() -> Dict[str, Dict[str, Any]]:
@@ -520,8 +543,10 @@ def evaluate_dual_sleeve_lookthrough(
     evaluated_holdings = []
     warnings = []
 
-    if researched_tickers is None and any(h.get("holding_type", "EQUITY").upper() in ("EQUITY", "FOREIGN_EQUITY") for h in holdings):
-        researched_tickers = get_researched_tickers_set()
+    if researched_tickers is None:
+        researched_tickers = get_researched_tickers_set(
+            h.get("identifier") for h in holdings if h.get("holding_type", "").upper() in ("EQUITY", "FOREIGN_EQUITY")
+        )
     if debt_by_isin is None and any(h.get("holding_type", "EQUITY").upper() in ("DEBT", "SDI") for h in holdings):
         debt_by_isin = get_debt_securities_map()
 
@@ -540,15 +565,7 @@ def evaluate_dual_sleeve_lookthrough(
         if h_type in ("EQUITY", "FOREIGN_EQUITY"):
             equity_weight += w
 
-            # Source-Grounded: Check if genuine 7-Pillar Equity report exists via O(1) batch set
-            is_researched = bool(researched_tickers is not None and ident in researched_tickers)
-            if not is_researched:
-                try:
-                    from core.db.reports import get_report_by_ticker
-                    rep = get_report_by_ticker(ident)
-                    is_researched = bool(rep and rep.get("report_text"))
-                except Exception as rep_err:
-                    logger.debug("Report lookup notice for %s: %s", ident, rep_err)
+            is_researched = ident in researched_tickers
 
             if is_researched:
                 score = VERIFIED_RESEARCHED_EQUITY_SCORE  # Verified 7-pillar asset
@@ -556,7 +573,7 @@ def evaluate_dual_sleeve_lookthrough(
                 equity_covered_weight += w
                 equity_weighted_score += (score * w)
                 posture_badge = "badge-success"
-                notes = "Verified 7-Pillar Equity Dossier Available"
+                notes = "Eligible archived 7-pillar research"
             elif ident in EQUITY_HEALTH_DEFAULTS:
                 # Calibrated baseline proxy for benchmark constituent (unverified look-through)
                 score = float(EQUITY_HEALTH_DEFAULTS[ident])
@@ -631,7 +648,7 @@ def evaluate_dual_sleeve_lookthrough(
         has_sufficient_coverage = False
     elif equity_weight > 0:
         genuine_coverage_pct = round((genuine_covered_weight / equity_weight * 100.0), 1)
-        has_sufficient_coverage = (genuine_coverage_pct >= MIN_COVERAGE_THRESHOLD)
+        has_sufficient_coverage = (genuine_covered_weight / equity_weight * 100 >= MIN_COVERAGE_THRESHOLD)
     else:
         # Pure fixed-income / cash portfolio with actual disclosed holdings
         genuine_coverage_pct = 100.0

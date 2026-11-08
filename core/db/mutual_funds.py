@@ -4,8 +4,10 @@ Supports dual-binding for local SQLite and production PostgreSQL (Supabase / Ren
 Complies with SEBI (Mutual Funds) Regulations, 1996 portfolio disclosure norms.
 """
 
+import hashlib
 import json
 import logging
+import math
 import re
 from decimal import Decimal
 from datetime import datetime, date, timezone
@@ -169,12 +171,8 @@ def _normalize_pg_portfolio_date(port_date: Any) -> Any:
     return port_date
 
 
-def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
+def save_mutual_fund_scheme(scheme: Dict[str, Any], *, connection: Any = None) -> bool:
     """Inserts or updates a mutual fund scheme master record."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    use_pg = is_postgres_connection(conn)
-
     code = scheme["scheme_code"].strip().upper()
     name = scheme["scheme_name"].strip()
     amc = scheme.get("fund_house", "Generic AMC")
@@ -190,7 +188,7 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
     active_share = float(raw_as) if raw_as is not None else None
     risk_grade = scheme.get("risk_grade", "Very High")
     fund_mgr = scheme.get("fund_manager", "Senior Fund Manager")
-    port_date = scheme.get("last_portfolio_date", datetime.now(IST).date().isoformat())
+    port_date = scheme.get("last_portfolio_date")
     pg_port_date = _normalize_pg_portfolio_date(port_date)
 
     meta = scheme.get("metadata", {})
@@ -198,6 +196,10 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
         meta_json = json.dumps(meta)
     else:
         meta_json = str(meta)
+
+    conn = connection if connection is not None else get_db_connection()
+    cursor = conn.cursor()
+    use_pg = is_postgres_connection(conn)
 
     try:
         if use_pg:
@@ -228,7 +230,12 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
                     risk_grade = EXCLUDED.risk_grade,
                     fund_manager = CASE WHEN EXCLUDED.fund_manager IS NOT NULL AND EXCLUDED.fund_manager <> 'Senior Fund Manager' THEN EXCLUDED.fund_manager ELSE COALESCE(NULLIF(mutual_fund_schemes.fund_manager, ''), EXCLUDED.fund_manager) END,
                     metadata_json = CASE WHEN EXCLUDED.metadata_json IS NOT NULL AND EXCLUDED.metadata_json NOT IN ('{}', '') THEN EXCLUDED.metadata_json ELSE COALESCE(NULLIF(mutual_fund_schemes.metadata_json, ''), EXCLUDED.metadata_json) END,
-                    last_portfolio_date = EXCLUDED.last_portfolio_date,
+                    last_portfolio_date = COALESCE((
+                        SELECT CAST(snap.as_on_date AS DATE)
+                        FROM mf_current_disclosures current_disclosure
+                        JOIN mf_disclosure_snapshots snap ON snap.snapshot_id = current_disclosure.snapshot_id
+                        WHERE current_disclosure.scheme_code = mutual_fund_schemes.scheme_code
+                    ), EXCLUDED.last_portfolio_date),
                     last_updated = now();
             """, (
                 code, name, amc, cat, broad_cat,
@@ -259,7 +266,12 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
                     risk_grade = excluded.risk_grade,
                     fund_manager = CASE WHEN excluded.fund_manager IS NOT NULL AND excluded.fund_manager <> 'Senior Fund Manager' THEN excluded.fund_manager ELSE COALESCE(NULLIF(mutual_fund_schemes.fund_manager, ''), excluded.fund_manager) END,
                     metadata_json = CASE WHEN excluded.metadata_json IS NOT NULL AND excluded.metadata_json NOT IN ('{}', '') THEN excluded.metadata_json ELSE COALESCE(NULLIF(mutual_fund_schemes.metadata_json, ''), excluded.metadata_json) END,
-                    last_portfolio_date = excluded.last_portfolio_date,
+                    last_portfolio_date = COALESCE((
+                        SELECT CAST(snap.as_on_date AS TEXT)
+                        FROM mf_current_disclosures current_disclosure
+                        JOIN mf_disclosure_snapshots snap ON snap.snapshot_id = current_disclosure.snapshot_id
+                        WHERE current_disclosure.scheme_code = mutual_fund_schemes.scheme_code
+                    ), excluded.last_portfolio_date),
                     last_updated = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
             """, (
                 code, name, amc, cat, broad_cat,
@@ -267,15 +279,18 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
                 ptr, active_share, risk_grade,
                 fund_mgr, meta_json, port_date
             ))
-        conn.commit()
+        if connection is None:
+            conn.commit()
         return True
     except Exception as e:
         logger.error(f"Error saving mutual fund scheme {code}: {e}")
-        conn.rollback()
+        if connection is None:
+            conn.rollback()
         return False
     finally:
         cursor.close()
-        conn.close()
+        if connection is None:
+            conn.close()
 
 
 def save_mutual_fund_schemes_batch(schemes: List[Dict[str, Any]]) -> int:
@@ -301,7 +316,7 @@ def save_mutual_fund_schemes_batch(schemes: List[Dict[str, Any]]) -> int:
         active_share = float(scheme.get("active_share_pct", 65.0) or 0.0)
         risk_grade = scheme.get("risk_grade", "Very High")
         fund_mgr = scheme.get("fund_manager", "Senior Fund Manager")
-        port_date = scheme.get("last_portfolio_date", datetime.now(IST).date().isoformat())
+        port_date = scheme.get("last_portfolio_date")
         meta = scheme.get("metadata", {})
         meta_json = json.dumps(meta) if isinstance(meta, dict) else str(meta)
         deduped[raw_code] = (
@@ -347,7 +362,12 @@ def save_mutual_fund_schemes_batch(schemes: List[Dict[str, Any]]) -> int:
                     risk_grade = EXCLUDED.risk_grade,
                     fund_manager = CASE WHEN EXCLUDED.fund_manager IS NOT NULL AND EXCLUDED.fund_manager <> 'Senior Fund Manager' THEN EXCLUDED.fund_manager ELSE COALESCE(NULLIF(mutual_fund_schemes.fund_manager, ''), EXCLUDED.fund_manager) END,
                     metadata_json = CASE WHEN EXCLUDED.metadata_json IS NOT NULL AND EXCLUDED.metadata_json NOT IN ('{}', '') THEN EXCLUDED.metadata_json ELSE COALESCE(NULLIF(mutual_fund_schemes.metadata_json, ''), EXCLUDED.metadata_json) END,
-                    last_portfolio_date = EXCLUDED.last_portfolio_date,
+                    last_portfolio_date = COALESCE((
+                        SELECT CAST(snap.as_on_date AS DATE)
+                        FROM mf_current_disclosures current_disclosure
+                        JOIN mf_disclosure_snapshots snap ON snap.snapshot_id = current_disclosure.snapshot_id
+                        WHERE current_disclosure.scheme_code = mutual_fund_schemes.scheme_code
+                    ), EXCLUDED.last_portfolio_date),
                     last_updated = now();
             """
             template = "(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())"
@@ -376,7 +396,12 @@ def save_mutual_fund_schemes_batch(schemes: List[Dict[str, Any]]) -> int:
                     risk_grade = excluded.risk_grade,
                     fund_manager = CASE WHEN excluded.fund_manager IS NOT NULL AND excluded.fund_manager <> 'Senior Fund Manager' THEN excluded.fund_manager ELSE COALESCE(NULLIF(mutual_fund_schemes.fund_manager, ''), excluded.fund_manager) END,
                     metadata_json = CASE WHEN excluded.metadata_json IS NOT NULL AND excluded.metadata_json NOT IN ('{}', '') THEN excluded.metadata_json ELSE COALESCE(NULLIF(mutual_fund_schemes.metadata_json, ''), excluded.metadata_json) END,
-                    last_portfolio_date = excluded.last_portfolio_date,
+                    last_portfolio_date = COALESCE((
+                        SELECT CAST(snap.as_on_date AS TEXT)
+                        FROM mf_current_disclosures current_disclosure
+                        JOIN mf_disclosure_snapshots snap ON snap.snapshot_id = current_disclosure.snapshot_id
+                        WHERE current_disclosure.scheme_code = mutual_fund_schemes.scheme_code
+                    ), excluded.last_portfolio_date),
                     last_updated = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
             """
             cursor.executemany(sql_sq, rows)
@@ -391,14 +416,19 @@ def save_mutual_fund_schemes_batch(schemes: List[Dict[str, Any]]) -> int:
         conn.close()
 
 
-def save_mutual_fund_holdings(scheme_code: str, holdings: List[Dict[str, Any]]) -> bool:
+def save_mutual_fund_holdings(scheme_code: str, holdings: List[Dict[str, Any]], *, connection: Any = None) -> bool:
     """Replaces or saves the portfolio constituents for a mutual fund scheme."""
-    conn = get_db_connection()
+    conn = connection if connection is not None else get_db_connection()
     cursor = conn.cursor()
     use_pg = is_postgres_connection(conn)
     clean_code = scheme_code.strip().upper()
 
     try:
+        if connection is None:
+            lock_fund_disclosure(conn, clean_code)
+            if get_current_fund_disclosure(clean_code, connection=conn):
+                raise ValueError("Use publish_mutual_fund_disclosure for a verified scheme")
+
         # Delete existing holdings for this scheme to refresh with newest disclosure
         if use_pg:
             cursor.execute("DELETE FROM mutual_fund_holdings WHERE scheme_code = %s;", (clean_code,))
@@ -414,7 +444,9 @@ def save_mutual_fund_holdings(scheme_code: str, holdings: List[Dict[str, Any]]) 
             name = h.get("holding_name", ident)
             weight = float(h.get("weight_pct", 0.0))
             sector = h.get("sector_or_rating", "Diversified")
-            port_date = h.get("portfolio_date", datetime.now(IST).date().isoformat())
+            port_date = parse_fund_disclosure_date(h.get("portfolio_date"))
+            if not port_date:
+                raise ValueError("A valid portfolio_date is required for every holding")
             det = h.get("instrument_details", {})
             det_json = json.dumps(det) if isinstance(det, dict) else str(det)
             deduped_holdings[(h_type, ident)] = (
@@ -449,14 +481,180 @@ def save_mutual_fund_holdings(scheme_code: str, holdings: List[Dict[str, Any]]) 
                         portfolio_date = excluded.portfolio_date;
                 """, row_vals)
 
-        conn.commit()
+        if connection is None:
+            conn.commit()
         return True
     except Exception as e:
         logger.error(f"Error saving holdings for scheme {clean_code}: {e}")
-        conn.rollback()
+        if connection is None:
+            conn.rollback()
         return False
     finally:
         cursor.close()
+        if connection is None:
+            conn.close()
+
+
+def parse_fund_disclosure_date(value: Any) -> Optional[str]:
+    """Return a real ISO date from a source field. Never substitute the run date."""
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value.isoformat()
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value.strip()):
+        return None
+    try:
+        return date.fromisoformat(value.strip()).isoformat()
+    except ValueError:
+        return None
+
+
+def lock_fund_disclosure(connection: Any, scheme_code: str) -> None:
+    """Serialize publication of a scheme, including its first publication."""
+    cur = connection.cursor()
+    try:
+        if is_postgres_connection(connection):
+            cur.execute("SELECT pg_advisory_xact_lock(193758, hashtext(%s))", (scheme_code,))
+            cur.execute("SELECT scheme_code FROM mutual_fund_schemes WHERE scheme_code = %s FOR UPDATE", (scheme_code,))
+        elif not getattr(connection, "in_transaction", False):
+            cur.execute("BEGIN IMMEDIATE")
+    finally:
+        cur.close()
+
+
+def _read_fund_disclosure(value: str, *, current: bool, connection: Any = None) -> Optional[Dict[str, Any]]:
+    conn = connection if connection is not None else get_db_connection()
+    cur = conn.cursor()
+    placeholder = "%s" if is_postgres_connection(conn) else "?"
+    try:
+        if current:
+            cur.execute(f"""
+                SELECT snap.payload_json
+                FROM mf_current_disclosures current_disclosure
+                JOIN mf_disclosure_snapshots snap ON snap.snapshot_id = current_disclosure.snapshot_id
+                WHERE current_disclosure.scheme_code = {placeholder}
+            """, (value,))
+        else:
+            cur.execute(f"SELECT payload_json FROM mf_disclosure_snapshots WHERE snapshot_id = {placeholder}", (value,))
+        row = cur.fetchone()
+        return json.loads(row[0]) if row else None
+    finally:
+        cur.close()
+        if connection is None:
+            conn.close()
+
+
+def get_fund_disclosure_snapshot(snapshot_id: str, *, connection: Any = None) -> Optional[Dict[str, Any]]:
+    """Load the immutable disclosure recorded for a specific quote or dossier."""
+    return _read_fund_disclosure(snapshot_id, current=False, connection=connection)
+
+
+def get_current_fund_disclosure(scheme_code: str, *, connection: Any = None) -> Optional[Dict[str, Any]]:
+    """Load the currently published disclosure; legacy holdings are deliberately excluded."""
+    return _read_fund_disclosure(scheme_code.strip().upper(), current=True, connection=connection)
+
+
+ALLOWED_DISCLOSURE_SOURCES = frozenset({"sebi_monthly_disclosure", "mfforecast_api", "manual_inbox"})
+
+
+def publish_mutual_fund_disclosure(
+    scheme: Dict[str, Any],
+    holdings: List[Dict[str, Any]],
+    *,
+    canonical_snapshot_id: Optional[str] = None,
+) -> str:
+    """Publish the source, exact portfolio and scheme pointer in one transaction."""
+    code = scheme["scheme_code"].strip().upper()
+    metadata = dict(scheme.get("metadata") or {})
+    as_on = parse_fund_disclosure_date(scheme.get("last_portfolio_date"))
+    source_url = str(metadata.get("holdings_source_url") or "").strip()
+    source_type = metadata.get("holdings_source")
+    if not as_on or as_on > datetime.now(IST).date().isoformat():
+        raise ValueError("Disclosure date is missing, invalid or in the future")
+    if not source_url or source_type not in ALLOWED_DISCLOSURE_SOURCES:
+        raise ValueError("A recognised disclosure source and reference are required")
+    if not holdings:
+        raise ValueError("A disclosure must contain holdings")
+
+    normalized = []
+    seen = set()
+    for holding in holdings:
+        kind = str(holding.get("holding_type") or "").strip().upper()
+        identifier = str(holding.get("identifier") or "").strip().upper()
+        key = (kind, identifier)
+        weight = float(holding["weight_pct"])
+        if not all(key) or key in seen or not math.isfinite(weight):
+            raise ValueError("Disclosure holdings contain missing or duplicate keys or invalid weights")
+        if parse_fund_disclosure_date(holding.get("portfolio_date")) != as_on:
+            raise ValueError("Every holding must match the disclosure date")
+        seen.add(key)
+        normalized.append({
+            **holding,
+            "scheme_code": code,
+            "holding_type": kind,
+            "identifier": identifier,
+            "portfolio_date": as_on,
+            "weight_pct": weight,
+        })
+    normalized.sort(key=lambda holding: (-holding["weight_pct"], holding["holding_type"], holding["identifier"]))
+    payload = {
+        "scheme_code": code,
+        "as_on_date": as_on,
+        "holdings_source": source_type,
+        "source_url": source_url,
+        "source_sha256": metadata.get("holdings_source_sha256"),
+        "source_sheet": metadata.get("holdings_source_sheet"),
+        "canonical_snapshot_id": canonical_snapshot_id,
+        "holdings": normalized,
+    }
+    snapshot_id = hashlib.sha256(json.dumps(payload, sort_keys=True, allow_nan=False).encode()).hexdigest()
+    payload["snapshot_id"] = snapshot_id
+    metadata.update(disclosure_snapshot_id=snapshot_id, holdings_as_on=as_on)
+    conn = get_db_connection()
+    cur = conn.cursor()
+    p = "%s" if is_postgres_connection(conn) else "?"
+    try:
+        canonical_code = metadata.get("canonical_amfi_code") if canonical_snapshot_id else None
+        if canonical_snapshot_id and (not canonical_code or canonical_code == code):
+            raise ValueError("An alias must name a distinct canonical scheme")
+        lock_fund_disclosure(conn, canonical_code or code)
+        if canonical_code:
+            parent = get_current_fund_disclosure(canonical_code, connection=conn)
+            if not parent or parent["snapshot_id"] != canonical_snapshot_id:
+                raise ValueError("Canonical snapshot changed before alias publication")
+            if is_postgres_connection(conn):
+                lock_fund_disclosure(conn, code)
+        current = get_current_fund_disclosure(code, connection=conn)
+        if current and current["as_on_date"] > as_on:
+            raise ValueError(f"Disclosure is older than the current publication for {code}")
+        if current and current["as_on_date"] == as_on and current["holdings_source"] != "mfforecast_api":
+            if source_type == "mfforecast_api":
+                raise ValueError(f"Vendor snapshot cannot replace an official disclosure for {code}")
+        if current and current["snapshot_id"] == snapshot_id:
+            conn.commit()
+            return snapshot_id
+        if get_fund_disclosure_snapshot(snapshot_id, connection=conn):
+            raise ValueError(f"A replay cannot replace the current disclosure for {code}")
+
+        if not save_mutual_fund_scheme({**scheme, "metadata": metadata}, connection=conn):
+            raise RuntimeError("Could not write scheme master")
+        if not save_mutual_fund_holdings(code, normalized, connection=conn):
+            raise RuntimeError("Could not write scheme holdings")
+        cur.execute(f"""
+            INSERT INTO mf_disclosure_snapshots (snapshot_id, scheme_code, as_on_date, payload_json)
+            VALUES ({p}, {p}, {p}, {p})
+        """, (snapshot_id, code, as_on, json.dumps(payload, sort_keys=True, allow_nan=False)))
+        cur.execute(f"""
+            INSERT INTO mf_current_disclosures (scheme_code, snapshot_id)
+            VALUES ({p}, {p})
+            ON CONFLICT (scheme_code) DO UPDATE SET snapshot_id = excluded.snapshot_id, updated_at = CURRENT_TIMESTAMP
+        """, (code, snapshot_id))
+        cur.execute(f"UPDATE mutual_fund_schemes SET last_portfolio_date = {p} WHERE scheme_code = {p}", (as_on, code))
+        conn.commit()
+        return snapshot_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
         conn.close()
 
 
@@ -5297,7 +5495,10 @@ def seed_default_mutual_funds() -> int:
         all_schemes = [dict(s) for s in schemes]
 
     for s in all_schemes:
-        holdings = list(s.pop("holdings", []))
+        holdings = [
+            {**holding, "portfolio_date": holding.get("portfolio_date") or s.get("last_portfolio_date")}
+            for holding in s.pop("holdings", [])
+        ]
         if save_mutual_fund_scheme(s):
             save_mutual_fund_holdings(s["scheme_code"], holdings)
             seeded += 1
@@ -5305,15 +5506,16 @@ def seed_default_mutual_funds() -> int:
     return seeded
 
 
-def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
+def save_fund_forensic_dossier(dossier: Dict[str, Any], *, connection: Any = None) -> bool:
     """Saves or updates a compiled 7-pillar forensic fund dossier."""
-    conn = get_db_connection()
+    owns_connection = connection is None
+    conn = get_db_connection() if owns_connection else connection
     cursor = conn.cursor()
     use_pg = is_postgres_connection(conn)
 
     code = dossier["scheme_code"].strip().upper()
     text = dossier.get("dossier_text", "")
-    if not text or not str(text).strip():
+    if owns_connection and (not text or not str(text).strip()):
         # Archival guard: preserve existing non-empty dossier_text if incoming text is empty
         try:
             if use_pg:
@@ -5335,25 +5537,36 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
 
     raw_comp = dossier.get("composite_health_score")
     comp_score = float(raw_comp) if raw_comp is not None else -1.0
-    moat_score = float(dossier.get("weighted_moat_score", 0.0))
-    asri = float(dossier.get("accounting_risk_index", 0.0))
-    mos = float(dossier.get("margin_of_safety_pct", 0.0))
-    pledge = float(dossier.get("promoter_pledge_exposure_pct", 0.0))
+    raw_moat = dossier.get("weighted_moat_score")
+    moat_score = float(raw_moat) if raw_moat is not None else -1.0
+    raw_asri = dossier.get("accounting_risk_index")
+    asri = float(raw_asri) if raw_asri is not None else -1.0
+    # Historical columns are NOT NULL. They are no longer public metrics.
+    mos = 0.0
+    pledge = 0.0
     raw_as_dos = dossier.get("active_share_pct")
-    active_share = float(raw_as_dos) if raw_as_dos is not None else None
+    active_share = float(raw_as_dos) if raw_as_dos is not None else -1.0
     risky_json = json.dumps(dossier.get("top_risky_holdings", []))
     quality_json = json.dumps(dossier.get("top_quality_holdings", []))
     auditor = dossier.get("audited_by", "Gemini_Chief_Forensic_Officer")
+    receipt = dossier.get("evidence_receipt")
+    receipt_json = json.dumps(receipt, allow_nan=False) if receipt is not None else None
 
     try:
+        if owns_connection and receipt and receipt.get("snapshot_id"):
+            lock_fund_disclosure(conn, code)
+            snapshot = get_current_fund_disclosure(code, connection=conn)
+            if not snapshot or snapshot["snapshot_id"] != receipt["snapshot_id"]:
+                conn.rollback()
+                return False
         if use_pg:
             cursor.execute("""
                 INSERT INTO fund_forensic_dossiers (
                     scheme_code, dossier_text, composite_health_score, weighted_moat_score,
                     accounting_risk_index, margin_of_safety_pct, promoter_pledge_exposure_pct,
                     active_share_pct, top_risky_holdings_json, top_quality_holdings_json,
-                    audited_by, last_audited_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                    audited_by, evidence_receipt_json, last_audited_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
                 ON CONFLICT (scheme_code) DO UPDATE SET
                     dossier_text = CASE 
                         WHEN EXCLUDED.dossier_text IS NOT NULL AND TRIM(EXCLUDED.dossier_text) != '' 
@@ -5369,16 +5582,17 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
                     top_risky_holdings_json = EXCLUDED.top_risky_holdings_json,
                     top_quality_holdings_json = EXCLUDED.top_quality_holdings_json,
                     audited_by = EXCLUDED.audited_by,
+                    evidence_receipt_json = EXCLUDED.evidence_receipt_json,
                     last_audited_at = now();
-            """, (code, text, comp_score, moat_score, asri, mos, pledge, active_share, risky_json, quality_json, auditor))
+            """, (code, text, comp_score, moat_score, asri, mos, pledge, active_share, risky_json, quality_json, auditor, receipt_json))
         else:
             cursor.execute("""
                 INSERT INTO fund_forensic_dossiers (
                     scheme_code, dossier_text, composite_health_score, weighted_moat_score,
                     accounting_risk_index, margin_of_safety_pct, promoter_pledge_exposure_pct,
                     active_share_pct, top_risky_holdings_json, top_quality_holdings_json,
-                    audited_by, last_audited_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
+                    audited_by, evidence_receipt_json, last_audited_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
                 ON CONFLICT (scheme_code) DO UPDATE SET
                     dossier_text = CASE 
                         WHEN excluded.dossier_text IS NOT NULL AND TRIM(excluded.dossier_text) != '' 
@@ -5394,17 +5608,47 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
                     top_risky_holdings_json = excluded.top_risky_holdings_json,
                     top_quality_holdings_json = excluded.top_quality_holdings_json,
                     audited_by = excluded.audited_by,
+                    evidence_receipt_json = excluded.evidence_receipt_json,
                     last_audited_at = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
-            """, (code, text, comp_score, moat_score, asri, mos, pledge, active_share, risky_json, quality_json, auditor))
-        conn.commit()
+            """, (code, text, comp_score, moat_score, asri, mos, pledge, active_share, risky_json, quality_json, auditor, receipt_json))
+        if owns_connection:
+            conn.commit()
         return True
     except Exception as e:
         logger.error(f"Error saving fund report for {code}: {e}")
-        conn.rollback()
+        if owns_connection:
+            conn.rollback()
         return False
     finally:
         cursor.close()
-        conn.close()
+        if owns_connection:
+            conn.close()
+
+
+def _public_fund_evidence_fields(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Prevent legacy proxy values or unverifiable prose from resurfacing."""
+    receipt = None
+    raw_receipt = row.pop("evidence_receipt_json", None)
+    if raw_receipt:
+        try:
+            candidate = json.loads(raw_receipt)
+            if isinstance(candidate, dict) and candidate.get("method_version") and isinstance(candidate.get("metrics"), dict):
+                receipt = candidate
+        except ValueError:
+            logger.warning("Malformed evidence receipt for fund %s", row.get("scheme_code"))
+    row["evidence_receipt"] = receipt
+    row.pop("margin_of_safety_pct", None)
+    row.pop("promoter_pledge_exposure_pct", None)
+    for key in ("composite_health_score", "weighted_moat_score", "accounting_risk_index"):
+        if receipt is None or (row.get(key) is not None and row[key] < 0):
+            row[key] = None
+    if row.get("active_share_pct") is not None and row["active_share_pct"] < 0:
+        row["active_share_pct"] = None
+    if receipt is None:
+        row["dossier_text"] = ""
+        row.pop("top_risky_holdings_json", None)
+        row.pop("top_quality_holdings_json", None)
+    return row
 
 
 def get_fund_forensic_dossier(scheme_code: str) -> Optional[Dict[str, Any]]:
@@ -5419,14 +5663,8 @@ def get_fund_forensic_dossier(scheme_code: str) -> Optional[Dict[str, Any]]:
         cursor.execute(sql, (clean_code,))
         row = cursor.fetchone()
         if not row:
-            sql_fallback = "SELECT * FROM fund_forensic_dossiers WHERE scheme_code LIKE %s LIMIT 1" if use_pg else "SELECT * FROM fund_forensic_dossiers WHERE scheme_code LIKE ? LIMIT 1"
-            cursor.execute(sql_fallback, (f"{clean_code}%",))
-            row = cursor.fetchone()
-        if not row:
             return None
-        res = clean_dict_row(cursor, row)
-        if res.get("composite_health_score") is not None and res["composite_health_score"] < 0:
-            res["composite_health_score"] = None
+        res = _public_fund_evidence_fields(clean_dict_row(cursor, row))
         if "top_risky_holdings_json" in res and res["top_risky_holdings_json"]:
             try:
                 res["top_risky_holdings"] = json.loads(res["top_risky_holdings_json"])
@@ -5459,6 +5697,7 @@ def get_featured_daily_fund_dossier() -> Optional[Dict[str, Any]]:
             FROM fund_forensic_dossiers d
             JOIN mutual_fund_schemes s ON d.scheme_code = s.scheme_code
             WHERE d.dossier_text IS NOT NULL AND TRIM(d.dossier_text) != ''
+              AND d.evidence_receipt_json IS NOT NULL
             ORDER BY d.last_audited_at DESC
             LIMIT 1
         """
@@ -5466,9 +5705,7 @@ def get_featured_daily_fund_dossier() -> Optional[Dict[str, Any]]:
         row = cursor.fetchone()
         if not row:
             return None
-        res = clean_dict_row(cursor, row)
-        if res.get("composite_health_score") is not None and res["composite_health_score"] < 0:
-            res["composite_health_score"] = None
+        res = _public_fund_evidence_fields(clean_dict_row(cursor, row))
         if "top_risky_holdings_json" in res and res["top_risky_holdings_json"]:
             try:
                 res["top_risky_holdings"] = json.loads(res["top_risky_holdings_json"])
@@ -5504,7 +5741,7 @@ def get_next_fund_for_daily_audit() -> Optional[Dict[str, Any]]:
                 CASE WHEN EXISTS (SELECT 1 FROM mutual_fund_holdings h WHERE h.scheme_code = s.scheme_code) THEN 0 ELSE 1 END ASC,
                 CASE
                     WHEN d.last_audited_at IS NULL THEN 0
-                    WHEN TRIM(COALESCE(d.dossier_text, '')) = '' THEN 1
+                    WHEN d.evidence_receipt_json IS NULL OR TRIM(COALESCE(d.dossier_text, '')) = '' THEN 1
                     ELSE 2
                 END ASC,
                 d.last_audited_at ASC

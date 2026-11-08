@@ -2,7 +2,7 @@
 
 These tools provide factual, verifiable metrics with zero hallucination:
 - Test suite execution & regression tracking
-- Live FastAPI endpoint probing & latency measurement
+- In-process FastAPI route probing & latency measurement
 - SEBI safe-harbor prohibited term & tone scanning
 - AST code hygiene & hardcoding pattern detection
 - CSS design token & behavioral UI/UX audits
@@ -27,15 +27,19 @@ def tool_run_test_suite(quick: bool = False) -> Dict[str, Any]:
     """Executes the project automated test suite via pytest, safely ignoring recursive auditor tests."""
     if os.environ.get("AUDIT_RECURSION_GUARD") == "1":
         return {
-            "status": "PASS",
-            "total_tests": 1,
-            "passed": 1,
+            "status": "SKIPPED",
+            "scope": "NONE",
+            "selected_files": [],
+            "omitted_patterns": [],
+            "skipped": 0,
+            "total_tests": 0,
+            "passed": 0,
             "failed": 0,
             "errors": 0,
             "failed_tests": [],
             "duration_s": 0.01,
             "exit_code": 0,
-            "summary": "1 passed in 0.01s (recursion guard active)"
+            "summary": "Nested audit invocation skipped."
         }
 
     is_quick = quick or (os.environ.get("AUDIT_QUICK_MODE") == "1")
@@ -56,6 +60,13 @@ def tool_run_test_suite(quick: bool = False) -> Dict[str, Any]:
             "--ignore=tests/audit/test_remediation_ledger.py",
             "-q"
         ]
+    scope = {
+        "scope": "QUICK" if is_quick else "FULL_WITH_EXCLUSIONS",
+        "selected_files": [arg for arg in cmd if arg.startswith("tests/")],
+        "omitted_patterns": [arg.split("=", 1)[1] for arg in cmd if arg.startswith("--ignore=")],
+    }
+    if is_quick:
+        scope["omitted_patterns"] = ["All tests outside the selected files"]
     start_time = time.time()
     try:
         test_env = dict(os.environ)
@@ -128,9 +139,9 @@ def tool_run_test_suite(quick: bool = False) -> Dict[str, Any]:
             failed = 0
             errors = 0
 
-        is_ok = proc.returncode == 0
-        if not is_ok and passed > 0 and failed == 0 and errors == 0:
-            is_ok = True
+        skipped_m = re.search(r"(\d+)\s+skipped", output)
+        skipped = int(skipped_m.group(1)) if skipped_m else 0
+        is_ok = proc.returncode == 0 and passed > 0 and failed == 0 and errors == 0
 
         # Extract specific failing test names for diagnostic transparency
         failed_tests = []
@@ -143,7 +154,9 @@ def tool_run_test_suite(quick: bool = False) -> Dict[str, Any]:
             logger.warning(f"Test suite failures detected ({len(failed_tests)}): {'; '.join(failed_tests[:5])}")
 
         return {
+            **scope,
             "status": "PASS" if is_ok else "FAIL",
+            "skipped": skipped,
             "total_tests": total_tests,
             "passed": passed,
             "failed": failed,
@@ -155,7 +168,9 @@ def tool_run_test_suite(quick: bool = False) -> Dict[str, Any]:
         }
     except subprocess.TimeoutExpired:
         return {
+            **scope,
             "status": "TIMEOUT",
+            "skipped": None,
             "total_tests": 0,
             "passed": 0,
             "failed": 0,
@@ -167,7 +182,9 @@ def tool_run_test_suite(quick: bool = False) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to execute test runner: {e}")
         return {
+            **scope,
             "status": "ERROR",
+            "skipped": None,
             "total_tests": 0,
             "passed": 0,
             "failed": 0,
@@ -297,6 +314,7 @@ def tool_probe_web_endpoints(base_url: Optional[str] = None) -> Dict[str, Any]:
             })
 
     return {
+        "probe_mode": "In-process FastAPI TestClient",
         "total_checked": len(routes_to_test),
         "healthy_count": healthy_count,
         "failed_count": len(routes_to_test) - healthy_count,
@@ -355,9 +373,9 @@ def tool_scan_prohibited_terms() -> Dict[str, Any]:
         files_to_scan.append(legal_file)
 
     for fpath in files_to_scan:
-        scanned_files += 1
         try:
             content = fpath.read_text(encoding="utf-8")
+            scanned_files += 1
             for pat, desc in prohibited_patterns:
                 # Skip root admin login template when checking admin owner whitelist
                 if fpath.name == "admin.html" and "email" in desc.lower():
@@ -386,6 +404,7 @@ def tool_scan_prohibited_terms() -> Dict[str, Any]:
 
     return {
         "scanned_templates": scanned_files,
+        "files_considered": len(files_to_scan),
         "violations_count": len(findings),
         "has_statutory_disclaimer": has_disclaimer,
         "is_clean": len(findings) == 0 and has_disclaimer,

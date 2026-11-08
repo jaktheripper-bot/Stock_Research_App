@@ -816,8 +816,19 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(warmup_task())
 
     if not is_testing and enable_schedulers:
+        from core.db.fund_audit_jobs import reconcile_expired_fund_audits
+
         scheduler = AsyncIOScheduler()
         register_jobs(scheduler)
+        # Refund expired paid jobs even if the separate synthesis worker is down.
+        scheduler.add_job(
+            reconcile_expired_fund_audits,
+            "interval",
+            seconds=30,
+            id="paid_fund_audit_reconciliation",
+            max_instances=1,
+            coalesce=True,
+        )
         scheduler.start()
         discovery_task = asyncio.create_task(run_daily_discovery_scheduler())
         amfi_task = asyncio.create_task(run_daily_amfi_scheduler())
@@ -2317,11 +2328,17 @@ def fund_dossier_page(request: Request, scheme_code: str):
             scheme_name=dossier.get("scheme", {}).get("scheme_name", "")
         )
 
+    from core.db.mutual_funds import get_current_fund_disclosure
+
+    disclosure = get_current_fund_disclosure(clean_code)
     credit_quote = None
-    try:
-        credit_quote = calculate_deep_dive_credit_cost(clean_code)
-    except Exception as e:
-        logger.warning(f"Could not calculate credit quote for {clean_code}: {e}")
+    if disclosure:
+        try:
+            credit_quote = calculate_deep_dive_credit_cost(
+                clean_code, holdings_override=disclosure["holdings"],
+            )
+        except Exception as e:
+            logger.warning(f"Could not calculate credit quote for {clean_code}: {e}")
 
     from core.analysis.epistemic_schema import build_multi_asset_epistemic_ledger
     sch_obj = dossier.get("scheme") or {}
@@ -2340,11 +2357,11 @@ def fund_dossier_page(request: Request, scheme_code: str):
     )
 
     from core.presentation.formatters import format_standard_date
-    has_disclosed_holdings = bool((dossier.get("lookthrough") or {}).get("holdings"))
-    raw_port_date = sch_obj.get("last_portfolio_date")
+
+    raw_port_date = disclosure["as_on_date"] if disclosure else None
     fund_portfolio_date_str = (
         format_standard_date(raw_port_date, fallback=str(raw_port_date))
-        if (has_disclosed_holdings and raw_port_date)
+        if raw_port_date
         else "Pending Monthly Disclosure"
     )
     fund_updated_str = format_standard_date(
@@ -2365,6 +2382,7 @@ def fund_dossier_page(request: Request, scheme_code: str):
             "forensic_dossier": forensic_dossier,
             "forensic_dossier_html": forensic_dossier_html,
             "credit_quote": credit_quote,
+            "has_validated_disclosure": bool(disclosure),
             "is_deep_dive_unlocked": is_deep_dive_unlocked,
             "forensic_locked": forensic_locked,
             "unlock_kind": "FUND",
@@ -2743,22 +2761,12 @@ def reit_dossier_page(request: Request, symbol: str):
 
 @app.get("/opportunities", response_class=HTMLResponse)
 def opportunities_terminal_page(request: Request, persona: Optional[str] = Query(None)):
-    """Cross-Asset Opportunity Terminal & Arbitrage Scanner."""
-    from core.analysis.opportunity_terminal import get_normalized_opportunity_universe, BENCHMARK_10Y_GSEC_YIELD
+    """Cross-Asset Opportunity Terminal."""
+    from core.analysis.opportunity_terminal import get_normalized_opportunity_universe
+
     init_db()
     universe = get_normalized_opportunity_universe(persona_filter=persona)
-
-    sgb_yields = [x["gross_yield_pct"] for x in universe if x.get("asset_class") == "SGB"]
-    peak_sgb = max(sgb_yields) if sgb_yields else 8.85
-    real_asset_yields = [x["gross_yield_pct"] for x in universe if x.get("seniority_tier") == "REAL_ASSET"]
-    peak_real_asset = max(real_asset_yields) if real_asset_yields else 10.20
-
-    summary = {
-        "total_items": len(universe),
-        "benchmark_yield": BENCHMARK_10Y_GSEC_YIELD,
-        "peak_sgb_yield": peak_sgb,
-        "peak_real_asset_yield": peak_real_asset
-    }
+    summary = {"total_items": len(universe)}
 
     return templates.TemplateResponse(
         request=request,
