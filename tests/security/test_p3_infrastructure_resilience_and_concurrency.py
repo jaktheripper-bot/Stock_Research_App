@@ -16,6 +16,7 @@ Empirically verifies:
 import asyncio
 import gc
 import os
+import threading
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock
@@ -372,6 +373,9 @@ class TestP3ConnectionPoolStarvationDefense(unittest.TestCase):
     def test_02_pooled_connection_proxy_gc_finalizer_prevents_pool_starvation(self):
         """Verifies __del__ GC finalizer auto-releases connection to pool if dropped unclosed."""
         mock_pool = MagicMock()
+        # A bare MagicMock `_lock.locked()` is truthy, which would route __del__ through its
+        # background-thread branch and race this assertion. Use a real, unheld pool lock.
+        mock_pool._lock = threading.Lock()
         mock_conn = MagicMock()
         mock_conn.closed = 0
 
@@ -383,6 +387,28 @@ class TestP3ConnectionPoolStarvationDefense(unittest.TestCase):
         gc.collect()
 
         # __del__ must have released connection back to pool
+        mock_pool.putconn.assert_called_once_with(mock_conn)
+
+    def test_02b_gc_finalizer_defers_release_when_pool_lock_is_held(self):
+        """If GC fires while the pool lock is held, __del__ must not release inline (that would
+        deadlock a non-reentrant pool lock); it hands release to a background thread, and the
+        connection still returns to the pool."""
+        mock_pool = MagicMock()
+        pool_lock = threading.Lock()
+        mock_pool._lock = pool_lock
+        mock_conn = MagicMock()
+        mock_conn.closed = 0
+
+        def create_and_abandon_proxy():
+            _PooledConnectionProxy(mock_pool, mock_conn)
+
+        released = threading.Event()
+        mock_pool.putconn.side_effect = lambda *a, **k: released.set()
+
+        with pool_lock:
+            create_and_abandon_proxy()
+            gc.collect()
+        self.assertTrue(released.wait(timeout=5.0), "Deferred GC release never returned the connection")
         mock_pool.putconn.assert_called_once_with(mock_conn)
 
     def test_03_pooled_connection_proxy_evicts_corrupted_connection_from_pool(self):

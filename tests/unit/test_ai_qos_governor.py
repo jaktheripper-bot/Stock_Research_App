@@ -215,7 +215,11 @@ class TestAiQosGovernorUnit(unittest.TestCase):
     def test_qos_governor_exception_fails_closed(self):
         """When an unexpected exception occurs in authorize_llm_execution, it must log error and fail closed."""
         from unittest.mock import patch
-        with patch("time.time", side_effect=RuntimeError("Database lock acquisition failure")):
+        # Patch only the governor module's `time` reference. Patching the global `time.time`
+        # also breaks logging.LogRecord on Python <= 3.12 (it timestamps via time.time()), so the
+        # governor's own logger.error() inside its fail-closed handler would re-raise.
+        with patch("core.billing.qos_governor.time") as mock_time:
+            mock_time.time.side_effect = RuntimeError("Database lock acquisition failure")
             ok, msg = authorize_llm_execution("USER_SYNTHESIS", user_email="test@moatnomics.com")
             self.assertFalse(ok)
             self.assertEqual(msg, "System busy verifying AI capacity limits. Please retry in a few seconds.")
