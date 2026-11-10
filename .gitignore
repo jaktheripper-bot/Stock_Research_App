@@ -40,3 +40,6 @@ web/static/img/Moatnomics-*/
 !.github/workflows/p0_release_gate.yml
 !.github/workflows/scheduled_pipeline.yml
 !.github/workflows/subscription_renewal_reminder.yml
+
+# Local AI-assistant scratch outputs (debug spreadsheets, notes); never part of the app
+Claude outputs/
