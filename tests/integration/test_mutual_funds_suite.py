@@ -1039,6 +1039,23 @@ Cash reserve of 12% cushions against broad equity sell-offs.
             cur.close()
             conn.close()
 
+    def _delete_archived_report_fixture(self, ticker):
+        """Remove a synthetic constituent report so repeated runs never accumulate duplicate dossiers."""
+        from core.db.reports import get_archived_reports, get_report_by_ticker
+
+        conn = get_db_connection()
+        p = get_placeholder()
+        cur = conn.cursor()
+        try:
+            for table in ("report_revisions", "reports"):
+                cur.execute(f"DELETE FROM {table} WHERE ticker = {p}", (ticker,))
+            conn.commit()
+        finally:
+            cur.close()
+            conn.close()
+        get_report_by_ticker.cache_clear()
+        get_archived_reports.cache_clear()
+
     def _create_paid_fixture_user(self):
         from core.db.users import get_or_create_user
 
@@ -1078,6 +1095,7 @@ Cash reserve of 12% cushions against broad equity sell-offs.
 
         user = self._create_paid_fixture_user()
         ticker = f"TESTDEEP{uuid4().hex[:8].upper()}"
+        self.addCleanup(self._delete_archived_report_fixture, ticker)
         scheme_code = self._published_portfolio_fixture(
             [
                 {"holding_type": "EQUITY", "identifier": ticker, "weight_pct": 80.0},
