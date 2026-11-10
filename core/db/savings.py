@@ -1546,6 +1546,46 @@ def validate_legacy_savings_migration_preservation(conn: Optional[Any] = None) -
             active.close()
 
 
+def acquire_savings_write_locks(
+    active_conn: Any,
+    cursor: Any,
+    *,
+    lock_universe: bool = False,
+    instrument_ids: Optional[List[str]] = None,
+    is_pg: bool,
+    owns_conn: bool,
+) -> List[str]:
+    """Serializes a multi-instrument writer against per-instrument writers.
+
+    PostgreSQL: takes the same per-instrument advisory xact locks used by
+    `_acquire_instrument_write_locks`, in ascending key order, so it can never
+    AB/BA-deadlock with a single-instrument writer. `lock_universe=True` locks
+    every canonical and legacy instrument id (used by destructive cutovers that
+    must verify-then-mutate the whole savings universe atomically).
+    SQLite: opens a `BEGIN IMMEDIATE` write transaction when this call owns the
+    connection (database-level write lock already covers the universe).
+    Returns the sorted list of advisory keys taken (empty on SQLite).
+    """
+    if not is_pg:
+        if owns_conn and not getattr(active_conn, "in_transaction", False):
+            cursor.execute("BEGIN IMMEDIATE;")
+        return []
+
+    keys = {str(i) for i in (instrument_ids or []) if i}
+    if lock_universe:
+        for tbl in ("savings_instruments", "fixed_savings_instruments"):
+            if _table_exists_on_cursor(cursor, tbl, is_pg=is_pg):
+                cursor.execute(f"SELECT instrument_id FROM {tbl};")
+                keys.update(str(r[0]) for r in cursor.fetchall() if r and r[0])
+    ordered = sorted(keys)
+    for lock_key in ordered:
+        cursor.execute(
+            "SELECT pg_advisory_xact_lock(%s, hashtext(%s));",
+            (SAVINGS_ADVISORY_LOCK_NS, lock_key),
+        )
+    return ordered
+
+
 def drop_retired_v049_savings_tables(
     *,
     confirm: bool = False,
@@ -1559,6 +1599,13 @@ def drop_retired_v049_savings_tables(
     cursor = active.cursor()
     is_pg = bool(get_supabase_url()) or is_postgres_connection(active)
     try:
+        acquire_savings_write_locks(
+            active,
+            cursor,
+            lock_universe=True,
+            is_pg=is_pg,
+            owns_conn=owns,
+        )
         check = _verify_legacy_preservation_on_cursor(cursor, is_pg=is_pg)
         if not check["valid"]:
             raise RuntimeError(

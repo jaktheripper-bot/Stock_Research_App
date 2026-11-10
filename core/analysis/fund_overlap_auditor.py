@@ -82,7 +82,11 @@ def parse_stock_report_health_matrix(report_text: str) -> Dict[str, Any]:
 
 
 def compute_fund_forensic_lookthrough(
-    scheme_code: str, *, holdings_override: Optional[List[Dict[str, Any]]] = None, scheme_override: Optional[Dict[str, Any]] = None
+    scheme_code: str,
+    *,
+    holdings_override: Optional[List[Dict[str, Any]]] = None,
+    scheme_override: Optional[Dict[str, Any]] = None,
+    reports_map: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Traverses constituent portfolio holdings, joins stock dossiers, and calculates aggregate metrics."""
     scheme = scheme_override if scheme_override is not None else get_mutual_fund_scheme(scheme_code)
@@ -147,10 +151,13 @@ def compute_fund_forensic_lookthrough(
 
             # 1. Check for genuine archived 7-Pillar Equity Report
             rep = None
-            try:
-                rep = get_report_by_ticker(ident)
-            except Exception as rep_err:
-                logger.debug("Report lookup notice for %s: %s", ident, rep_err)
+            if reports_map is not None:
+                rep = reports_map.get(ident)
+            else:
+                try:
+                    rep = get_report_by_ticker(ident)
+                except Exception as rep_err:
+                    logger.debug("Report lookup notice for %s: %s", ident, rep_err)
 
             evidence = qualify_fund_research(rep, ident, analyzed_at=analyzed_at)
             if evidence and w > 0:

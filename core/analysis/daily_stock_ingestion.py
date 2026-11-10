@@ -825,6 +825,33 @@ def recalculate_affected_mutual_funds(
 
     logger.info(f"Identified {len(affected_schemes_map)} mutual fund schemes affected by ingestion of {len(clean_tickers)} stocks.")
 
+    reports_map: Optional[Dict[str, Dict[str, Any]]] = None
+    try:
+        from core.db.reports import get_archived_reports
+        all_reps = get_archived_reports(include_text=True)
+        reports_map = {}
+        for r in all_reps:
+            raw_sym = str(r.get("ticker") or "")
+            sym = clean_ticker(raw_sym)
+            # Parity with get_report_by_ticker(): it matches `ticker = clean_ticker(x)` exactly,
+            # so only rows already stored under their canonical ticker are eligible.
+            if sym and raw_sym == sym and sym not in reports_map:
+                reports_map[sym] = {
+                    **r,
+                    "timestamp": r.get("timestamp") or r.get("raw_timestamp"),
+                }
+        if not reports_map:
+            # get_archived_reports() swallows DB errors and returns []; an empty map would silently
+            # zero research coverage for every fund, so fall back to per-ticker lookups instead.
+            logger.warning("Reports preload returned no rows; falling back to per-ticker lookups.")
+            reports_map = None
+    except Exception as preload_err:
+        logger.warning(
+            "Reports preload failed in recalculate_affected_mutual_funds; falling back to per-ticker lookups: %s",
+            preload_err,
+        )
+        reports_map = None
+
     updated_funds = []
     synthesized_narratives_count = 0
     for scheme_code, scheme_name in affected_schemes_map.items():
@@ -838,7 +865,7 @@ def recalculate_affected_mutual_funds(
                 old_text = (old_dossier.get("dossier_text") or "").strip()
 
             # Re-compute look-through
-            new_dossier = compute_fund_forensic_lookthrough(scheme_code)
+            new_dossier = compute_fund_forensic_lookthrough(scheme_code, reports_map=reports_map)
 
             # Synthesize updated narrative or retain existing non-empty qualitative narrative
             scheme = get_mutual_fund_scheme(scheme_code) or {"scheme_code": scheme_code, "scheme_name": scheme_name}
