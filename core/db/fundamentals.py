@@ -11,6 +11,53 @@ from core.presentation.formatters import normalize_de_ratio, normalize_pe_raw
 logger = logging.getLogger("equity_research.core.db.fundamentals")
 
 
+_OPM_RANGE_PATTERN = re.compile(
+    r"\b(?:Operating\s+(?:Profit\s+)?Margins?|OPM\b|EBITDA\s+Margins?)"
+    r"(?P<gap>[^\n%\d.;:*]{0,60}?)\bbetween\s+"
+    r"(?P<lo>-?\d{1,2}(?:\.\d{1,2})?)\s*%?\s*(?:and|to|-|–)\s*(?P<hi>-?\d{1,2}(?:\.\d{1,2})?)\s*%",
+    re.I,
+)
+_OPM_RANGE_EXCLUDE = re.compile(
+    r"\b(?:segment|division|vertical|Jio|Leasing|Europe|Aspiration|hypothetical|if|assuming|"
+    r"expect\w*|guid\w*|target\w*|forecast\w*|project\w*|aim\w*|could|may|might|will|would)\b",
+    re.I,
+)
+_OPM_RANGE_MAX_SPREAD = 10.0
+# Words allowed before the margin label within its own clause; anything else (e.g. a subsidiary
+# or peer name such as "CG Power generates operating margins ...") means the range is not the
+# reporting company's own margin, so it is skipped.
+_OPM_RANGE_SUBJECT_QUALIFIERS = {
+    "consolidated", "standalone", "historical", "historically", "while", "its", "the", "overall",
+    "blended", "reported", "company's", "core", "annual", "typical", "operating",
+}
+_OPM_CLAUSE_START = re.compile(r"(?:\*\*[^*\n]*?:?\*\*:?|[.;:!?]|^\s*[-*•]|\n)\s*", re.M)
+
+
+def _extract_operating_margin_range_midpoint(txt: str) -> Optional[float]:
+    """Midpoint of a stated historical operating/EBITDA margin range ("between 16% and 20%" -> 18.0).
+
+    Fallback only for reports that never state a single margin figure. Rejects forward-looking
+    guidance, segment-level ranges, inverted ranges and spreads wider than 10 percentage points.
+    """
+    for m in _OPM_RANGE_PATTERN.finditer(txt or ""):
+        line_start = txt.rfind("\n", 0, m.start()) + 1
+        line_prefix = txt[line_start:m.start()]
+        if _OPM_RANGE_EXCLUDE.search(line_prefix + m.group("gap")):
+            continue
+        clause_ends = [c.end() for c in _OPM_CLAUSE_START.finditer(line_prefix)]
+        subject = line_prefix[clause_ends[-1]:] if clause_ends else line_prefix
+        if any(w.strip("()[],*\"'").lower() not in _OPM_RANGE_SUBJECT_QUALIFIERS for w in subject.split() if w.strip("*")):
+            continue
+        try:
+            lo, hi = float(m.group("lo")), float(m.group("hi"))
+        except ValueError:
+            continue
+        if not (-100.0 <= lo <= hi <= 95.0) or (hi - lo) > _OPM_RANGE_MAX_SPREAD:
+            continue
+        return round((lo + hi) / 2.0, 2)
+    return None
+
+
 def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Deterministically extracts verified financial ratios, multiples, and price ranges
@@ -139,6 +186,10 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
                             res["operating_margin"] = cand_opm
                     except Exception as e:
                         logger.debug("Failed parsing OPM from report text: %s", e)
+            if res.get("operating_margin") in [None, "N/A", "", 0, 0.0]:
+                range_opm = _extract_operating_margin_range_midpoint(txt)
+                if range_opm is not None:
+                    res["operating_margin"] = range_opm
 
     # 4. Debt-to-Equity (D/E)
     if not is_legacy_synth_template and res.get("debt_to_equity") in [None, "N/A", ""]:

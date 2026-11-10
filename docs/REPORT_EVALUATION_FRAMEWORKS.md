@@ -562,6 +562,7 @@ Benchmarks **2 to 5 Indian listed equities** (`?a=&b=` backward-compatible + `?t
 **Data Harmonization & Localized Fundamentals Cache (`v027_cached_fundamentals`):**
 - Connects `compare_two_companies()` to localized `cached_fundamentals` repository in `reports.db` and Supabase.
 - Deterministically extracts verified ROCE, ROE, OPM, D/E, and 52-week ranges from research baseline text and discovery reel (`core/db/fundamentals.py`).
+- **OPM range midpoint fallback (`_extract_operating_margin_range_midpoint`):** when a report never states a single operating/EBITDA margin figure but states the company's own historical range ("EBITDA margins sit between 13% and 14%"), OPM = (low + high) / 2, rounded to 2 dp. Rejected: ranges wider than 10 percentage points, inverted ranges, forward-looking wording (expect/guidance/target/forecast/project/aim/could/may/might/will/would), segment/division lines, and any clause whose subject is not the margin itself (e.g. a subsidiary, peer or industry named before the label). A single stated margin always takes precedence. Corpus effect at rollout: 14 of 536 archived reports gain an OPM; 0 existing OPM values change. Applied on the next `cached_fundamentals` sync (no migration).
 - Guarantees 100% non-N/A metrics across primary and peer companies even when external market feeds are throttled or offline.
 
 ---
