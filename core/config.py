@@ -173,13 +173,13 @@ def yfinance_fallback_enabled() -> bool:
 
     Disabled by default ("0") in production now that Angel One SmartAPI and direct BSE
     exchange feeds serve as primary market gateways. Only activates if explicitly opted in
-    via YFINANCE_FALLBACK=1 (or in isolated unit tests that mock yfinance offline).
+    via YFINANCE_FALLBACK=1. Test runs (TESTING=1) get the same production default so the
+    suite exercises the SmartAPI -> BSE path; a test that covers the yfinance tier must opt in
+    itself (patch.dict(os.environ, {"YFINANCE_FALLBACK": "1"})).
     """
     explicit = get_secret("YFINANCE_FALLBACK")
     if explicit is not None:
         return str(explicit).strip().lower() in ("1", "true", "yes", "on")
-    if os.environ.get("TESTING") == "1":
-        return True
     return False
 
 

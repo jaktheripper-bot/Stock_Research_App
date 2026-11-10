@@ -430,9 +430,14 @@ class TestYfinanceOptIn(unittest.TestCase):
         else:
             os.environ.pop("YFINANCE_FALLBACK", None)
 
-    def test_flag_defaults_on_and_can_be_disabled(self):
+    def test_flag_defaults_off_even_under_testing_and_can_be_enabled(self):
+        """yfinance is the opt-in third tier: off by default, including when TESTING=1,
+        so the suite exercises the SmartAPI -> BSE path production actually uses."""
         from core.config import yfinance_fallback_enabled
         os.environ.pop("YFINANCE_FALLBACK", None)
+        with patch.dict(os.environ, {"TESTING": "1"}):
+            self.assertFalse(yfinance_fallback_enabled())
+        os.environ["YFINANCE_FALLBACK"] = "1"
         self.assertTrue(yfinance_fallback_enabled())
         os.environ["YFINANCE_FALLBACK"] = "0"
         self.assertFalse(yfinance_fallback_enabled())
