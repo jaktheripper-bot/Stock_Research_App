@@ -8,17 +8,25 @@ from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 from core.analysis.metric_contract import has_forbidden_vendor_token
+from core.analysis.savings_engine import compute_fisher_real_yield_pct, is_pure_sec_112a_arbitrage_fund
 from core.db.connection import get_db_connection
 from core.db.debt import get_active_debt_securities
 from core.db.mutual_funds import get_active_mutual_funds
 from core.db.reits import get_all_reits_and_invits, get_all_sgb_tranches
 from core.db.reports import get_archived_reports
-from core.db.sovereign import get_etf_matrix, get_sovereign_yield_curve
+from core.db.savings import get_active_savings_instruments
+from core.db.sovereign import get_etf_matrix, get_live_macro_anchors, get_sovereign_yield_curve
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MOSPI_CPI_INFLATION: float = 4.50
+DEFAULT_MOSPI_CPI_INFLATION: float = 3.65
 DEFAULT_TAX_SLAB_PCT: float = 30.0
+
+_MF_DEBT_CATEGORY_RE = re.compile(
+    r"\b(?:debt|liquid|gilt|overnight|money\s+market|banking\s+and\s+psu|corporate\s+bond|credit\s+risk)\b",
+    re.IGNORECASE,
+)
+_MF_GILT_PSU_RE = re.compile(r"\b(?:gilt|psu)\b", re.IGNORECASE)
 
 # Capital Hierarchy Seniority Hierarchy (0: Safest Sovereign to 5: Residual Equity)
 SENIORITY_RANKS = {
@@ -96,8 +104,8 @@ def calculate_tax_waterfall(
             "effective_tax_rate_pct": round(eff_tax_rate, 1),
         }
 
-    # 3. Equities & Equity Mutual Funds: Section 112A (12.5% Long-Term Capital Gains)
-    elif asset_class in ("EQUITY", "MF_EQUITY", "ETF_EQUITY"):
+    # 3. Equities, Equity Mutual Funds & Pure Sec 112A Arbitrage Funds
+    elif asset_class in ("EQUITY", "MF_EQUITY", "ETF_EQUITY", "ARBITRAGE_MF"):
         ltcg_rate = 12.5
         net_yield = gross_yield * (1.0 - (ltcg_rate / 100.0))
         return {
@@ -105,6 +113,15 @@ def calculate_tax_waterfall(
             "tax_drag_pct": round(gross_yield - net_yield, 2),
             "tax_statute": "Sec 112A Long-Term Capital Gains (Flat 12.5% above ₹1.25L)",
             "effective_tax_rate_pct": ltcg_rate,
+        }
+
+    # 3B. Exempt-Exempt-Exempt Statutory Small Savings (PPF / SSY / EPF within ₹2.5L)
+    elif asset_class == "SAVINGS_EEE":
+        return {
+            "net_yield_pct": round(gross_yield, 2),
+            "tax_drag_pct": 0.0,
+            "tax_statute": "Sec 10(11) / 10(11A) / 10(12) 100% Exempt-Exempt-Exempt",
+            "effective_tax_rate_pct": 0.0,
         }
 
     # 4. Standard Fixed Income & Debt: Section 50AA / Marginal Slab Tax
@@ -136,6 +153,7 @@ def assign_tenure_bucket(years: float) -> str:
 MEASURE_MAX_AGE = {
     "CONTRACTUAL_YTM": 7,
     "AUCTION_CUTOFF_YIELD": 45,
+    "STATUTORY_OR_TARIFF_RATE": 365,
     "DISTRIBUTION_YIELD_TTM": 7,
     "HISTORICAL_CAGR_3Y": 45,
     "EARNINGS_YIELD_TTM": 7,
@@ -316,9 +334,9 @@ def _equity_observation(
 
 def _comparison_group(item: Dict[str, Any]) -> str:
     kind = item["yield_type"]
-    if kind in {"CONTRACTUAL_YTM", "AUCTION_CUTOFF_YIELD"}:
+    if kind in {"CONTRACTUAL_YTM", "AUCTION_CUTOFF_YIELD", "STATUTORY_OR_TARIFF_RATE"}:
         # Duration and maturity are distinct. The collector uses a declared
-        # years-to-maturity measure for these two groups.
+        # years-to-maturity measure for these groups.
         tenure = item["tenure_bucket"]
         if tenure is None:
             return ""
@@ -507,7 +525,7 @@ def get_normalized_opportunity_universe(
     # 4. Sovereign Yield Benchmarks & T-Bills
     # ----------------------------------------------------
     try:
-        sovereign_benchmarks = get_sovereign_yield_curve()
+        sovereign_benchmarks = get_sovereign_yield_curve(auto_seed=False)
         canonical_tenors = ("91D", "364D", "5Y", "10Y", "10Y_SGRB", "30Y")
         for b in sovereign_benchmarks:
             tenor = b.get("tenor_label", "")
@@ -516,7 +534,7 @@ def get_normalized_opportunity_universe(
             )
             if is_canonical:
                 inst_id = f"GOI_{tenor}"
-                if b.get("source") == "RBI_AUCTION_CUTOFF":
+                if b.get("source") in ("RBI_AUCTION_CUTOFF", "FBIL_LIVE") and not b.get("is_fallback"):
                     metric = _observation(
                         "AUCTION_CUTOFF_YIELD",
                         b.get("cut_off_yield"),
@@ -555,17 +573,16 @@ def get_normalized_opportunity_universe(
         logger.error("Error aggregating sovereign curve for Opportunity Terminal: %s", e)
 
     # ----------------------------------------------------
-    # 5. Mutual Funds
+    # 5. Mutual Funds (with strict Sec 112A Arbitrage vs FoF guard)
     # ----------------------------------------------------
     try:
         funds = get_active_mutual_funds(limit=20, audited_only=True)
         for f in funds:
             broad = (f.get("broad_category") or "EQUITY").upper()
             cat_name = f.get("category") or ""
-            is_debt = (broad == "DEBT") or any(
-                k in cat_name.lower()
-                for k in ["debt", "liquid", "gilt", "overnight", "money market", "banking and psu", "corporate bond", "credit risk"]
-            )
+            scheme_name = f.get("scheme_name") or "Mutual Fund Scheme"
+            is_pure_arb = is_pure_sec_112a_arbitrage_fund(broad, cat_name, scheme_name)
+            is_debt = (not is_pure_arb) and ((broad == "DEBT") or bool(_MF_DEBT_CATEGORY_RE.search(cat_name)))
             scheme_code = str(f.get("scheme_code") or "").strip()
             inputs = _source_metadata(f)
             ded_mf = inst_obs_map.get((scheme_code, "MF", "HISTORICAL_CAGR_3Y"))
@@ -578,23 +595,31 @@ def get_normalized_opportunity_universe(
                     inputs.get("returns_3y_as_of"),
                     inputs.get("returns_3y_source"),
                 )
-            if is_debt:
-                seniority = "AAA_PSU" if ("gilt" in cat_name.lower() or "psu" in cat_name.lower()) else "SENIOR_SECURED"
+            if is_pure_arb:
+                seniority = "SENIOR_SECURED"
+                personas = ["capital_preservation", "quarterly_cashflow"]
+                recourse = "SEBI >=65% Hedged Cash-Futures Arbitrage + Sovereign T-Bill Margin"
+                failure = "Cash-Futures Spread Compression in Bearish Derivatives Regime"
+                resolved_cat_label = "Arbitrage Mutual Fund (Sec 112A)"
+            elif is_debt:
+                seniority = "AAA_PSU" if bool(_MF_GILT_PSU_RE.search(cat_name)) else "SENIOR_SECURED"
                 personas = ["capital_preservation", "quarterly_cashflow"]
                 recourse = "Regulated Underlying Debt Portfolio (AMFI Liquidations / Accrual)"
                 failure = "Credit Rating Downgrade / RBI Repo Rate Shock"
+                resolved_cat_label = cat_name or "Debt Mutual Fund"
             else:
                 seniority = "EQUITY"
                 personas = ["compounding", "asymmetric_upside"]
                 recourse = "Diversified Underlying Equity Portfolio (AMFI NAV Liquidation)"
                 failure = "Market-Wide Equity Drawdown / Active Fund Underperformance"
+                resolved_cat_label = cat_name or "Equity Mutual Fund"
 
             items.append({
                 "id": f.get("scheme_code"),
                 "symbol": f.get("scheme_code"),
-                "name": f.get("scheme_name", "Mutual Fund Scheme"),
+                "name": scheme_name,
                 "asset_class": "MF",
-                "category_label": cat_name or ("Debt Mutual Fund" if is_debt else "Equity Mutual Fund"),
+                "category_label": resolved_cat_label,
                 **metric,
                 "seniority_tier": seniority,
                 "seniority_rank": SENIORITY_RANKS.get(seniority, 5),
@@ -713,6 +738,91 @@ def get_normalized_opportunity_universe(
     except Exception as e:
         logger.error("Error aggregating equities for Opportunity Terminal: %s", e)
 
+    # ----------------------------------------------------
+    # 8. Statutory Small Savings, Term Deposits & Retirement Schemes
+    # ----------------------------------------------------
+    try:
+        savings_items = get_active_savings_instruments()
+        for sv in savings_items:
+            stale_info = sv.get("staleness") or {}
+            stale_status = str(stale_info.get("status") or "FRESH").upper()
+            src_url = str(sv.get("source_url") or "").strip()
+            src_auth = str(sv.get("source_authority") or "").strip()
+            if (
+                sv.get("rate_type") == "MARKET_LINKED_NAV"
+                or stale_status == "UNVERIFIED_PROVENANCE"
+                or not src_url.lower().startswith("https://")
+                or has_forbidden_vendor_token(f"{src_auth} {src_url}")
+            ):
+                metric = _observation(None)
+            elif stale_status == "STALE_TARIFF":
+                raw_val = _number(sv.get("base_rate_pct"))
+                metric = {
+                    "yield_type": "STATUTORY_OR_TARIFF_RATE",
+                    "metric_status": "stale",
+                    "metric_as_of": str(sv.get("effective_from") or "")[:10] or None,
+                    "metric_source": src_auth or None,
+                    "gross_yield_pct": None,
+                    "last_observed_pct": raw_val,
+                    "net_yield_pct": None,
+                    "post_tax_status": "not_calculated",
+                    "real_yield_pct": None,
+                    "spread_vs_10y_gsec_bps": None,
+                    "tax_statute": None,
+                    "effective_tax_rate_pct": None,
+                }
+            else:
+                notes = sv.get("notes") if isinstance(sv.get("notes"), dict) else {}
+                freshness_anchor = notes.get("last_tariff_verified_on") or sv.get("effective_from")
+                metric = _observation(
+                    "STATUTORY_OR_TARIFF_RATE",
+                    sv.get("base_rate_pct"),
+                    freshness_anchor,
+                    src_auth,
+                )
+                if metric.get("metric_status") == "available" and sv.get("effective_from"):
+                    metric["metric_as_of"] = str(sv.get("effective_from"))[:10]
+            max_months = int(sv.get("tenure_max_months") or 0)
+            mat_years = round(max_months / 12.0, 2) if max_months > 0 else 0.25
+            if sv.get("sovereign_backed"):
+                s_tier = "SOVEREIGN"
+                recourse = "Government of India Statutory Sovereign Guarantee"
+                failure = "Statutory Quarterly Reset Drift / Premature Closure Lock-In"
+            elif sv.get("dicgc_insured"):
+                s_tier = "AAA_PSU"
+                recourse = "DICGC Act Sec 16(1) ₹5,00,000 Principal + Accrued Interest Insurance"
+                failure = "Uninsured Balance Above ₹5L Per Bank Charter / Premature Exit Penalty"
+            else:
+                s_tier = "SUBORDINATED"
+                recourse = "Unsecured Public Deposit Claim (0% DICGC Cover; Ranks Behind Secured NCDs)"
+                failure = "NBFC Liquidity Freeze / Unsecured Creditor Haircut"
+
+            personas = ["capital_preservation"]
+            if "PAYOUT" in str(sv.get("compounding_freq") or ""):
+                personas.append("quarterly_cashflow")
+
+            items.append({
+                "id": sv["instrument_id"],
+                "symbol": sv["instrument_id"],
+                "name": sv["scheme_name"],
+                "asset_class": "SAVINGS_DEPOSIT",
+                "category_label": sv.get("category_label", "Fixed Savings & Deposit"),
+                **metric,
+                "seniority_tier": s_tier,
+                "seniority_rank": SENIORITY_RANKS[s_tier],
+                "credit_rating": sv.get("credit_rating", "DICGC_INSURED"),
+                "macaulay_duration_years": None,
+                "tenure_bucket": assign_tenure_bucket(mat_years),
+                "min_ticket_inr": _number(sv.get("min_investment_inr")),
+                "liquidity_tier": "INSTANT_T1" if int(sv.get("lock_in_months") or 0) == 0 else "PERIODIC_WINDOW",
+                "recovery_recourse": recourse,
+                "primary_failure_mode": failure,
+                "detail_url": f"/savings/{sv['instrument_id']}",
+                "persona_tags": personas,
+            })
+    except Exception as e:
+        logger.error("Error aggregating fixed savings universe for Opportunity Terminal: %s", e)
+
     # Research categories filter inventory without implying suitability.
     if persona_filter:
         p_clean = persona_filter.strip().lower()
@@ -743,6 +853,7 @@ def get_heatmap_matrix(universe: Optional[List[Dict[str, Any]]] = None) -> Dict[
         ("SOVEREIGN", "AUCTION_CUTOFF_YIELD", "Sovereign auction cut-off"),
         ("BOND", "CONTRACTUAL_YTM", "Corporate bond quoted YTM"),
         ("SDI", "CONTRACTUAL_YTM", "Securitised debt quoted YTM"),
+        ("SAVINGS_DEPOSIT", "STATUTORY_OR_TARIFF_RATE", "Statutory & DICGC deposit rate"),
     ]
     rows = []
     for asset_class, kind, label in row_specs:

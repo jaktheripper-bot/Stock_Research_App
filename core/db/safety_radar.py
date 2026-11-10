@@ -110,27 +110,27 @@ DEFAULT_ALTERNATIVE_YIELD_PRODUCTS = [
         "audit_matrix_json": json.dumps({
             "regulatory_license": "NBFC-Deposit Taking",
             "bankruptcy_remoteness": "Unsecured creditor status under IBC 2016",
-            "dicgc_insurance": "Zero coverage (DICGC applies ONLY to scheduled banks)",
+            "dicgc_insurance": "Zero coverage (DICGC applies ONLY to RBI-licensed scheduled, small finance, RRB, and insured co-operative banks — never NBFCs)",
             "capital_risk": "Catastrophic principal loss upon corporate liquidity crunch"
         })
     },
     {
         "product_id": "SCHEDULED_BANK_FD",
-        "product_name": "Scheduled Commercial Bank FD (HDFC / SBI / ICICI)",
+        "product_name": "Scheduled Commercial & Small Finance Bank FD (DICGC Insured)",
         "category": "SCHEDULED_COMMERCIAL_BANK",
-        "promoted_yield_pct": 7.10,
+        "promoted_yield_pct": 7.35,
         "danger_score": 8,
         "regulatory_status": "DICGC_INSURED_5LAKH",
         "counterparty_risk_level": "MINIMAL_SOVEREIGN",
         "principal_guarantee_validity": True,
-        "rbi_warning_circular": "Statutory Deposit Insurance Coverage Act (DICGC)",
+        "rbi_warning_circular": "DICGC Act 1961 Section 16(1) (₹5,00,000 Principal + Accrued Interest per Bank Charter)",
         "liquidity_lock_months": 12,
-        "precedent_losses_summary": "100% capital safety for deposits up to ₹5,00,000 per depositor per bank backed by DICGC sovereign guarantee. D-SIBs (SBI, HDFC, ICICI) are systemically backed.",
-        "safe_alternative_recommendation": "Gold standard for absolute capital protection up to ₹5 Lakhs.",
+        "precedent_losses_summary": "Insured up to ₹5,00,000 combined principal + accrued interest per depositor per RBI-licensed bank charter in the same right and capacity by Deposit Insurance and Credit Guarantee Corporation (wholly-owned RBI subsidiary). RBI D-SIBs (SBI, HDFC Bank, ICICI Bank) carry additional systemic oversight.",
+        "safe_alternative_recommendation": "Benchmark reference for insured bank deposit protection up to ₹5,00,000 combined principal and accrued interest per bank charter.",
         "audit_matrix_json": json.dumps({
-            "regulatory_license": "Scheduled Commercial Bank (RBI Regulated)",
-            "dicgc_insurance": "₹5,00,000 statutory insurance backed by RBI subsidiary",
-            "capital_risk": "Near Zero nominal risk (subject to inflation tax drag)"
+            "regulatory_license": "RBI-Licensed Scheduled Commercial / Small Finance / Insured Co-operative Bank",
+            "dicgc_insurance": "₹5,00,000 combined principal + accrued interest backed by wholly-owned RBI subsidiary under DICGC Act 1961 Sec 16(1)",
+            "capital_risk": "Protected up to ₹5L charter cap; uninsured excess remains exposed to bank moratorium and inflation/tax drag"
         })
     }
 ]

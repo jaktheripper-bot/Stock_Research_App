@@ -1031,34 +1031,62 @@ def _publish_scheme_disclosure(
     source_hash: str,
     sheet_name: Optional[str] = None,
 ) -> str:
-    existing = get_mutual_fund_scheme(row["scheme_code"])
-    if existing and existing.get("scheme_code", "").upper() == row["scheme_code"].upper():
-        scheme = dict(existing)
-        meta = dict(existing.get("metadata") or {})
-    else:
-        scheme = dict(amfi_lookup.get(row["scheme_code"]) or {})
-        scheme.setdefault("scheme_code", row["scheme_code"])
-        scheme.setdefault("scheme_name", row["scheme_name"])
-        scheme.setdefault("fund_house", row["fund_house"])
-        scheme.setdefault("category", row["category"])
-        scheme.setdefault("broad_category", row["broad_category"])
-        meta = {}
-    if float(row.get("aum_crores") or 0.0) > 0:
-        scheme["aum_crores"] = row["aum_crores"]
-    scheme["last_portfolio_date"] = as_on
-    top10 = round(sum(h["weight_pct"] for h in holdings[:10]), 1)
-    meta.update({
-        "holdings_source": source_type,
-        "holdings_source_url": source,
-        "holdings_source_sha256": source_hash,
-        "holdings_source_sheet": sheet_name,
-        "holdings_as_on": as_on,
-        "aum_rank": row.get("aum_rank"),
-        "aum_source": "AMFI average AUM (scheme-wise)",
-        "top_10_weight_pct": top10,
-    })
-    scheme["metadata"] = meta
-    return publish_mutual_fund_disclosure(scheme, holdings)
+    from core.db.connection import close_all_pg_pools
+
+    for attempt in range(2):
+        try:
+            existing = get_mutual_fund_scheme(row["scheme_code"])
+            if existing and existing.get("scheme_code", "").upper() == row["scheme_code"].upper():
+                scheme = dict(existing)
+                meta = dict(existing.get("metadata") or {})
+            else:
+                scheme = dict(amfi_lookup.get(row["scheme_code"]) or {})
+                scheme.setdefault("scheme_code", row["scheme_code"])
+                scheme.setdefault("scheme_name", row["scheme_name"])
+                scheme.setdefault("fund_house", row["fund_house"])
+                scheme.setdefault("category", row["category"])
+                scheme.setdefault("broad_category", row["broad_category"])
+                meta = {}
+            if float(row.get("aum_crores") or 0.0) > 0:
+                scheme["aum_crores"] = row["aum_crores"]
+            scheme["last_portfolio_date"] = as_on
+            top10 = round(sum(h["weight_pct"] for h in holdings[:10]), 1)
+            meta.update({
+                "holdings_source": source_type,
+                "holdings_source_url": source,
+                "holdings_source_sha256": source_hash,
+                "holdings_source_sheet": sheet_name,
+                "holdings_as_on": as_on,
+                "aum_rank": row.get("aum_rank"),
+                "aum_source": "AMFI average AUM (scheme-wise)",
+                "top_10_weight_pct": top10,
+            })
+            scheme["metadata"] = meta
+            return publish_mutual_fund_disclosure(scheme, holdings)
+        except Exception as exc:
+            err_text = f"{type(exc).__name__}: {exc}".lower()
+            is_transient_sock = any(
+                tok in err_text
+                for tok in (
+                    "operationalerror",
+                    "interfaceerror",
+                    "connection already closed",
+                    "server closed the connection",
+                    "ssl syscall error",
+                    "eof detected",
+                    "can't assign requested address",
+                )
+            )
+            if attempt == 0 and is_transient_sock:
+                logger.warning(
+                    "Transient DB socket drop publishing scheme %s (%s); resetting pool and retrying once...",
+                    row.get("scheme_code"),
+                    exc,
+                )
+                close_all_pg_pools()
+                time.sleep(0.5)
+                continue
+            raise
 
 
 def sync_legacy_slug_twins_from_verified_numeric(isin_map: Optional[Dict[str, str]] = None) -> Dict[str, int]:

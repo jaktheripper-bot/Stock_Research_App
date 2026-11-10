@@ -255,7 +255,7 @@ class TestAdversarialEngineResilience(unittest.TestCase):
         # compare_asset_classes with NaN slab
         comps = compare_asset_classes_post_tax(marginal_tax_slab_pct=float("nan"))
         self.assertIsInstance(comps, list)
-        self.assertEqual(len(comps), 7)
+        self.assertEqual(len(comps), 9)
 
 
 if __name__ == "__main__":

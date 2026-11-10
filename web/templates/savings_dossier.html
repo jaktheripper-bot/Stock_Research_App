@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+
+{% block title %}{{ instrument.scheme_name }} ({{ instrument.instrument_id }}) | Post-Tax & Seniority Dossier | Moatnomics{% endblock %}
+{% block meta_desc %}Source-grounded fixed-savings dossier for {{ instrument.scheme_name }} ({{ instrument.issuer_name }}): {{ tax_eval.gross_apy_pct }}% Gross APY, {{ tax_eval.post_tax_yield_pct }}% Post-Tax Yield, {{ tax_eval.fisher_real_yield_pct }}% Fisher Real Return, DICGC Sec 16(1) safe principal, and listed Senior NCD seniority comparison.{% endblock %}
+{% block og_title %}{{ instrument.scheme_name }} — Post-Tax & Seniority Dossier | Moatnomics{% endblock %}
+{% block og_desc %}Gross APY {{ tax_eval.gross_apy_pct }}% • Post-Tax {{ tax_eval.post_tax_yield_pct }}% • Fisher Real {{ tax_eval.fisher_real_yield_pct }}% • {{ instrument.credit_rating }}.{% endblock %}
+
+{% block content %}
+<div class="container py-8" data-asset-class="savings">
+  <!-- Breadcrumb Navigation -->
+  <nav aria-label="Breadcrumb" style="margin-bottom: 18px; font-size: 13px; color: var(--text-muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+    <a href="/savings">Fixed Savings &amp; Deposits</a>
+    <span>/</span>
+    <a href="/savings?category={{ instrument.category }}">{{ instrument.category|replace('_', ' ') }}</a>
+    <span>/</span>
+    <span class="mono" style="color: var(--text-primary); font-weight: 700;">{{ instrument.instrument_id }}</span>
+  </nav>
+
+  <!-- Hero Dossier Card -->
+  <div class="hero-portal-banner asset-card-accent" style="border-radius: 16px; padding: 30px; margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+        {% if instrument.sovereign_backed %}
+        <span class="savings-badge-sovereign">
+          <svg class="glyph" aria-hidden="true"><use href="#glyph-temple"></use></svg>
+          <span>100% Sovereign Guarantee (Govt of India)</span>
+        </span>
+        {% elif instrument.dicgc_insured %}
+        <span class="savings-badge-insured">
+          <svg class="glyph" aria-hidden="true"><use href="#glyph-shield"></use></svg>
+          <span>DICGC Act Sec 16(1) Insured (₹5,00,000 Principal + Interest)</span>
+        </span>
+        {% elif instrument.category == 'CORPORATE_FD' %}
+        <span class="savings-badge-uninsured">
+          <svg class="glyph" aria-hidden="true"><use href="#glyph-alert"></use></svg>
+          <span>0% DICGC Insurance • Unsecured Public Deposit</span>
+        </span>
+        {% else %}
+        <span class="savings-badge-sovereign">
+          <svg class="glyph" aria-hidden="true"><use href="#icon-portfolio"></use></svg>
+          <span>{{ instrument.credit_rating }}</span>
+        </span>
+        {% endif %}
+
+        <span class="mono" style="font-size: 11.5px; padding: 3px 9px; border-radius: 9999px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-secondary);">
+          {{ instrument.credit_rating }} • Safety {{ contagion.composite_safety_score }}/100
+        </span>
+      </div>
+
+      <span style="font-size: 12px; color: var(--text-muted);" class="tnum">
+        <svg class="glyph" aria-hidden="true"><use href="#glyph-clock"></use></svg>
+        {{ instrument.staleness.badge_label }} • Source: {{ instrument.source_authority }}
+      </span>
+    </div>
+
+    <h1 style="font-size: 30px; font-weight: 800; color: var(--text-primary); margin: 0 0 6px 0; letter-spacing: -0.02em;">
+      {{ instrument.scheme_name }}
+    </h1>
+    <p style="font-size: 14.5px; color: var(--text-secondary); margin: 0 0 22px 0;">
+      Issued by <strong>{{ instrument.issuer_name }}</strong>
+      {% if instrument.issuer_ticker %} • Exchange Ticker: <span class="mono">{{ instrument.issuer_ticker }}</span>{% endif %}
+      • Compounding: <strong>{{ instrument.compounding_freq }}</strong>
+      {% if tax_eval.rate_formula_note %} • {{ tax_eval.rate_formula_note }}{% endif %}
+    </p>
+
+    <!-- 4-Card Hero Quantitative Strip -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px;">
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Headline / Effective Gross APY</div>
+        <div class="tnum" style="font-size: 26px; font-weight: 800; color: var(--text-primary);">{{ tax_eval.gross_apy_pct }}%</div>
+        <div class="tnum" style="font-size: 12px; color: var(--text-secondary);">
+          Nominal {{ tax_eval.nominal_rate_pct }}%{% if tax_eval.senior_bonus_applied_bps > 0 %} (+{{ tax_eval.senior_bonus_applied_bps }} bps Senior){% endif %}
+        </div>
+      </div>
+
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">
+          Post-Tax Yield ({% if current_regime == 'OLD_REGIME' %}Old Regime{% else %}New 115BAC{% endif %})
+        </div>
+        <div class="tnum savings-yield-neutral" style="font-size: 26px;">{{ tax_eval.post_tax_yield_pct }}%</div>
+        <div class="tnum" style="font-size: 12px; color: var(--text-secondary);">
+          Tax Drag: -{{ tax_eval.tax_drag_bps }} bps ({{ tax_eval.effective_tax_rate_pct }}% eff.)
+        </div>
+      </div>
+
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Fisher Net Real Return</div>
+        <div class="tnum {% if tax_eval.fisher_real_yield_pct >= 0 %}savings-yield-positive{% else %}savings-yield-negative{% endif %}" style="font-size: 26px;">
+          {% if tax_eval.fisher_real_yield_pct >= 0 %}+{% endif %}{{ tax_eval.fisher_real_yield_pct }}%
+        </div>
+        <div class="tnum" style="font-size: 12px; color: var(--text-secondary);">
+          Deflated vs {{ tax_eval.cpi_inflation_used_pct }}% {% if macro_anchors.cpi_is_fallback %}Assumed CPI (Unverified){% else %}MOSPI CPI{% endif %}
+        </div>
+      </div>
+
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Spread vs {% if macro_anchors.gsec_10y_is_fallback %}Assumed 10Y Anchor{% else %}10Y G-Sec{% endif %} ({{ tax_eval.gsec_10y_used_pct }}%)</div>
+        <div class="tnum" style="font-size: 26px; font-weight: 800; color: var(--text-primary);">
+          {% if tax_eval.spread_vs_10y_gsec_bps >= 0 %}+{% endif %}{{ tax_eval.spread_vs_10y_gsec_bps }} bps
+        </div>
+        <div style="font-size: 12px; color: var(--text-secondary);">
+          Alt Regime: {{ alt_regime_eval.post_tax_yield_pct }}% Post-Tax
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive Profile Switcher Form -->
+  <section class="savings-normalizer-shell" aria-labelledby="dossierTaxSwitcherHeading">
+    <h2 id="dossierTaxSwitcherHeading" style="font-size: 15px; font-weight: 800; color: var(--text-primary); margin: 0 0 12px 0;">
+      Simulate Investor Tax Profile on {{ instrument.instrument_id }}
+    </h2>
+    <form action="/savings/{{ instrument.instrument_id }}" method="GET" class="savings-form-grid">
+      <div class="savings-field">
+        <label for="dossierRegimeSelect">Tax Regime</label>
+        <select id="dossierRegimeSelect" name="tax_regime">
+          <option value="NEW_115BAC" {% if current_regime == 'NEW_115BAC' %}selected{% endif %}>New Regime (Sec 115BAC)</option>
+          <option value="OLD_REGIME" {% if current_regime == 'OLD_REGIME' %}selected{% endif %}>Old Regime (80C / 80TTA / 80TTB)</option>
+        </select>
+      </div>
+      <div class="savings-field">
+        <label for="dossierSlabSelect">Marginal / Effective Slab</label>
+        <select id="dossierSlabSelect" name="slab">
+          <option value="42.744" {% if current_slab == 42.744 %}selected{% endif %}>42.74% Effective (Old &gt; ₹5Cr)</option>
+          <option value="39.0" {% if current_slab == 39.0 %}selected{% endif %}>39.00% Effective (HNI &gt; ₹2Cr)</option>
+          <option value="35.88" {% if current_slab == 35.88 %}selected{% endif %}>35.88% Effective (₹1–2Cr)</option>
+          <option value="34.32" {% if current_slab == 34.32 %}selected{% endif %}>34.32% Effective (₹50L–₹1Cr)</option>
+          <option value="31.2" {% if current_slab == 31.2 %}selected{% endif %}>31.20% Effective (30% + Cess)</option>
+          <option value="30.0" {% if current_slab == 30.0 %}selected{% endif %}>30% Slab</option>
+          <option value="20.0" {% if current_slab == 20.0 %}selected{% endif %}>20% Slab</option>
+          <option value="15.0" {% if current_slab == 15.0 %}selected{% endif %}>15% Slab</option>
+          <option value="10.0" {% if current_slab == 10.0 %}selected{% endif %}>10% Slab</option>
+          <option value="5.0" {% if current_slab == 5.0 %}selected{% endif %}>5% Slab</option>
+          <option value="0.0" {% if current_slab == 0.0 %}selected{% endif %}>0% Tax-Exempt</option>
+        </select>
+      </div>
+      <div class="savings-field">
+        <label for="dossierSurchargeSelect">Surcharge</label>
+        <select id="dossierSurchargeSelect" name="surcharge">
+          <option value="0.0" {% if current_surcharge == 0.0 %}selected{% endif %}>0% (≤ ₹50L)</option>
+          <option value="10.0" {% if current_surcharge == 10.0 %}selected{% endif %}>10% (₹50L–₹1Cr)</option>
+          <option value="15.0" {% if current_surcharge == 15.0 %}selected{% endif %}>15% (₹1Cr–₹2Cr)</option>
+          <option value="25.0" {% if current_surcharge == 25.0 %}selected{% endif %}>25% (&gt; ₹2Cr)</option>
+          <option value="37.0" {% if current_surcharge == 37.0 %}selected{% endif %}>37% (&gt; ₹5Cr Old Regime)</option>
+        </select>
+      </div>
+      <div class="savings-field" style="display: flex; flex-direction: column; justify-content: flex-end;">
+        <label for="dossierSeniorCheck" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; text-transform: none; font-size: 13.5px; margin-bottom: 10px;">
+          <input type="checkbox" id="dossierSeniorCheck" name="senior" value="true" {% if current_senior %}checked{% endif %}>
+          <span>Senior Citizen (60+)</span>
+        </label>
+        <button type="submit" class="btn btn-primary" style="min-height: 46px; font-weight: 700;">Recalculate Waterfall</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Pillar 1: Statutory Tax Waterfall, Sec 194A TDS & Dual-Regime Slab Matrix -->
+  <section class="card" style="padding: 24px; margin-bottom: 24px;" aria-labelledby="taxWaterfallHeading">
+    <h2 id="taxWaterfallHeading" style="font-size: 20px; font-weight: 800; color: var(--text-primary); margin: 0 0 12px 0;">
+      01. Statutory Income-Tax Waterfall &amp; Sec 194A TDS Audit ({{ tax_eval.rule_version }})
+    </h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px;">
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--asset-accent); text-transform: uppercase; margin-bottom: 6px;">
+          {{ tax_eval.tax_treatment_badge }}
+        </div>
+        <p style="font-size: 13.5px; color: var(--text-secondary); margin: 0; line-height: 1.55;">
+          {{ tax_eval.tax_statute_note }}
+        </p>
+      </div>
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; margin-bottom: 6px;">
+          Sec 194A Withholding &amp; Form 15G / 15H Cash-Flow Check
+        </div>
+        <p style="font-size: 13.5px; color: var(--text-secondary); margin: 0; line-height: 1.55;">
+          {{ tax_eval.tds_note }}
+        </p>
+      </div>
+    </div>
+
+    <div tabindex="0" role="region" aria-labelledby="taxWaterfallHeading" class="table-sticky-wrap">
+      <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px;">
+        <thead>
+          <tr style="text-align: left; color: var(--text-muted); font-size: 11.5px; text-transform: uppercase;">
+            <th style="padding: 10px 14px; border-bottom: 1px solid var(--border-subtle);">Base Tax Slab</th>
+            <th style="padding: 10px 14px; border-bottom: 1px solid var(--border-subtle);">New Regime (115BAC) Post-Tax</th>
+            <th style="padding: 10px 14px; border-bottom: 1px solid var(--border-subtle);">New Regime Fisher Real</th>
+            <th style="padding: 10px 14px; border-bottom: 1px solid var(--border-subtle);">Old Regime Post-Tax</th>
+            <th style="padding: 10px 14px; border-bottom: 1px solid var(--border-subtle);">Old Regime Fisher Real</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sm in slab_matrix %}
+          <tr>
+            <th scope="row" class="tnum" style="padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border-subtle);">{{ sm.slab_label or (sm.slab_pct ~ '% Slab') }}</th>
+            <td class="tnum savings-yield-neutral" style="padding: 10px 14px; border-bottom: 1px solid var(--border-subtle);">{{ sm.new_regime_post_tax_pct }}%</td>
+            <td class="tnum {% if sm.new_regime_real_pct >= 0 %}savings-yield-positive{% else %}savings-yield-negative{% endif %}" style="padding: 10px 14px; border-bottom: 1px solid var(--border-subtle);">
+              {% if sm.new_regime_real_pct >= 0 %}+{% endif %}{{ sm.new_regime_real_pct }}%
+            </td>
+            <td class="tnum savings-yield-neutral" style="padding: 10px 14px; border-bottom: 1px solid var(--border-subtle);">{{ sm.old_regime_post_tax_pct }}%</td>
+            <td class="tnum {% if sm.old_regime_real_pct >= 0 %}savings-yield-positive{% else %}savings-yield-negative{% endif %}" style="padding: 10px 14px; border-bottom: 1px solid var(--border-subtle);">
+              {% if sm.old_regime_real_pct >= 0 %}+{% endif %}{{ sm.old_regime_real_pct }}%
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Pillar 2: DICGC ₹5,00,000 Exact Principal + Accrued Interest Sizing (For Insured Banks) -->
+  {% if dicgc_cumulative and dicgc_quarterly_payout %}
+  <section class="dicgc-workbench-card" aria-labelledby="dicgcDossierHeading">
+    <h2 id="dicgcDossierHeading" style="font-size: 20px; font-weight: 800; color: var(--text-primary); margin: 0 0 8px 0;">
+      02. DICGC Section 16(1) ₹5,00,000 Safe-Principal Sizing ({{ instrument.bank_charter_key }})
+    </h2>
+    <p style="font-size: 13.5px; color: var(--text-secondary); margin: 0 0 16px 0;">
+      Maximum single-depositor principal in <strong>{{ instrument.issuer_name }}</strong> so that principal plus compounded accrued interest never breaches ₹5,00,000 at peak balance:
+    </p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+      <div class="dicgc-tranche-item">
+        <div style="font-size: 12px; font-weight: 700; color: var(--asset-accent); text-transform: uppercase; margin-bottom: 6px;">Cumulative Mode (Reinvested)</div>
+        <div class="tnum" style="font-size: 24px; font-weight: 800; color: var(--accent-emerald); margin-bottom: 4px;">
+          ₹{{ "{:,.0f}".format(dicgc_cumulative.safe_principal_inr) }}
+        </div>
+        <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
+          Compounded Interest Reserved: <strong class="tnum">₹{{ "{:,.0f}".format(dicgc_cumulative.accrued_interest_at_risk_inr) }}</strong><br>
+          Peak Insured Maturity Value: <strong class="tnum">₹{{ "{:,.0f}".format(dicgc_cumulative.peak_insured_balance_inr) }}</strong> (₹0 Uninsured)
+        </div>
+      </div>
+
+      <div class="dicgc-tranche-item">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; margin-bottom: 6px;">Quarterly Payout Mode (Swept Out)</div>
+        <div class="tnum" style="font-size: 24px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px;">
+          ₹{{ "{:,.0f}".format(dicgc_quarterly_payout.safe_principal_inr) }}
+        </div>
+        <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
+          Single-Quarter Interest Buffer: <strong class="tnum">₹{{ "{:,.0f}".format(dicgc_quarterly_payout.accrued_interest_at_risk_inr) }}</strong><br>
+          Peak Balance Between Payouts: <strong class="tnum">₹{{ "{:,.0f}".format(dicgc_quarterly_payout.peak_insured_balance_inr) }}</strong> (₹0 Uninsured)
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Pillar 3: Cross-Capital-Structure Contagion & Seniority Waterfall Bridge -->
+  <section class="savings-contagion-card" aria-labelledby="contagionBridgeHeading">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+      <h2 id="contagionBridgeHeading" style="font-size: 20px; font-weight: 800; color: var(--text-primary); margin: 0;">
+        03. Capital-Structure Seniority Waterfall &amp; Contagion Bridge
+      </h2>
+      {% if contagion.contagion_flag == 'SENIORITY_YIELD_INVERSION' %}
+      <span class="savings-badge-danger">
+        <svg class="glyph" aria-hidden="true"><use href="#glyph-alert"></use></svg>
+        <span>SENIORITY YIELD INVERSION</span>
+      </span>
+      {% else %}
+      <span class="savings-badge-sovereign">
+        <span>{{ contagion.safety_tier|replace('_', ' ') }}</span>
+      </span>
+      {% endif %}
+    </div>
+
+    <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 18px 0;">
+      {{ contagion.contagion_summary }}
+    </p>
+
+    {% if contagion.comparable_senior_ncds %}
+    <h3 id="issuerNcdTableHeading" style="font-size: 14.5px; font-weight: 700; color: var(--text-primary); margin: 0 0 10px 0;">
+      Same-Issuer Listed Senior Corporate Bonds / NCDs (AT1 &amp; Tier-2 Subordinated Debt Excluded: {{ contagion.excluded_subordinated_or_at1_bonds }})
+    </h3>
+    <div tabindex="0" role="region" aria-labelledby="issuerNcdTableHeading" class="table-sticky-wrap" style="margin-bottom: 18px;">
+      <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px;">
+        <thead>
+          <tr style="text-align: left; color: var(--text-muted); font-size: 11.5px; text-transform: uppercase;">
+            <th style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">ISIN &amp; Series</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">Seniority Claim</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">Rating</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">Traded YTM</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">Asset Cover</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">Bond Dossier</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ncd in contagion.comparable_senior_ncds %}
+          <tr>
+            <th scope="row" style="padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-subtle);">
+              <div style="font-weight: 700; color: var(--text-primary);">{{ ncd.instrument_name }}</div>
+              <div class="mono" style="font-size: 11px; color: var(--text-muted);">{{ ncd.isin }}</div>
+            </th>
+            <td style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">{{ ncd.seniority_tier|replace('_', ' ') }}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">{{ ncd.credit_rating }}</td>
+            <td class="tnum" style="padding: 10px 12px; font-weight: 800; color: var(--accent-emerald); border-bottom: 1px solid var(--border-subtle);">{{ ncd.ytm_pct }}%</td>
+            <td class="tnum" style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">
+              {% if ncd.asset_cover_ratio %}{{ ncd.asset_cover_ratio }}x{% else %}—{% endif %}
+            </td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">
+              <a href="{{ ncd.detail_url }}" class="btn btn-secondary btn-sm">Open Bond &rarr;</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if contagion.equity_health %}
+    {% set eq = contagion.equity_health %}
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Listed Issuer Equity Solvency Anchor</div>
+        <div style="font-size: 15px; font-weight: 800; color: var(--text-primary);">
+          {{ eq.company_name }} ({{ eq.ticker }})
+          {% if eq.current_price %} • <span class="tnum">₹{{ "{:,.2f}".format(eq.current_price) }}</span>{% endif %}
+          {% if eq.pb_ratio %} • <span class="tnum">P/B {{ eq.pb_ratio }}x</span>{% endif %}
+          {% if eq.roe_pct %} • <span class="tnum">ROE {{ eq.roe_pct }}%</span>{% endif %}
+          {% if eq.is_bfsi_balance_sheet %} • <span>BFSI Balance Sheet (CRAR / NPA Regulated)</span>{% endif %}
+        </div>
+      </div>
+      {% if eq.has_equity_dossier %}
+      <a href="{{ eq.equity_dossier_url }}" class="btn btn-secondary btn-sm">Inspect 7-Pillar Equity Dossier &rarr;</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- Pillar 4: Contractual Liquidity, Lock-In & Rate Revision History -->
+  <section class="card" style="padding: 24px; margin-bottom: 24px;" aria-labelledby="liquidityHistoryHeading">
+    <h2 id="liquidityHistoryHeading" style="font-size: 20px; font-weight: 800; color: var(--text-primary); margin: 0 0 14px 0;">
+      04. Tenure, Premature Exit Rules &amp; Statutory Rate Revision Ledger
+    </h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; font-size: 13.5px;">
+      <div class="dicgc-tranche-item">
+        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Tenure &amp; Lock-In</div>
+        <div class="tnum" style="font-weight: 700; color: var(--text-primary); margin-top: 4px;">
+          {{ instrument.tenure_min_months }}–{{ instrument.tenure_max_months }} Months (Lock-in: {{ instrument.lock_in_months }}M)
+        </div>
+      </div>
+      <div class="dicgc-tranche-item">
+        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Entry &amp; Cap Bounds</div>
+        <div class="tnum" style="font-weight: 700; color: var(--text-primary); margin-top: 4px;">
+          Min ₹{{ "{:,.0f}".format(instrument.min_investment_inr) }}{% if instrument.max_investment_inr %} • Max ₹{{ "{:,.0f}".format(instrument.max_investment_inr) }}{% else %} • No Statutory Ceiling{% endif %}
+        </div>
+      </div>
+      <div class="dicgc-tranche-item">
+        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Premature Exit Clause</div>
+        <div style="font-weight: 600; color: var(--text-secondary); margin-top: 4px;">{{ instrument.premature_exit_rule }}</div>
+      </div>
+    </div>
+
+    {% if rate_history %}
+    <div tabindex="0" role="region" aria-labelledby="liquidityHistoryHeading" class="table-sticky-wrap">
+      <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px;">
+        <thead>
+          <tr style="text-align: left; color: var(--text-muted); font-size: 11.5px; text-transform: uppercase;">
+            <th style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">Effective From</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">Status / Effective To</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">Revision</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">Regular Rate</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">Senior Citizen Rate</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">Source Authority</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rh in rate_history %}
+          <tr>
+            <th scope="row" class="tnum" style="padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-subtle);">{{ rh.effective_from }}</th>
+            <td class="tnum" style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">{% if rh.observation_status == 'SUPERSEDED_CONFLICT' %}Reconciled Conflict (Rev {{ rh.revision_seq or 1 }}){% elif rh.superseded_at %}Superseded (Rev {{ rh.revision_seq or 1 }}){% elif rh.observation_status == 'SCHEDULED_FUTURE' %}Scheduled (Eff. {{ rh.effective_from }}){% else %}{{ rh.effective_to or 'Current Active' }}{% endif %}</td>
+            <td class="tnum" style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">v{{ rh.revision_seq or 1 }}</td>
+            <td class="tnum" style="padding: 10px 12px; font-weight: 700; border-bottom: 1px solid var(--border-subtle);">{{ rh.base_rate_pct }}%</td>
+            <td class="tnum" style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);">{{ rh.senior_rate_pct }}%</td>
+            <td style="padding: 10px 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle);">{{ rh.source_authority }}{% if rh.rate_circular_ref and rh.rate_circular_ref != rh.source_authority %} ({{ rh.rate_circular_ref }}){% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- Category Peers -->
+  {% if category_peers %}
+  <section style="margin-bottom: 28px;" aria-labelledby="peersHeading">
+    <h2 id="peersHeading" style="font-size: 19px; font-weight: 800; color: var(--text-primary); margin: 0 0 14px 0;">
+      Category Peers ({{ instrument.category|replace('_', ' ') }})
+    </h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;">
+      {% for p in category_peers %}
+      <div class="card asset-card-accent" data-asset-class="savings" data-href="/savings/{{ p.instrument_id }}" style="padding: 18px; border-radius: 12px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div style="font-size: 14.5px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px;">{{ p.scheme_name }}</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">{{ p.issuer_name }}</div>
+          <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;" class="tnum">
+            Gross <strong>{{ p.tax_eval.gross_apy_pct }}%</strong> • Post-Tax <strong>{{ p.tax_eval.post_tax_yield_pct }}%</strong> • Real <strong>{{ p.tax_eval.fisher_real_yield_pct }}%</strong>
+          </div>
+        </div>
+        <a href="/savings/{{ p.instrument_id }}" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: center; display: inline-flex;">Compare Dossier &rarr;</a>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Mandatory Regulatory Disclosure -->
+  <div style="padding: 18px 20px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+    <strong>Mandatory Regulatory &amp; Statutory Disclosure:</strong> Moatnomics is an independent software utility (not registered anywhere) operating strictly under SEBI (Research Analysts) Regulations, 2014 Section 2(u) educational Safe Harbor. All post-tax, Fisher real-return, DICGC Sec 16(1), and seniority-spread calculations are deterministic educational computations based on published circulars ({{ instrument.source_authority }}, effective {{ instrument.effective_from }}). Verify live bank/post-office card rates and tax applicability before committing funds. Support &amp; data feedback: <a href="/contact">Feedback &amp; Complaints Form</a>.
+  </div>
+</div>
+{% endblock %}

@@ -14,6 +14,7 @@ from core.db.admin import (
     record_admin_audit, get_admin_audit_logs
 )
 from web.main import app, ADMIN_COOKIE_NAME, ADMIN_2FA_PENDING_COOKIE, _generate_admin_token
+from web.common import _generate_pending_2fa_token
 
 class TestAdminAuthSuite(unittest.TestCase):
     def setUp(self):
@@ -269,6 +270,12 @@ class TestAdminAuthSuite(unittest.TestCase):
     
     def test_admin_2fa_local_bypass_code_and_next_url(self):
         """Verify 000000 bypass on localhost preserves next_url destination."""
+        # Ensure owner has an enrolled TOTP secret so direct-verify routes to /admin/verify-2fa
+        owner = get_admin_user("lyndnpnto@gmail.com")
+        if not owner or not owner.get("totp_secret"):
+            set_admin_totp_secret("lyndnpnto@gmail.com", generate_totp_secret())
+        enable_admin_totp("lyndnpnto@gmail.com")
+
         # 1. Direct verify with next_url
         res_init = self.client.post(
             "/admin/auth/direct-verify",
@@ -396,7 +403,19 @@ class TestAdminAuthSuite(unittest.TestCase):
         mock_req.client.host = "::1"
         self.assertTrue(_is_local_dev_request(mock_req))
 
-
-    
-    
-    
+    def test_admin_2fa_light_mode_theme_token_parity(self):
+        """Verify 2FA setup and verify views bind to --bg-card and --text-primary without hardcoded dark-only surfaces."""
+        pending_cookie = _generate_pending_2fa_token("lyndnpnto@gmail.com")
+        res_verify_view = self.client.get(
+            "/admin/verify-2fa",
+            cookies={ADMIN_2FA_PENDING_COOKIE: pending_cookie},
+        )
+        self.assertEqual(res_verify_view.status_code, 200)
+        html_text = res_verify_view.text
+        box_start = html_text.find('<div class="auth-card-wrap">')
+        self.assertNotEqual(box_start, -1)
+        box_html = html_text[box_start:]
+        self.assertIn("var(--bg-card", html_text)
+        self.assertNotIn("var(--card-bg", html_text)
+        self.assertIn("color: var(--text-primary", box_html)
+        self.assertNotIn('style="color: #f8fafc;">lyndnpnto@gmail.com</strong>', box_html)

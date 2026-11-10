@@ -79,7 +79,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Four things we promise every reader", res.text)
         self.assertIn("We never tell you to buy or sell", res.text)
         self.assertIn("Multi-asset investment research", res.text)
-        self.assertIn("One Standard Across Seven Asset Classes", res.text)
+        self.assertIn("One Standard Across Eight Asset Classes", res.text)
         self.assertIn("Statutory Exchange &amp; Registry Ingestion", res.text)
         self.assertIn("Deterministic Financial &amp; Risk Modelling", res.text)
         self.assertIn("Glass-Box Multi-Agent AI &amp; Research Desk", res.text)
@@ -1283,11 +1283,11 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertEqual(res.status_code, 200)
         html = res.text
         self.assertIn("Browse Stock Research Reports", html)
-        self.assertIn("One Standard Across Seven Asset Classes", html)
+        self.assertIn("One Standard Across Eight Asset Classes", html)
         self.assertLess(
-            html.index("One Standard Across Seven Asset Classes"),
+            html.index("One Standard Across Eight Asset Classes"),
             html.index("Browse Stock Research Reports"),
-            "Browse Stock Research Reports section must appear below One Standard Across Seven Asset Classes",
+            "Browse Stock Research Reports section must appear below One Standard Across Eight Asset Classes",
         )
         self.assertIn("home-stock-card", html)
         self.assertIn("homeStockSearchInput", html)
@@ -1326,27 +1326,35 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
 
     def test_tax_calculator_page_resilience_and_clamping(self):
         """Verify /calculator/tax parses strings safely, clamps bounds, and renders the matrix."""
-        # 1. Default request
+        from core.analysis.net_real_tax_calculator import get_default_cpi_inflation
+
+        default_cpi = get_default_cpi_inflation()
+
+        # 1. Default request uses live macro CPI anchor (never stale hardcoded 5.0%)
         r1 = self.client.get("/calculator/tax")
         self.assertEqual(r1.status_code, 200)
         self.assertIn("Post-Tax Purchasing Power Matrix", r1.text)
         self.assertIn("Sovereign Gold Bond (SGB)", r1.text)
-        self.assertIn("Active Deflator: 5.0% Annual Inflation", r1.text)
+        self.assertIn(f"Active Deflator: {default_cpi}% Annual Inflation", r1.text)
 
-        # 2. Non-numeric string inputs fall back cleanly
+        # 2. Non-numeric string inputs fall back cleanly to live macro CPI anchor
         r2 = self.client.get("/calculator/tax?tax_slab=invalid&inflation=also_invalid")
         self.assertEqual(r2.status_code, 200)
-        self.assertIn("Active Deflator: 5.0% Annual Inflation", r2.text)
+        self.assertIn(f"Active Deflator: {default_cpi}% Annual Inflation", r2.text)
 
-        # 3. Clamping out-of-bound inputs
+        # 3. Clamping out-of-bound inputs & honoring explicit valid overrides
         r3 = self.client.get("/calculator/tax?tax_slab=99.0&inflation=50.0")
         self.assertEqual(r3.status_code, 200)
         self.assertIn("Active Deflator: 25.0% Annual Inflation", r3.text)
 
-        # 4. Empty query parameters fall back safely
+        r3_explicit = self.client.get("/calculator/tax?tax_slab=31.2&inflation=5.0")
+        self.assertEqual(r3_explicit.status_code, 200)
+        self.assertIn("Active Deflator: 5.0% Annual Inflation", r3_explicit.text)
+
+        # 4. Empty query parameters fall back safely to live macro CPI anchor
         r4 = self.client.get("/calculator/tax?tax_slab=&inflation=")
         self.assertEqual(r4.status_code, 200)
-        self.assertIn("Active Deflator: 5.0% Annual Inflation", r4.text)
+        self.assertIn(f"Active Deflator: {default_cpi}% Annual Inflation", r4.text)
 
         # 5. Outside-In DOM & attribute contract audit for #inflationInput
         from bs4 import BeautifulSoup
@@ -1354,8 +1362,8 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         inp = soup.find("input", id="inflationInput")
         self.assertIsNotNone(inp, "Missing #inflationInput in rendered HTML")
         self.assertEqual(inp.get("name"), "inflation")
-        self.assertEqual(inp.get("value"), "5.0")
-        self.assertEqual(inp.get("step"), "0.1")
+        self.assertEqual(float(inp.get("value")), float(default_cpi))
+        self.assertEqual(inp.get("step"), "0.01")
         self.assertEqual(inp.get("min"), "0")
         self.assertEqual(inp.get("max"), "25")
         self.assertTrue(inp.has_attr("required"))
@@ -1515,10 +1523,11 @@ class TestOpportunityTerminalEngine(unittest.TestCase):
             self.assertIn("compounding", item.get("persona_tags", []))
 
     def test_get_heatmap_matrix(self):
-        """Verify 2D heatmap matrix construction."""
+        """Verify 2D heatmap matrix construction across all 4 contractual/statutory yield rows."""
         matrix = get_heatmap_matrix()
         self.assertEqual(matrix["tenure_buckets"], ["<1Y", "1-3Y", "3-5Y", "5-10Y", "10Y+"])
-        self.assertEqual(len(matrix["rows"]), 3)
+        self.assertEqual(len(matrix["rows"]), 4)
+        self.assertEqual(matrix["rows"][3]["category_label"], "Statutory & DICGC deposit rate")
         self.assertIsNone(matrix["benchmark_10y_yield"])
 
     def test_get_arbitrage_comparison(self):
@@ -2616,7 +2625,8 @@ class TestInteractiveUiContracts(unittest.TestCase):
             "/", "/equities", "/dossier/INFY", "/funds", "/funds/compare/overlap",
             "/funds/PPFAS_FLEXICAP_DIR", "/debt", "/debt/IN901SDI0012",
             "/reits", "/reits/EMBASSY", "/etfs", "/etfs/NIFTYBEES",
-            "/sovereign", "/msme", "/msme/UDYAM-AP-03-0045619",
+            "/sovereign", "/savings", "/savings/SAV-PPF", "/savings/FD-SHRIRAM-50M",
+            "/msme", "/msme/UDYAM-AP-03-0045619",
             "/opportunities", "/discovery", "/safety-radar",
             "/compare?a=INFY&b=TCS", "/calculator/tax", "/pricing", "/contact",
             "/admin", "/admin/audit"
@@ -2715,6 +2725,232 @@ class TestInteractiveUiContracts(unittest.TestCase):
                 )
         finally:
             self.client.cookies.clear()
+
+
+class TestFixedSavingsOutsideInContracts(unittest.TestCase):
+    """Outside-In UI, DOM, JS, Redirect & API Contract Tests for the 8th Asset Class (`/savings`)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.client = TestClient(app)
+
+    def test_savings_directory_dom_js_and_accessibility_contracts(self):
+        resp = self.client.get("/savings")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.text
+        self.assertNotIn("{{", html)
+        self.assertNotIn("{%", html)
+        self.assertNotIn('\\"', html)
+        self.assertIn('data-asset-class="savings"', html)
+        self.assertIn("Zero-Uninsured-Rupee DICGC Multi-Bank Ladder Workbench", html)
+
+        soup = BeautifulSoup(html, "html.parser")
+        # 1. Directory cards must have valid primary /savings/{id} links
+        cards = soup.select("#savingsCardsGrid .card.asset-card-accent")
+        self.assertGreaterEqual(len(cards), 25)
+        for card in cards:
+            link = card.find("a", href=lambda h: h and h.startswith("/savings/"))
+            self.assertIsNotNone(link, "Savings card missing primary /savings/{id} link")
+
+        # 2. Keyboard-scrollable table containers have tabindex="0" & role="region"
+        table_wraps = soup.select('.table-sticky-wrap[tabindex="0"][role="region"]')
+        self.assertGreaterEqual(len(table_wraps), 2)
+
+        # 3. Interactive DICGC Ladder form & status live region bindings match script targets
+        for dom_id in (
+            "dicgcLadderForm",
+            "dicgcCorpusInput",
+            "dicgcTenureSelect",
+            "dicgcPayoutSelect",
+            "dicgcIncludeSfbCheck",
+            "dicgcComputeBtn",
+            "dicgcStatusBanner",
+            "dicgcChartersVal",
+            "dicgcInsuredVal",
+            "dicgcOverflowVal",
+            "dicgcBlendedNetVal",
+            "dicgcBlendedRealVal",
+            "dicgcTranchesContainer",
+        ):
+            self.assertIsNotNone(soup.find(id=dom_id), f"Missing #{dom_id} on /savings")
+
+        self.assertIn("handleDicgcLadderSubmit", html)
+        self.assertIn("switchSavingsView", html)
+        self.assertIn("/api/savings/dicgc-ladder", html)
+
+    def test_savings_dossiers_mobile_brief_and_legacy_redirects(self):
+        for legacy_path in ("/deposits", "/small-savings", "/pensions"):
+            r_leg = self.client.get(legacy_path, follow_redirects=False)
+            self.assertEqual(r_leg.status_code, 302)
+            self.assertTrue(r_leg.headers.get("location", "").startswith("/savings"))
+
+        for inst_id, expected_phrase in (
+            ("SAV-PPF", "Public Provident Fund"),
+            ("SAV-SCSS", "Senior Citizens Savings Scheme"),
+            ("FD-SBI-444D", "Amrit Vrishti"),
+            ("FD-SHRIRAM-50M", "Unsecured Public Deposit"),
+            ("SAV-NPS-TIER1", "National Pension System"),
+        ):
+            r_dos = self.client.get(f"/savings/{inst_id}")
+            self.assertEqual(r_dos.status_code, 200, f"Failed rendering /savings/{inst_id}")
+            self.assertNotIn("{{", r_dos.text)
+            self.assertNotIn("{%", r_dos.text)
+            self.assertNotIn('\\"', r_dos.text)
+            self.assertIn(expected_phrase, r_dos.text)
+
+        r_missing = self.client.get("/savings/SAV-DOES-NOT-EXIST")
+        self.assertEqual(r_missing.status_code, 404)
+
+        r_mob = self.client.get("/m/SAV-PPF")
+        self.assertEqual(r_mob.status_code, 200)
+        self.assertIn("Public Provident Fund", r_mob.text)
+
+    def test_savings_json_apis_and_admin_import_guard(self):
+        r_list = self.client.get("/api/savings/instruments?category=SMALL_SAVINGS&tax_regime=OLD_REGIME&slab=30")
+        self.assertEqual(r_list.status_code, 200)
+        p_list = r_list.json()
+        self.assertEqual(p_list["status"], "success")
+        self.assertGreaterEqual(p_list["total_count"], 7)
+
+        r_one = self.client.get("/api/savings/instrument/SAV-PPF")
+        self.assertEqual(r_one.status_code, 200)
+        self.assertEqual(r_one.json()["instrument"]["instrument_id"], "SAV-PPF")
+
+        r_ladder = self.client.post(
+            "/api/savings/dicgc-ladder",
+            json={
+                "corpus_inr": 2500000.0,
+                "tenure_months": 36,
+                "payout_mode": "CUMULATIVE",
+                "is_senior": True,
+                "tax_regime": "NEW_115BAC",
+                "slab_rate_pct": 30.0,
+                "include_sfb": True,
+            },
+        )
+        self.assertEqual(r_ladder.status_code, 200)
+        ladder = r_ladder.json()
+        self.assertEqual(ladder["total_uninsured_credit_exposure_inr"], 0.0)
+        bank_charters = [
+            t["bank_charter_key"]
+            for t in ladder["tranches"]
+            if t["tranche_type"] == "DICGC_INSURED_BANK_CHARTER"
+        ]
+        self.assertEqual(len(bank_charters), len(set(bank_charters)))
+
+        r_cp = self.client.get("/api/savings/cash-park?holding_months=13&slab_rate_pct=30")
+        self.assertEqual(r_cp.status_code, 200)
+        self.assertEqual(r_cp.json()["status"], "success")
+
+        # Verify HNI tax inputs (31.2% vs 39.0%) work end-to-end across JSON API and SSR /savings
+        r_dir_312 = self.client.get("/api/savings/directory?slab_rate_pct=31.2&tax_regime=NEW_115BAC")
+        r_dir_390 = self.client.get("/api/savings/directory?slab_rate_pct=39.0&tax_regime=NEW_115BAC")
+        self.assertEqual(r_dir_312.status_code, 200)
+        self.assertEqual(r_dir_390.status_code, 200)
+        rows_312 = sorted(r_dir_312.json()["instruments"], key=lambda x: x["instrument_id"])
+        rows_390 = sorted(r_dir_390.json()["instruments"], key=lambda x: x["instrument_id"])
+        changed_api = sum(
+            1
+            for a, b in zip(rows_312, rows_390)
+            if a["tax_eval"]["post_tax_yield_pct"] != b["tax_eval"]["post_tax_yield_pct"]
+        )
+        self.assertGreaterEqual(changed_api, 30)
+
+        r_ssr_390 = self.client.get("/savings?slab=39.0&tax_regime=NEW_115BAC")
+        self.assertEqual(r_ssr_390.status_code, 200)
+        self.assertIn("39.0% Effective Tax", r_ssr_390.text)
+
+        # Verify unsupported DICGC deposit terms are strictly rejected with HTTP 422
+        r_bad_mode = self.client.get("/api/savings/dicgc-ladder?payout_mode=WEEKLY_PAYOUT")
+        self.assertEqual(r_bad_mode.status_code, 422)
+
+        r_bad_tenor = self.client.post(
+            "/api/savings/dicgc-ladder",
+            json={"corpus_inr": 2000000.0, "tenure_months": 96, "payout_mode": "CUMULATIVE"},
+        )
+        self.assertEqual(r_bad_tenor.status_code, 422)
+
+        r_bad_sfb_band = self.client.post(
+            "/api/savings/dicgc-ladder",
+            json={
+                "corpus_inr": 2000000.0,
+                "tenure_months": 36,
+                "payout_mode": "CUMULATIVE",
+                "include_sfb": False,
+            },
+        )
+        self.assertEqual(r_bad_sfb_band.status_code, 422)
+
+        r_bad_ssr = self.client.get("/savings?payout_mode=WEEKLY_PAYOUT")
+        self.assertEqual(r_bad_ssr.status_code, 422)
+
+        r_admin_unauth = self.client.post("/api/admin/savings/import-rates", json={"allow_network": False})
+        self.assertIn(r_admin_unauth.status_code, (401, 403))
+
+        with patch("web.routers.markets._is_admin_authenticated", return_value=True), patch(
+            "web.routers.markets._validate_request_origin", return_value=True
+        ):
+            r_spoof = self.client.post(
+                "/api/admin/savings/import-rates",
+                json={
+                    "instruments": [
+                        {
+                            "instrument_id": "SAV-NSC",
+                            "base_rate_pct": 8.10,
+                            "effective_from": "2027-02-01",
+                            "source_authority": "Invented authority",
+                            "source_url": "https://invented-source.example/rates",
+                        }
+                    ]
+                },
+            )
+            self.assertEqual(r_spoof.status_code, 422)
+
+            r_rev1 = self.client.post(
+                "/api/admin/savings/import-rates",
+                json={"instruments": [{"instrument_id": "SAV-NSC", "base_rate_pct": 7.90, "effective_from": "2026-11-01"}]},
+            )
+            self.assertEqual(r_rev1.status_code, 200)
+            r_rev2 = self.client.post(
+                "/api/admin/savings/import-rates",
+                json={"instruments": [{"instrument_id": "SAV-NSC", "base_rate_pct": 8.00, "effective_from": "2026-11-01"}]},
+            )
+            self.assertEqual(r_rev2.status_code, 200)
+
+            dossier_html = self.client.get("/savings/SAV-NSC").text
+            self.assertIn("Superseded (Rev 1)", dossier_html)
+            self.assertIn("v2", dossier_html)
+
+            # Older date skipped without force_overwrite, rejected with 422 if force_overwrite lacks override_reason,
+            # and applied when force_overwrite=True + explicit override_reason + override_operator are supplied
+            r_older_no_force = self.client.post(
+                "/api/admin/savings/import-rates",
+                json={"instruments": [{"instrument_id": "SAV-NSC", "base_rate_pct": 7.70, "effective_from": "2026-10-01"}]},
+            )
+            self.assertEqual(r_older_no_force.json()["updated"][0]["status"], "SKIPPED_OLDER_EFFECTIVE_DATE")
+
+            r_older_missing_reason = self.client.post(
+                "/api/admin/savings/import-rates",
+                json={
+                    "force_overwrite": True,
+                    "instruments": [{"instrument_id": "SAV-NSC", "base_rate_pct": 7.70, "effective_from": "2026-10-01"}],
+                },
+            )
+            self.assertEqual(r_older_missing_reason.status_code, 422)
+
+            r_older_force = self.client.post(
+                "/api/admin/savings/import-rates",
+                json={
+                    "force_overwrite": True,
+                    "override_reason": "Statutory DEA retrospective gazette rollback",
+                    "override_operator": "admin:rahul_sharma",
+                    "instruments": [{"instrument_id": "SAV-NSC", "base_rate_pct": 7.70, "effective_from": "2026-10-01"}],
+                },
+            )
+            self.assertEqual(r_older_force.status_code, 200)
+            self.assertEqual(r_older_force.json()["updated"][0]["status"], "RATE_UPDATED")
+            self.assertGreaterEqual(r_older_force.json()["updated"][0]["override_epoch"], 1)
+            self.assertIsNotNone(r_older_force.json()["updated"][0]["override_id"])
 
 
 if __name__ == "__main__":

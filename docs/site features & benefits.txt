@@ -1,9 +1,9 @@
 ================================================================================
 MOATNOMICS — SITE FEATURES, USER CAPABILITIES & REASONS TO BELIEVE
 ================================================================================
-Last Updated: 2026-11-02 (IST)
+Last Updated: 2026-11-09 (IST)
 Document Purpose: Comprehensive AI & Stakeholder Reference Briefing
-Primary Market Focus: Indian Capital Markets (NSE, BSE, AMFI, RBI Sovereign, SEBI REITs/InvITs, MSMED Act Enterprises)
+Primary Market Focus: Indian Capital Markets (NSE, BSE, AMFI, RBI Sovereign, Fixed Savings & Statutory Small Savings, SEBI REITs/InvITs, MSMED Act Enterprises)
 Entity & Regulatory Posture: Independent Software Utility (Not Registered Anywhere). Operates strictly as a factual, descriptive, non-advisory analytical software tool under SEBI (Research Analysts) Regulations, 2014 Section 2(u) Safe Harbor. Zero buy/sell/hold recommendations, target prices, or personalised allocation advice. Support is handled strictly via the on-site Feedback & Complaints Desk (/contact).
 ================================================================================
 
@@ -21,13 +21,14 @@ Moatnomics solves both problems by pairing a Deterministic Quantitative Engine (
 
 2. CORE ADVANTAGES OF USING THE PLATFORM (THE VALUE PROPOSITION)
 --------------------------------------------------------------------------------
-A. Unified 7-Asset Directory Coverage & 8-Instrument Capital Hierarchy:
-   Instead of siloed asset tabs, Moatnomics links seven primary research directories (spanning eight distinct Indian instrument classes) into one unified capital hierarchy:
+A. Unified 8-Asset Directory Coverage & Full Capital Hierarchy:
+   Instead of siloed asset tabs, Moatnomics links eight primary research directories across Indian capital markets and household savings into one unified capital hierarchy:
    - Listed Indian Equities (NSE/BSE — 385+ compiled 7-Pillar dossiers including 100/100 Nifty 100 saturation)
-   - Mutual Funds (2,065+ active AMFI schemes searchable; 231+ portfolio-backed 7-pillar look-through dossiers)
+   - Mutual Funds (2,065+ active AMFI schemes searchable; 944+ twin-deduplicated portfolio-backed look-through dossiers)
    - Exchange-Traded Funds (442 primary exchange-listed AMFI ETFs across 9 institutional categories)
    - Corporate Bonds, NCDs & Securitised Debt Instruments (130+ benchmark securities across 5 credit sleeves under SEBI INR 10,000 Face Value rules)
    - Sovereign Yield Curve & SDLs (16 RBI/CCIL T-Bill & G-Sec tenors, historical yield curve archival, and 10 State Development Loan spreads)
+   - Fixed Savings, Term Deposits, Small Savings & Retirement Universe (34 curated Bank/SFB/Corporate FDs, Post Office Small Savings, RBI Floating Rate Bonds, High-Yield Savings Accounts, EPF/VPF, and NPS with DICGC INR 5,00,000 Principal + Accrued-Interest Safe-Deposit Ladder)
    - Commercial REITs, SEBI SM REITs, InvITs & RBI Sovereign Gold Bonds (12 listed trusts + all 36 active secondary-market SGB tranches)
    - Unlisted MSMEs & Emerging SMEs (136+ MSMED Act Udyam enterprises mapped to listed NSE/BSE sector offtake universes)
 
@@ -42,8 +43,8 @@ C. Post-Tax, Post-Inflation "In-Hand" Realism:
    Nominal yields can mislead allocators. Moatnomics natively models Indian statutory taxation (Finance Act 2023/2024 Sections 50AA, 112A, 111A, 115UA, and 47(viic)) including 4% Health & Education Cess and HNI Surcharges (up to 39.00% peak effective slab) alongside MOSPI Consumer Price Index (CPI) inflation so users see true net real purchasing power returns.
 
 D. Instant Omni-Product Discovery, 30-Second Mobile Briefs & Sub-Second Rendering:
-   - Sitewide 7-Asset Omni-Search (/search, `/` or `Shift+Cmd+K`): Resolves company names, tickers, 6-digit BSE scrip codes, AMFI codes, ISINs, and Udyam UINs across all seven asset classes in parallel.
-   - Mobile Brief Mode (/m, /m/{asset_type}/{asset_id}): Zero-LLM, sub-50ms 30-second executive briefs and the post-close 7-Asset Day-End Market Wrap feed tailored for rapid mobile review.
+   - Sitewide 8-Asset Omni-Search (/search, `/` or `Shift+Cmd+K`): Resolves company names, tickers, 6-digit BSE scrip codes, AMFI codes, ISINs, savings scheme IDs (`SAV-*`/`FD-*`), and Udyam UINs across all eight asset classes in parallel.
+   - Mobile Brief Mode (/m, /m/{asset_type}/{asset_id}): Zero-LLM, sub-50ms 30-second executive briefs and the post-close 8-Asset Day-End Market Wrap feed tailored for rapid mobile review.
    - High-Resolution `@2x` Progressive UI: Dual-theme (`Light`, `Dark`, and ivory dossier reading surfaces) with WCAG-verified contrast and `2400 x 800` `@2x` `image-set()` hero panoramas.
 
 

@@ -78,8 +78,18 @@ class SetuMatrixEngine:
     On-Demand Cross-Asset Capital Structure Matrix.
     """
 
-    DEFAULT_GSEC_10Y: float = 7.05
+    DEFAULT_GSEC_10Y: float = 7.12
     DEFAULT_REIT_YIELD: float = 7.80
+
+    @classmethod
+    def _resolve_live_gsec_10y(cls) -> float:
+        try:
+            from core.db.sovereign import get_live_macro_anchors
+
+            return float(get_live_macro_anchors().get("gsec_10y_pct", cls.DEFAULT_GSEC_10Y))
+        except Exception as exc:
+            logger.debug("Setu live 10Y G-Sec lookup fallback: %s", exc)
+            return cls.DEFAULT_GSEC_10Y
 
     @classmethod
     def evaluate(
@@ -88,10 +98,11 @@ class SetuMatrixEngine:
         equity_fcf_yield_pct: float,
         senior_debt_ytm_pct: Optional[float] = None,
         debt_credit_rating: str = "AAA",
-        gsec_10y_yield_pct: float = DEFAULT_GSEC_10Y,
+        gsec_10y_yield_pct: Optional[float] = None,
         mutual_fund_net_flow_cr: float = 0.0,
         promoter_pledge_pct: float = 0.0,
         tax_slab_pct: float = 30.0,
+        unsecured_fd_yield_pct: Optional[float] = None,
     ) -> SetuMatrixResult:
         """
         Executes on-demand capital structure transmission evaluation.
@@ -100,7 +111,8 @@ class SetuMatrixEngine:
         clean_symbol = str(symbol or "UNKNOWN").upper().strip()
         clean_rating = str(debt_credit_rating or "AAA").upper().strip()
         fcf_yield = _safe_float(equity_fcf_yield_pct, default=0.0)
-        gsec_yield = _safe_float(gsec_10y_yield_pct, default=cls.DEFAULT_GSEC_10Y)
+        live_gsec = cls._resolve_live_gsec_10y()
+        gsec_yield = _safe_float(gsec_10y_yield_pct, default=live_gsec) if gsec_10y_yield_pct is not None else live_gsec
         mf_flow = _safe_float(mutual_fund_net_flow_cr, default=0.0)
         pledge_val = _safe_float(promoter_pledge_pct, default=0.0)
         slab_pct = max(0.0, min(100.0, _safe_float(tax_slab_pct, default=30.0)))
@@ -163,6 +175,31 @@ class SetuMatrixEngine:
         ]
 
         anomalies: List[CapitalStructureAnomaly] = []
+
+        if unsecured_fd_yield_pct is not None:
+            fd_y = _safe_float(unsecured_fd_yield_pct, default=0.0)
+            if fd_y > 0:
+                tranches.append(
+                    CapitalTranche(
+                        tier="UNSECURED_PUBLIC_DEPOSIT",
+                        instrument_name=f"{clean_symbol} Public Deposit (FD)",
+                        nominal_yield_pct=fd_y,
+                        post_tax_yield_pct=round(fd_y * tax_drag, 2),
+                        seniority_rank=4,
+                        rating=clean_rating,
+                    )
+                )
+                if fd_y <= senior_debt_ytm_pct:
+                    anomalies.append(
+                        CapitalStructureAnomaly(
+                            anomaly_type="UNSECURED_FD_YIELD_INVERSION",
+                            severity="WARNING",
+                            description=(
+                                f"Unsecured FD ({fd_y:.2f}%) yields at or below Senior Secured NCD "
+                                f"({senior_debt_ytm_pct:.2f}%) despite zero collateral recourse."
+                            ),
+                        )
+                    )
 
         # 1. Capital Structure Inversion Check (use sanitized fcf_yield, mf_flow, pledge_val)
         if fcf_yield < senior_debt_ytm_pct:

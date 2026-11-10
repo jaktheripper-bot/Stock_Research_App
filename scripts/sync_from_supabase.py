@@ -54,6 +54,10 @@ SYNC_TABLE_SPECS: List[Tuple[str, Tuple[str, ...], Optional[str], str]] = [
     ("etf_matrix", ("symbol",), "updated_at", "upsert"),
     ("msme_firms", ("uin",), "last_updated", "upsert"),
     ("equity_price_history_cache", ("ticker", "period"), "updated_at", "upsert"),
+    ("savings_override_audit_log", ("override_id",), "created_at", "upsert"),
+    ("savings_rate_observations", ("observation_id",), "observed_at", "upsert"),
+    ("savings_instruments", ("instrument_id",), "updated_at", "upsert"),
+    ("tax_rule_registry", ("rule_version",), "updated_at", "upsert"),
 ]
 
 
@@ -123,6 +127,8 @@ def _canonical_key(table_name: str, key_cols: Tuple[str, ...], row_dict: Dict[st
             parts.append(int(dt.timestamp()) if dt is not None else str(raw or "").strip())
         elif table_name == "discovery_reel" and col == "edition_date":
             parts.append(str(raw or "").strip()[:10])
+        elif col == "revision_seq":
+            parts.append(int(raw if raw is not None else 1))
         elif isinstance(raw, str):
             parts.append(raw.strip())
         else:
@@ -157,11 +163,85 @@ def should_apply_incoming_row(
             if not ex_has_dossier and inc_has_dossier:
                 return True
 
+    if table_name == "savings_instruments":
+        from core.db.savings import is_valid_savings_provenance
+
+        if not is_valid_savings_provenance(incoming):
+            logger.warning(
+                "Rejected incoming savings_instruments row %s failing official provenance validation.",
+                incoming.get("instrument_id"),
+            )
+            return False
+    elif table_name == "tax_rule_registry":
+        from core.db.savings import validate_tax_rule_provenance
+
+        try:
+            validate_tax_rule_provenance(incoming)
+        except ValueError as tv_err:
+            logger.warning("Rejected incoming tax_rule_registry row failing provenance check: %s", tv_err)
+            return False
+    elif table_name == "savings_override_audit_log":
+        if not str(incoming.get("operator_id") or "").strip() or len(str(incoming.get("override_reason") or "").strip()) < 8:
+            logger.warning("Rejected incoming savings_override_audit_log row missing operator_id or override_reason.")
+            return False
+        return existing is None
+    elif table_name == "savings_rate_observations":
+        from core.db.savings import validate_observation_provenance
+
+        try:
+            validate_observation_provenance(incoming)
+        except ValueError as obs_err:
+            logger.warning("Rejected incoming savings_rate_observations row failing provenance check: %s", obs_err)
+            return False
+        if existing is None:
+            return True
+        needs_eff_to = not existing.get("effective_to") and bool(incoming.get("effective_to"))
+        needs_superseded = not existing.get("superseded_at") and bool(incoming.get("superseded_at"))
+        needs_sup_by = not existing.get("superseded_by_observation_id") and bool(
+            incoming.get("superseded_by_observation_id")
+        )
+        needs_status_upgrade = (
+            str(existing.get("observation_status") or "") != str(incoming.get("observation_status") or "")
+            and str(incoming.get("observation_status") or "")
+            in ("SUPERSEDED", "SUPERSEDED_CONFLICT", "HISTORICAL", "ACTIVE")
+        )
+        return bool(needs_eff_to or needs_superseded or needs_sup_by or needs_status_upgrade)
+
     if existing is None:
         return True
 
     if force:
         return True
+
+    if table_name == "savings_instruments":
+        inc_epoch = int(incoming.get("override_epoch") or 0)
+        ex_epoch = int(existing.get("override_epoch") or 0)
+        if inc_epoch > ex_epoch:
+            return True
+        if inc_epoch < ex_epoch:
+            return False
+        inc_eff = str(incoming.get("effective_from") or "").strip()[:10]
+        ex_eff = str(existing.get("effective_from") or "").strip()[:10]
+        if inc_eff and ex_eff:
+            if inc_eff < ex_eff:
+                return False
+            if inc_eff > ex_eff:
+                return True
+            inc_act_obs = str(incoming.get("active_observation_id") or "").strip()
+            ex_act_obs = str(existing.get("active_observation_id") or "").strip()
+            if inc_act_obs and ex_act_obs and inc_act_obs != ex_act_obs:
+                # Authoritative PostgreSQL active_observation_id differs on same effective_from;
+                # caller checks whether local causally superseded remote or if PG wins split-brain.
+                return True
+            inc_rate = float(incoming.get("base_rate_pct") or 0.0)
+            ex_rate = float(existing.get("base_rate_pct") or 0.0)
+            inc_bonus = float(incoming.get("senior_citizen_bonus_bps") or 0.0)
+            ex_bonus = float(existing.get("senior_citizen_bonus_bps") or 0.0)
+            if abs(inc_rate - ex_rate) >= 1e-6 or abs(inc_bonus - ex_bonus) >= 1e-6:
+                inc_dt_s = _coerce_datetime(incoming.get(ts_col)) if ts_col else None
+                ex_dt_s = _coerce_datetime(existing.get(ts_col)) if ts_col else None
+                if inc_dt_s is None or ex_dt_s is None or inc_dt_s >= ex_dt_s:
+                    return True
 
     if ts_col:
         inc_dt = _coerce_datetime(incoming.get(ts_col))
@@ -187,7 +267,7 @@ def should_apply_incoming_row(
 
 
 def _ensure_local_sqlite_schema(sqlite_path: str) -> None:
-    """Initializes local SQLite schema if the target file is new or missing core tables."""
+    """Initializes local SQLite schema if the target file is new or missing core/v051 tables."""
     need_init = not os.path.exists(sqlite_path)
     if not need_init:
         conn = sqlite3.connect(sqlite_path)
@@ -196,6 +276,15 @@ def _ensure_local_sqlite_schema(sqlite_path: str) -> None:
                 r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             }
             need_init = not all(spec[0] in existing_tables for spec in SYNC_TABLE_SPECS)
+            if not need_init:
+                obs_cols = {
+                    r[1] for r in conn.execute("PRAGMA table_info(savings_rate_observations)").fetchall()
+                }
+                inst_cols = {
+                    r[1] for r in conn.execute("PRAGMA table_info(savings_instruments)").fetchall()
+                }
+                if "observation_id" not in obs_cols or "override_epoch" not in inst_cols:
+                    need_init = True
         finally:
             conn.close()
 
@@ -203,11 +292,15 @@ def _ensure_local_sqlite_schema(sqlite_path: str) -> None:
         import core.db.connection as db_conn
 
         prev_db_path = os.environ.get("DB_PATH")
+        prev_test_db_path = os.environ.get("TEST_DB_PATH")
+        prev_force_sqlite = os.environ.get("FORCE_LOCAL_SQLITE")
         prev_sb_url = os.environ.get("SUPABASE_DB_URL")
         prev_cached = db_conn._CACHED_SUPABASE_URL
         prev_resolved = db_conn._SUPABASE_URL_RESOLVED
         try:
             os.environ["DB_PATH"] = sqlite_path
+            os.environ["TEST_DB_PATH"] = sqlite_path
+            os.environ["FORCE_LOCAL_SQLITE"] = "1"
             os.environ["SUPABASE_DB_URL"] = ""
             db_conn._CACHED_SUPABASE_URL = ""
             db_conn._SUPABASE_URL_RESOLVED = True
@@ -217,6 +310,14 @@ def _ensure_local_sqlite_schema(sqlite_path: str) -> None:
                 os.environ.pop("DB_PATH", None)
             else:
                 os.environ["DB_PATH"] = prev_db_path
+            if prev_test_db_path is None:
+                os.environ.pop("TEST_DB_PATH", None)
+            else:
+                os.environ["TEST_DB_PATH"] = prev_test_db_path
+            if prev_force_sqlite is None:
+                os.environ.pop("FORCE_LOCAL_SQLITE", None)
+            else:
+                os.environ["FORCE_LOCAL_SQLITE"] = prev_force_sqlite
             if prev_sb_url is None:
                 os.environ.pop("SUPABASE_DB_URL", None)
             else:
@@ -430,6 +531,32 @@ def sync_via_postgresql_pull(
                         )
                         continue
 
+                    # Preload local observation causal chain when pulling savings_instruments
+                    local_obs_sup_chain: Dict[str, Optional[str]] = {}
+                    if table_name == "savings_instruments":
+                        try:
+                            for orow in sqlite_conn.execute(
+                                "SELECT observation_id, superseded_by_observation_id FROM savings_rate_observations"
+                            ).fetchall():
+                                local_obs_sup_chain[str(orow[0])] = (
+                                    str(orow[1]) if orow[1] else None
+                                )
+                        except Exception as obs_chain_err:
+                            logger.debug("Local observation chain notice: %s", obs_chain_err)
+
+                    def _local_causally_superseded(ancestor_oid: str, descendant_oid: str) -> bool:
+                        cur_id: Optional[str] = ancestor_oid
+                        seen = set()
+                        while cur_id and cur_id not in seen and len(seen) < 64:
+                            seen.add(cur_id)
+                            nxt = local_obs_sup_chain.get(cur_id)
+                            if nxt == descendant_oid:
+                                return True
+                            cur_id = nxt
+                        return False
+
+                    now_pull_iso = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S+05:30")
+
                     for raw_remote in remote_rows:
                         incoming = {
                             c: normalize_pg_value_for_sqlite(raw_remote.get(c))
@@ -441,6 +568,67 @@ def sync_via_postgresql_pull(
                         if not should_apply_incoming_row(table_name, incoming, existing, ts_col, force=force):
                             stats["skipped_fresh"] += 1
                             continue
+
+                        # Handle causal vs split-brain conflict resolution on savings_instruments
+                        if table_name == "savings_instruments" and existing is not None and not force:
+                            inc_epoch = int(incoming.get("override_epoch") or 0)
+                            ex_epoch = int(existing.get("override_epoch") or 0)
+                            inc_eff = str(incoming.get("effective_from") or "")[:10]
+                            ex_eff = str(existing.get("effective_from") or "")[:10]
+                            inc_act_obs = str(incoming.get("active_observation_id") or "").strip()
+                            ex_act_obs = str(existing.get("active_observation_id") or "").strip()
+
+                            if (
+                                inc_epoch == ex_epoch
+                                and inc_eff == ex_eff
+                                and inc_act_obs
+                                and ex_act_obs
+                                and inc_act_obs != ex_act_obs
+                            ):
+                                if _local_causally_superseded(inc_act_obs, ex_act_obs):
+                                    # Local SQLite has an un-pushed sequential amendment on top of PG's observation
+                                    stats["skipped_fresh"] += 1
+                                    continue
+                                # Otherwise PG causally superseded local OR this is a cross-DB split-brain conflict:
+                                # PostgreSQL is authoritative; mark divergent local observation SUPERSEDED_CONFLICT!
+                                if not dry_run:
+                                    sq_cur.execute(
+                                        """
+                                        UPDATE savings_rate_observations
+                                        SET superseded_at = COALESCE(superseded_at, ?),
+                                            superseded_by_observation_id = COALESCE(superseded_by_observation_id, ?),
+                                            observation_status = CASE
+                                                WHEN superseded_at IS NULL THEN 'SUPERSEDED_CONFLICT'
+                                                ELSE observation_status
+                                            END
+                                        WHERE observation_id = ? AND superseded_at IS NULL
+                                        """,
+                                        (now_pull_iso, inc_act_obs, ex_act_obs),
+                                    )
+                                    if sq_cur.rowcount > 0:
+                                        stats["conflicts_reconciled"] = (
+                                            stats.get("conflicts_reconciled", 0) + sq_cur.rowcount
+                                        )
+                            elif inc_epoch > ex_epoch and not dry_run and inc_act_obs:
+                                sq_cur.execute(
+                                    """
+                                    UPDATE savings_rate_observations
+                                    SET superseded_at = COALESCE(superseded_at, ?),
+                                        superseded_by_observation_id = COALESCE(superseded_by_observation_id, ?),
+                                        observation_status = 'SUPERSEDED'
+                                    WHERE instrument_id = ?
+                                      AND superseded_at IS NULL
+                                      AND observation_id <> ?
+                                      AND effective_from >= ?
+                                    """,
+                                    (
+                                        now_pull_iso,
+                                        inc_act_obs,
+                                        str(incoming["instrument_id"]),
+                                        inc_act_obs,
+                                        inc_eff,
+                                    ),
+                                )
 
                         # Preserve non-empty local prose/citations when incoming field is blank
                         if existing is not None:
@@ -462,12 +650,44 @@ def sync_via_postgresql_pull(
                             cols_sql = ", ".join(write_cols)
                             placeholders = ", ".join(["?"] * len(write_cols))
                             conflict_sql = ", ".join(key_cols)
-                            update_cols = [c for c in write_cols if c not in key_cols]
-                            update_sql = ", ".join([f"{c} = excluded.{c}" for c in update_cols])
-                            sql = (
-                                f"INSERT INTO {table_name} ({cols_sql}) VALUES ({placeholders}) "
-                                f"ON CONFLICT ({conflict_sql}) DO UPDATE SET {update_sql}"
-                            )
+                            if table_name == "savings_rate_observations":
+                                sql = (
+                                    f"INSERT INTO {table_name} ({cols_sql}) VALUES ({placeholders}) "
+                                    f"ON CONFLICT ({conflict_sql}) DO UPDATE SET "
+                                    f"effective_to = COALESCE({table_name}.effective_to, excluded.effective_to), "
+                                    f"superseded_at = COALESCE({table_name}.superseded_at, excluded.superseded_at), "
+                                    f"superseded_by_observation_id = COALESCE("
+                                    f"{table_name}.superseded_by_observation_id, excluded.superseded_by_observation_id), "
+                                    f"observation_status = CASE "
+                                    f"WHEN {table_name}.superseded_at IS NULL AND excluded.superseded_at IS NOT NULL "
+                                    f"THEN excluded.observation_status "
+                                    f"WHEN {table_name}.observation_status = 'SCHEDULED_FUTURE' "
+                                    f"AND excluded.observation_status = 'ACTIVE' THEN 'ACTIVE' "
+                                    f"ELSE {table_name}.observation_status END"
+                                )
+                            elif table_name == "savings_override_audit_log":
+                                sql = (
+                                    f"INSERT INTO {table_name} ({cols_sql}) VALUES ({placeholders}) "
+                                    f"ON CONFLICT ({conflict_sql}) DO NOTHING"
+                                )
+                            elif table_name == "savings_instruments" and not force:
+                                update_cols = [c for c in write_cols if c not in key_cols]
+                                update_sql = ", ".join([f"{c} = excluded.{c}" for c in update_cols])
+                                sql = (
+                                    f"INSERT INTO {table_name} ({cols_sql}) VALUES ({placeholders}) "
+                                    f"ON CONFLICT ({conflict_sql}) DO UPDATE SET {update_sql} "
+                                    f"WHERE COALESCE(excluded.override_epoch, 0) > COALESCE({table_name}.override_epoch, 0) "
+                                    f"OR (COALESCE(excluded.override_epoch, 0) = COALESCE({table_name}.override_epoch, 0) "
+                                    f"AND ({table_name}.effective_from IS NULL "
+                                    f"OR excluded.effective_from >= {table_name}.effective_from))"
+                                )
+                            else:
+                                update_cols = [c for c in write_cols if c not in key_cols]
+                                update_sql = ", ".join([f"{c} = excluded.{c}" for c in update_cols])
+                                sql = (
+                                    f"INSERT INTO {table_name} ({cols_sql}) VALUES ({placeholders}) "
+                                    f"ON CONFLICT ({conflict_sql}) DO UPDATE SET {update_sql}"
+                                )
                             sq_cur.execute(sql, tuple(incoming[c] for c in write_cols))
                         else:
                             # natural_no_uniq (discovery_reel, report_revisions)

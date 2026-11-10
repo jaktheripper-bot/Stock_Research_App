@@ -35,6 +35,8 @@ def infer_canonical_asset_path(raw_id: str, details: dict | None = None, event_t
     upper_id = raw_clean.upper()
     if action == "export_msme_pdf" or upper_id.startswith("UDYAM-"):
         return f"/msme/{upper_id}"
+    if action == "export_savings_pdf" or re.match(r"^(?:SAV|FD|HYSA)-[A-Z0-9-]+$", upper_id):
+        return f"/savings/{upper_id}"
     if action == "export_fund_pdf":
         return f"/funds/{raw_clean}"
     if action == "export_debt_pdf":

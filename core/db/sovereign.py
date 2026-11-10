@@ -248,7 +248,7 @@ DEFAULT_SDL_MATRIX = [
     }
 ]
 
-# Policy Corridor and Macro Rates
+# Policy Corridor and Macro Rates (offline baseline reference; live observations override `source` upon verification)
 DEFAULT_MACRO_RATES = [
     {
         "metric_key": "repo_rate",
@@ -257,7 +257,7 @@ DEFAULT_MACRO_RATES = [
         "metric_value": 6.50,
         "unit": "%",
         "period_label": "Current Stance (Neutral / Withdrawal of Accommodation)",
-        "source": "RBI Monetary Policy Committee (MPC)"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "metric_key": "sdf_rate",
@@ -266,7 +266,7 @@ DEFAULT_MACRO_RATES = [
         "metric_value": 6.25,
         "unit": "%",
         "period_label": "Corridor Floor (Uncollateralized Absorption)",
-        "source": "Reserve Bank of India"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "metric_key": "msf_rate",
@@ -275,7 +275,7 @@ DEFAULT_MACRO_RATES = [
         "metric_value": 6.75,
         "unit": "%",
         "period_label": "Corridor Ceiling (Emergency Liquidity Window)",
-        "source": "Reserve Bank of India"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "metric_key": "cpi_inflation",
@@ -283,8 +283,8 @@ DEFAULT_MACRO_RATES = [
         "indicator_name": "Headline CPI Retail Inflation",
         "metric_value": 3.65,
         "unit": "%",
-        "period_label": "Latest Statutory Gazette (Target: 4.0% +/- 2%)",
-        "source": "MOSPI Gazette Release"
+        "period_label": "Baseline Reference Deflator (Target: 4.0% +/- 2%)",
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "metric_key": "net_laf_liquidity_cr",
@@ -293,7 +293,7 @@ DEFAULT_MACRO_RATES = [
         "metric_value": 125400.0,
         "unit": "₹ Cr",
         "period_label": "Daily System Liquidity Surplus",
-        "source": "RBI Financial Markets Operations"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "metric_key": "real_10y_yield",
@@ -302,7 +302,7 @@ DEFAULT_MACRO_RATES = [
         "metric_value": 3.47,
         "unit": "%",
         "period_label": "Nominal 10Y (7.12%) minus Headline CPI (3.65%)",
-        "source": "Moatnomics Calculation"
+        "source": "Moatnomics Calculation (Baseline Reference)"
     }
 ]
 
@@ -378,10 +378,16 @@ def save_sovereign_benchmark(bench: Dict[str, Any]) -> bool:
                 ON CONFLICT (tenor_label) DO UPDATE SET
                     instrument_type = EXCLUDED.instrument_type,
                     maturity_years = EXCLUDED.maturity_years,
+                    updated_at = CASE
+                        WHEN ABS(sovereign_benchmarks.cut_off_yield - EXCLUDED.cut_off_yield) >= 0.000001
+                          OR COALESCE(sovereign_benchmarks.auction_date, '') <> COALESCE(EXCLUDED.auction_date, '')
+                          OR COALESCE(sovereign_benchmarks.source, '') <> COALESCE(EXCLUDED.source, '')
+                        THEN now()
+                        ELSE sovereign_benchmarks.updated_at
+                    END,
                     cut_off_yield = EXCLUDED.cut_off_yield,
                     auction_date = EXCLUDED.auction_date,
-                    source = EXCLUDED.source,
-                    updated_at = now();
+                    source = EXCLUDED.source;
             """
         else:
             query = f"""
@@ -392,10 +398,16 @@ def save_sovereign_benchmark(bench: Dict[str, Any]) -> bool:
                 ON CONFLICT (tenor_label) DO UPDATE SET
                     instrument_type = excluded.instrument_type,
                     maturity_years = excluded.maturity_years,
+                    updated_at = CASE
+                        WHEN ABS(sovereign_benchmarks.cut_off_yield - excluded.cut_off_yield) >= 0.000001
+                          OR COALESCE(sovereign_benchmarks.auction_date, '') <> COALESCE(excluded.auction_date, '')
+                          OR COALESCE(sovereign_benchmarks.source, '') <> COALESCE(excluded.source, '')
+                        THEN (datetime('now', '+5 hours', '+30 minutes') || '+05:30')
+                        ELSE sovereign_benchmarks.updated_at
+                    END,
                     cut_off_yield = excluded.cut_off_yield,
                     auction_date = excluded.auction_date,
-                    source = excluded.source,
-                    updated_at = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
+                    source = excluded.source;
             """
         params = (
             bench["tenor_label"],
@@ -417,8 +429,12 @@ def save_sovereign_benchmark(bench: Dict[str, Any]) -> bool:
         conn.close()
 
 
-def get_sovereign_yield_curve() -> List[Dict[str, Any]]:
-    """Returns the sovereign yield curve sorted in ascending order by maturity."""
+def get_sovereign_yield_curve(auto_seed: bool = True) -> List[Dict[str, Any]]:
+    """Returns the sovereign yield curve sorted in ascending order by maturity.
+
+    When `auto_seed=False`, strictly returns only persisted DB rows without inserting
+    or substituting baseline assumptions.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -431,11 +447,13 @@ def get_sovereign_yield_curve() -> List[Dict[str, Any]]:
         """)
         rows = cursor.fetchall()
 
-        if not rows or len(rows) < len(DEFAULT_SOVEREIGN_BENCHMARKS):
-            # Seed or synchronize the full suite of sovereign benchmarks
-            logger.info("Synchronizing full suite of statutory RBI sovereign benchmarks...")
+        if not rows and auto_seed:
+            # Seed baseline curve only when table is completely empty and caller opted in
+            logger.info("Synchronizing baseline suite of sovereign benchmarks...")
             for b in DEFAULT_SOVEREIGN_BENCHMARKS:
-                save_sovereign_benchmark(b)
+                b_seed = dict(b)
+                b_seed["source"] = "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
+                save_sovereign_benchmark(b_seed)
             cursor.execute("""
                 SELECT id, tenor_label, instrument_type, maturity_years, cut_off_yield,
                        auction_date, source, updated_at
@@ -452,14 +470,24 @@ def get_sovereign_yield_curve() -> List[Dict[str, Any]]:
                 "instrument_type": r[2],
                 "maturity_years": float(r[3]),
                 "cut_off_yield": float(r[4]),
-                "auction_date": str(r[5]),
+                "auction_date": str(r[5]) if r[5] is not None else None,
                 "source": r[6],
                 "updated_at": str(r[7]),
             })
         return results
     except Exception as e:
         logger.error(f"Error fetching sovereign yield curve: {e}")
-        return DEFAULT_SOVEREIGN_BENCHMARKS
+        if not auto_seed:
+            return []
+        return [
+            {
+                **b,
+                "auction_date": None,
+                "source": "ASSUMED_FALLBACK (DB_UNAVAILABLE)",
+                "is_fallback": True,
+            }
+            for b in DEFAULT_SOVEREIGN_BENCHMARKS
+        ]
     finally:
         cursor.close()
         conn.close()
@@ -488,19 +516,22 @@ def fetch_live_rbi_ccil_yield_curve(data_source: str = "CCIL_LIVE") -> Dict[str,
 
     try:
         resp = requests.get("https://www.fbil.org.in", headers=headers, timeout=3, verify=certifi.where())
-        if resp.status_code == 200:
+        if resp.status_code == 200 and live_benchmarks:
             source_tag = "FBIL_LIVE"
             success = True
             logger.info("Connected to live sovereign market endpoint: FBIL_LIVE")
+        else:
+            source_tag = "STATIC_BASELINE_REFERENCE"
+            success = False
     except Exception as fetch_err:
         logger.warning(f"Live sovereign endpoint probe notice ({data_source}): {fetch_err}. Retaining verified statutory cut-offs.")
         source_tag = "FALLBACK_HISTORICAL"
 
     return {
-        "status": "LIVE_FETCHED" if success else "STATUTORY_BASELINE",
+        "status": "LIVE_FETCHED" if (success and live_benchmarks) else "STATUTORY_BASELINE",
         "data_source": source_tag,
         "live_benchmarks": live_benchmarks,
-        "is_live": success
+        "is_live": bool(success and live_benchmarks)
     }
 
 
@@ -613,18 +644,26 @@ def refresh_daily_sovereign_benchmarks(edition_date: Optional[str] = None) -> Di
     active_source = live_feed.get("data_source", "RBI_AUCTION_CUTOFF")
     is_live = live_feed.get("is_live", False)
 
+    existing_bench_map = {
+        pt["tenor_label"]: pt for pt in get_sovereign_yield_curve(auto_seed=False)
+    }
     benchmarks_updated = 0
     for bench in DEFAULT_SOVEREIGN_BENCHMARKS:
         b_copy = dict(bench)
-        # Only update auction_date if live auction cut-off was verified
+        prev_b = existing_bench_map.get(bench["tenor_label"])
+        # Only update existing benchmark if a live auction cut-off was verified
         if is_live and live_feed.get("live_benchmarks"):
             b_copy["auction_date"] = str(live_feed.get("auction_date") or edition_date)
             b_copy["source"] = active_source
-        else:
-            # Preserve verified historical cut-off date without fabrication
-            b_copy["source"] = bench.get("source", "RBI_AUCTION_CUTOFF")
-        if save_sovereign_benchmark(b_copy):
+            if save_sovereign_benchmark(b_copy):
+                benchmarks_updated += 1
+        elif prev_b is not None:
+            # Preserve existing persisted benchmark without reverting rate or fabricating source
             benchmarks_updated += 1
+        else:
+            b_copy["source"] = "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
+            if save_sovereign_benchmark(b_copy):
+                benchmarks_updated += 1
 
     sdl_updated = 0
     for sdl in DEFAULT_SDL_MATRIX:
@@ -634,41 +673,52 @@ def refresh_daily_sovereign_benchmarks(edition_date: Optional[str] = None) -> Di
         if save_sovereign_sdl_item(s_copy):
             sdl_updated += 1
 
-    # Synchronize macro monetary corridor rates and stamp updated_at
+    # Synchronize macro monetary corridor rates without restamping updated_at or reverting live updates
     macro_updated = 0
+    live_macro = fetch_live_rbi_mospi_macro_corridor()
+    live_macro_map = live_macro.get("rates", {})
+    is_live_macro = bool(live_macro.get("is_live"))
+
     conn = get_db_connection()
     cursor = conn.cursor()
     p = get_placeholder()
     is_pg = bool(get_supabase_url()) or is_postgres_connection(conn)
+    now_expr = "now()" if is_pg else "(datetime('now', '+5 hours', '+30 minutes') || '+05:30')"
+    excl = "EXCLUDED" if is_pg else "excluded"
     try:
+        cursor.execute("SELECT metric_key, metric_value, updated_at FROM sovereign_macro_rates;")
+        existing_macro = {str(r[0]): (float(r[1]), r[2]) for r in cursor.fetchall() if r and r[0]}
+
         for m in DEFAULT_MACRO_RATES:
+            m_key = m["metric_key"]
             metric_name_val = m.get("metric_name") or m.get("indicator_name", "")
-            if is_pg:
+            live_override = live_macro_map.get(m_key)
+            prev_entry = existing_macro.get(m_key)
+
+            # Never revert an existing DB macro observation with static baseline defaults when offline
+            if prev_entry is not None and not (is_live_macro and live_override):
+                continue
+
+            val_to_save = float(live_override["metric_value"]) if live_override else float(m["metric_value"])
+            period_to_save = str(live_override.get("period_label") or m["period_label"]) if live_override else m["period_label"]
+            source_to_save = str(live_override.get("source") or m["source"]) if live_override else m["source"]
+
+            value_changed = prev_entry is None or abs(prev_entry[0] - val_to_save) >= 1e-6
+
+            if prev_entry is None or value_changed or (is_live_macro and live_override):
                 q_macro = f"""
                     INSERT INTO sovereign_macro_rates (metric_key, metric_name, metric_value, unit, period_label, source, updated_at)
-                    VALUES ({p}, {p}, {p}, {p}, {p}, {p}, now())
+                    VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {now_expr})
                     ON CONFLICT (metric_key) DO UPDATE SET
-                        metric_name = EXCLUDED.metric_name,
-                        metric_value = EXCLUDED.metric_value,
-                        unit = EXCLUDED.unit,
-                        period_label = EXCLUDED.period_label,
-                        source = EXCLUDED.source,
-                        updated_at = now();
+                        metric_name = {excl}.metric_name,
+                        metric_value = {excl}.metric_value,
+                        unit = {excl}.unit,
+                        period_label = {excl}.period_label,
+                        source = {excl}.source,
+                        updated_at = {now_expr};
                 """
-            else:
-                q_macro = f"""
-                    INSERT INTO sovereign_macro_rates (metric_key, metric_name, metric_value, unit, period_label, source, updated_at)
-                    VALUES ({p}, {p}, {p}, {p}, {p}, {p}, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
-                    ON CONFLICT (metric_key) DO UPDATE SET
-                        metric_name = excluded.metric_name,
-                        metric_value = excluded.metric_value,
-                        unit = excluded.unit,
-                        period_label = excluded.period_label,
-                        source = excluded.source,
-                        updated_at = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
-                """
-            cursor.execute(q_macro, (m["metric_key"], metric_name_val, m["metric_value"], m["unit"], m["period_label"], m["source"]))
-            macro_updated += 1
+                cursor.execute(q_macro, (m_key, metric_name_val, val_to_save, m["unit"], period_to_save, source_to_save))
+                macro_updated += 1
         conn.commit()
     except Exception as macro_err:
         logger.warning(f"Macro monetary corridor sync notice: {macro_err}")
@@ -676,7 +726,6 @@ def refresh_daily_sovereign_benchmarks(edition_date: Optional[str] = None) -> Di
     finally:
         cursor.close()
         conn.close()
-    get_macro_monetary_corridor()
 
     # Record daily term-structure snapshot into sovereign_curve_history
     curve_snapshots = save_sovereign_curve_snapshot(edition_date)
@@ -852,8 +901,12 @@ get_sdl_state_spreads = get_sovereign_sdl_matrix
 
 
 
-def get_macro_monetary_corridor() -> Dict[str, Any]:
-    """Returns official policy rates (Repo, SDF, MSF), CPI inflation, and real yield metrics."""
+def get_macro_monetary_corridor(auto_seed: bool = True) -> Dict[str, Any]:
+    """Returns policy rates (Repo, SDF, MSF), CPI inflation, and real yield metrics.
+
+    When `auto_seed=False`, returns strictly persisted DB rows without auto-inserting
+    baseline reference figures.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -864,7 +917,7 @@ def get_macro_monetary_corridor() -> Dict[str, Any]:
         """)
         rows = cursor.fetchall()
 
-        if not rows:
+        if not rows and auto_seed:
             p = get_placeholder()
             for m in DEFAULT_MACRO_RATES:
                 metric_name_val = m.get("metric_name") or m.get("indicator_name", "")
@@ -878,6 +931,14 @@ def get_macro_monetary_corridor() -> Dict[str, Any]:
 
         result_dict = {}
         for r in rows:
+            src_str = str(r[5] or "").strip()
+            is_unverified_seed = (
+                not src_str
+                or "FALLBACK" in src_str.upper()
+                or "ASSUMED" in src_str.upper()
+                or "UNVERIFIED" in src_str.upper()
+                or "STATIC_BASELINE" in src_str.upper()
+            )
             result_dict[r[0]] = {
                 "key": r[0],
                 "name": r[1],
@@ -886,11 +947,14 @@ def get_macro_monetary_corridor() -> Dict[str, Any]:
                 "unit": r[3],
                 "period": r[4],
                 "period_label": r[4],
-                "source": r[5]
+                "source": src_str or "UNVERIFIED_MACRO_ROW",
+                "is_fallback": is_unverified_seed,
             }
         return result_dict
     except Exception as e:
         logger.error(f"Error fetching macro rates: {e}")
+        if not auto_seed:
+            return {}
         return {
             m["metric_key"]: {
                 "key": m["metric_key"],
@@ -898,15 +962,211 @@ def get_macro_monetary_corridor() -> Dict[str, Any]:
                 "indicator_name": m.get("indicator_name", m.get("metric_name", "")),
                 "value": m["metric_value"],
                 "unit": m["unit"],
-                "period": m["period_label"],
-                "period_label": m["period_label"],
-                "source": m["source"]
+                "period": "Fallback Assumption (DB Unavailable)",
+                "period_label": "Fallback Assumption (DB Unavailable)",
+                "source": "ASSUMED_FALLBACK (DB_UNAVAILABLE)",
+                "is_fallback": True,
             }
             for m in DEFAULT_MACRO_RATES
         }
     finally:
         cursor.close()
         conn.close()
+
+
+def fetch_live_rbi_mospi_macro_corridor() -> Dict[str, Any]:
+    """Probes official RBI / MOSPI macro endpoints via certifi TLS verification.
+    Fails closed without fabricating rates when upstream feeds are offline or unchanged.
+    """
+    import os
+    import re
+    import certifi
+    import requests
+
+    if os.environ.get("TESTING") == "1":
+        return {"status": "SKIPPED_TEST_MODE", "is_live": False, "rates": {}}
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; MoatnomicsMacroVerifier/1.0)",
+        "Accept": "text/html,application/json,*/*",
+    }
+    parsed_rates: Dict[str, Dict[str, Any]] = {}
+    try:
+        resp = requests.get("https://www.rbi.org.in", headers=headers, timeout=3, verify=certifi.where())
+        if resp.status_code == 200 and resp.text:
+            repo_match = re.search(r"Policy\s+Repo\s+Rate[^0-9]{1,80}([3-9]\.\d{1,2})\s*%", resp.text, re.IGNORECASE)
+            if repo_match:
+                repo_val = round(float(repo_match.group(1)), 2)
+                if 3.0 <= repo_val <= 10.0:
+                    parsed_rates["repo_rate"] = {
+                        "metric_value": repo_val,
+                        "source": "RBI Monetary Policy Committee (Live Verified)",
+                    }
+            sdf_match = re.search(r"Standing\s+Deposit\s+Facility[^0-9]{1,80}([3-9]\.\d{1,2})\s*%", resp.text, re.IGNORECASE)
+            if sdf_match:
+                sdf_val = round(float(sdf_match.group(1)), 2)
+                if 2.5 <= sdf_val <= 10.0:
+                    parsed_rates["sdf_rate"] = {
+                        "metric_value": sdf_val,
+                        "source": "Reserve Bank of India (Live Verified)",
+                    }
+    except Exception as exc:
+        logger.warning("Live RBI macro corridor probe notice: %s. Retaining verified statutory baseline.", exc)
+
+    return {
+        "status": "LIVE_VERIFIED" if parsed_rates else "STATUTORY_BASELINE",
+        "is_live": bool(parsed_rates),
+        "rates": parsed_rates,
+    }
+
+
+def _is_verified_source_label(source_val: Any) -> bool:
+    """Returns True only when a persisted macro/curve row carries a verified non-fallback source."""
+    s = str(source_val or "").strip()
+    if not s:
+        return False
+    upper = s.upper()
+    for unverified_tok in ("FALLBACK", "ASSUMED", "UNVERIFIED", "STATIC_BASELINE", "MOCK", "PLACEHOLDER"):
+        if unverified_tok in upper:
+            return False
+    return True
+
+
+def get_live_macro_anchors() -> Dict[str, Any]:
+    """Unified source-of-truth macro anchor feed consumed across /savings, /opportunities,
+    /calculator/tax, and Setu so inflation assumptions and risk-free rates never drift.
+
+    Epistemic Honesty Invariant:
+    - Queries persisted DB tables with `auto_seed=False` so reading anchors NEVER writes
+      assumed numbers into empty tables under official MOSPI / RBI labels.
+    - When a macro or yield-curve observation is absent or unverified, explicitly flags
+      `*_is_fallback = True`, `*_observed_pct = None`, and labels `*_source` as
+      `ASSUMED_FALLBACK (Unverified — Observation Missing)` — NEVER as `MOSPI Gazette Release`
+      or `RBI_AUCTION_CUTOFF`.
+    """
+    corridor = get_macro_monetary_corridor(auto_seed=False)
+    curve = get_sovereign_yield_curve(auto_seed=False)
+    tenor_map = {pt["tenor_label"]: pt for pt in curve if pt.get("tenor_label")}
+
+    def _resolve_macro_entry(entry: Dict[str, Any], default_val: float) -> Dict[str, Any]:
+        raw_val = entry.get("value") if isinstance(entry, dict) else None
+        raw_src = entry.get("source") if isinstance(entry, dict) else None
+        raw_period = entry.get("period_label") if isinstance(entry, dict) else None
+        verified = (raw_val is not None) and _is_verified_source_label(raw_src) and not bool(entry.get("is_fallback"))
+        num_val = round(float(raw_val), 2) if raw_val is not None else round(float(default_val), 2)
+        if verified:
+            return {
+                "pct": num_val,
+                "observed_pct": num_val,
+                "is_fallback": False,
+                "status": "available",
+                "source": str(raw_src).strip(),
+                "period_label": str(raw_period or "Verified Release").strip(),
+            }
+        return {
+            "pct": num_val,
+            "observed_pct": round(float(raw_val), 2) if raw_val is not None else None,
+            "is_fallback": True,
+            "status": "unverified_baseline" if raw_val is not None else "missing_assumed_fallback",
+            "source": (
+                str(raw_src).strip()
+                if (raw_val is not None and raw_src and not _is_verified_source_label(raw_src))
+                else "ASSUMED_FALLBACK (Unverified — Macro Observation Missing)"
+            ),
+            "period_label": (
+                f"{raw_period} [Unverified Baseline]"
+                if (raw_val is not None and raw_period)
+                else "Assumed Modeling Fallback (Live Observation Missing)"
+            ),
+        }
+
+    def _resolve_curve_point(pt: Dict[str, Any], default_val: float) -> Dict[str, Any]:
+        raw_val = pt.get("cut_off_yield") if isinstance(pt, dict) else None
+        raw_src = pt.get("source") if isinstance(pt, dict) else None
+        raw_date = pt.get("auction_date") if isinstance(pt, dict) else None
+        verified = (
+            raw_val is not None
+            and _is_verified_source_label(raw_src)
+            and bool(str(raw_date or "").strip())
+            and not bool(pt.get("is_fallback"))
+        )
+        num_val = round(float(raw_val), 2) if raw_val is not None else round(float(default_val), 2)
+        if verified:
+            return {
+                "pct": num_val,
+                "observed_pct": num_val,
+                "is_fallback": False,
+                "status": "available",
+                "source": str(raw_src).strip(),
+                "auction_date": str(raw_date).strip(),
+            }
+        return {
+            "pct": num_val,
+            "observed_pct": round(float(raw_val), 2) if raw_val is not None else None,
+            "is_fallback": True,
+            "status": "unverified_baseline" if raw_val is not None else "missing_assumed_fallback",
+            "source": (
+                str(raw_src).strip()
+                if (raw_val is not None and raw_src and not _is_verified_source_label(raw_src))
+                else "ASSUMED_FALLBACK (Unverified — Curve Observation Missing)"
+            ),
+            "auction_date": str(raw_date).strip() if (raw_val is not None and raw_date) else None,
+        }
+
+    cpi_res = _resolve_macro_entry(corridor.get("cpi_inflation", {}), 3.65)
+    repo_res = _resolve_macro_entry(corridor.get("repo_rate", {}), 6.50)
+    sdf_res = _resolve_macro_entry(corridor.get("sdf_rate", {}), 6.25)
+    msf_res = _resolve_macro_entry(corridor.get("msf_rate", {}), 6.75)
+
+    g10_res = _resolve_curve_point(tenor_map.get("10Y_GSEC", {}), 7.12)
+    t91_res = _resolve_curve_point(tenor_map.get("91D_TBILL", {}), 6.84)
+    t182_res = _resolve_curve_point(tenor_map.get("182D_TBILL", {}), 6.92)
+    t364_res = _resolve_curve_point(tenor_map.get("364D_TBILL", {}), 6.96)
+
+    cpi_pct = cpi_res["pct"]
+    gsec_10y_pct = g10_res["pct"]
+    fisher_real_10y = (((1.0 + (gsec_10y_pct / 100.0)) / (1.0 + (cpi_pct / 100.0))) - 1.0) * 100.0
+    any_fallback = any(
+        r["is_fallback"] for r in (cpi_res, repo_res, g10_res, t91_res)
+    )
+
+    return {
+        "cpi_inflation_pct": cpi_pct,
+        "cpi_observed_pct": cpi_res["observed_pct"],
+        "cpi_is_fallback": cpi_res["is_fallback"],
+        "cpi_status": cpi_res["status"],
+        "cpi_source": cpi_res["source"],
+        "cpi_period_label": cpi_res["period_label"],
+        "gsec_10y_pct": gsec_10y_pct,
+        "gsec_10y_observed_pct": g10_res["observed_pct"],
+        "gsec_10y_is_fallback": g10_res["is_fallback"],
+        "gsec_10y_status": g10_res["status"],
+        "gsec_10y_auction_date": g10_res["auction_date"],
+        "gsec_10y_source": g10_res["source"],
+        "tbill_91d_pct": t91_res["pct"],
+        "tbill_91d_observed_pct": t91_res["observed_pct"],
+        "tbill_91d_is_fallback": t91_res["is_fallback"],
+        "tbill_91d_source": t91_res["source"],
+        "tbill_91d_auction_date": t91_res["auction_date"],
+        "tbill_182d_pct": t182_res["pct"],
+        "tbill_182d_is_fallback": t182_res["is_fallback"],
+        "tbill_364d_pct": t364_res["pct"],
+        "tbill_364d_is_fallback": t364_res["is_fallback"],
+        "repo_rate_pct": repo_res["pct"],
+        "rbi_repo_rate_pct": repo_res["pct"],
+        "repo_observed_pct": repo_res["observed_pct"],
+        "repo_is_fallback": repo_res["is_fallback"],
+        "repo_source": repo_res["source"],
+        "sdf_rate_pct": sdf_res["pct"],
+        "sdf_is_fallback": sdf_res["is_fallback"],
+        "sdf_source": sdf_res["source"],
+        "msf_rate_pct": msf_res["pct"],
+        "msf_is_fallback": msf_res["is_fallback"],
+        "msf_source": msf_res["source"],
+        "real_10y_fisher_pct": round(fisher_real_10y, 2),
+        "is_fallback": any_fallback,
+        "as_of": g10_res["auction_date"] if not g10_res["is_fallback"] else "Unverified Fallback Assumption",
+    }
 
 
 def get_historical_sovereign_curves() -> Dict[str, List[Dict[str, Any]]]:

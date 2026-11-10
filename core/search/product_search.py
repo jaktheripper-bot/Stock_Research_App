@@ -79,11 +79,12 @@ CATEGORY_ORDER = (
     "reits_invits",
     "sovereign",
     "msmes",
+    "savings_deposits",
 )
 
 
 def empty_search_categories() -> Dict[str, List[Dict[str, Any]]]:
-    """Returns a fresh 7-category dictionary with empty result lists."""
+    """Returns a fresh 8-category dictionary with empty result lists."""
     return {key: [] for key in CATEGORY_ORDER}
 
 
@@ -974,17 +975,82 @@ def search_msmes(query: str, limit: int = 10) -> List[Dict[str, Any]]:
     return matches[:safe_limit]
 
 
+def search_savings_instruments(query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    """Searches Statutory Small Savings, Bank/SFB/Corporate Term Deposits, HYSAs, and EPF/NPS."""
+    clean_q = (query or "").strip()
+    if not clean_q:
+        return []
+
+    safe_limit = max(1, min(int(limit or 10), 100))
+    q_upper = clean_q.upper()
+    broad_trigger = q_upper in (
+        "FD",
+        "FDS",
+        "FIXED DEPOSIT",
+        "DEPOSIT",
+        "DEPOSITS",
+        "SAVINGS",
+        "SMALL SAVINGS",
+        "POST OFFICE",
+        "DICGC",
+        "80C",
+        "PENSION",
+        "RETIREMENT",
+    )
+
+    try:
+        from core.db.savings import get_active_savings_instruments
+
+        candidates = (
+            get_active_savings_instruments()
+            if broad_trigger
+            else get_active_savings_instruments(query=clean_q)
+        )
+        matches: List[Dict[str, Any]] = []
+        for inst in candidates[:safe_limit]:
+            inst_id = inst["instrument_id"]
+            rate_val = _safe_float(inst.get("base_rate_pct"), 0.0)
+            guarantee_short = (
+                "Sovereign"
+                if inst.get("sovereign_backed")
+                else ("DICGC ₹5L" if inst.get("dicgc_insured") else inst.get("credit_rating", "Rated"))
+            )
+            matches.append(
+                {
+                    "product_type": "SAVINGS_DEPOSIT",
+                    "data_asset_class": "savings",
+                    "identifier": inst_id,
+                    "title": inst["scheme_name"],
+                    "subtitle": f"{inst['issuer_name']} • {rate_val:.2f}% p.a. • {guarantee_short}",
+                    "url": f"/savings/{inst_id}",
+                    "badge": "Savings / FD",
+                    "badge_class": "badge-primary",
+                    "details": {
+                        "instrument_id": inst_id,
+                        "rate_pct": f"{rate_val:.2f}%",
+                        "category": inst.get("category_label", inst["category"]),
+                        "guarantee": guarantee_short,
+                    },
+                }
+            )
+        return matches
+    except Exception as exc:
+        logger.warning("Savings instruments search warning: %s", exc)
+        return []
+
+
 def search_investment_products(
     query: str,
     product_type: str = "ALL",
     limit_per_category: int = 6,
 ) -> Dict[str, Any]:
     """
-    Master 7-Asset Omni-Search function querying across:
+    Master 8-Asset Omni-Search function querying across:
     1. Equities  2. Mutual Funds  3. ETFs  4. Corporate Debt
     5. REITs/InvITs/SGBs  6. Sovereign Curve & SDLs  7. Unlisted MSMEs
+    8. Fixed Savings, Term Deposits & Statutory Small Savings
 
-    Returns grouped `categories` across all 7 asset classes plus interleaved flat `results`.
+    Returns grouped `categories` across all 8 asset classes plus interleaved flat `results`.
     """
     clean_q = (query or "").strip()
     categories = empty_search_categories()
@@ -1011,6 +1077,18 @@ def search_investment_products(
         tasks.append(("sovereign", search_sovereign))
     if type_filter in ("ALL", "MSME", "MSMES", "SME", "UDYAM"):
         tasks.append(("msmes", search_msmes))
+    if type_filter in (
+        "ALL",
+        "SAVINGS",
+        "SAVINGS_DEPOSIT",
+        "SAVINGS_DEPOSITS",
+        "FD",
+        "DEPOSIT",
+        "DEPOSITS",
+        "SMALL_SAVINGS",
+        "PENSION",
+    ):
+        tasks.append(("savings_deposits", search_savings_instruments))
 
     if len(tasks) > 1 and is_postgres_active():
         from concurrent.futures import ThreadPoolExecutor
@@ -1100,6 +1178,17 @@ def resolve_cross_asset_dossier_redirect(
         except Exception as exc:
             logger.warning("Cross-asset MSME lookup warning for %s: %s", upper_id, exc)
         return "/msme"
+
+    if re.match(r"^(?:SAV|FD|HYSA)-[A-Z0-9-]+$", upper_id):
+        try:
+            from core.db.savings import get_savings_instrument_by_id
+
+            sav = get_savings_instrument_by_id(upper_id)
+            if sav and sav.get("instrument_id"):
+                return f"/savings/{sav['instrument_id']}"
+        except Exception as exc:
+            logger.warning("Cross-asset savings lookup warning for %s: %s", upper_id, exc)
+        return "/savings"
 
     if re.match(r"^IN00[A-Z0-9]{8}$", upper_id):
         return "/sovereign"

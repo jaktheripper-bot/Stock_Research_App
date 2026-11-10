@@ -3035,6 +3035,12 @@ progress.loading-spinner:indeterminate::-moz-progress-bar {
   --asset-accent-border: rgba(59, 64, 122, 0.38);
 }
 
+[data-asset-class="savings"] {
+  --asset-accent: #0F5C4D;
+  --asset-accent-subtle: rgba(15, 92, 77, 0.11);
+  --asset-accent-border: rgba(15, 92, 77, 0.38);
+}
+
 [data-asset-class="reits"] {
   --asset-accent: #964325;
   --asset-accent-subtle: rgba(150, 67, 37, 0.11);
@@ -3134,6 +3140,14 @@ html[data-theme="light"] [data-asset-class="sovereign"],
   --asset-accent-border: rgba(59, 64, 122, 0.38);
 }
 
+html[data-theme="light"] [data-asset-class="savings"],
+.dossier-ivory-surface [data-asset-class="savings"],
+.dossier-ivory-surface[data-asset-class="savings"] {
+  --asset-accent: #0F5C4D;
+  --asset-accent-subtle: rgba(15, 92, 77, 0.11);
+  --asset-accent-border: rgba(15, 92, 77, 0.38);
+}
+
 html[data-theme="light"] [data-asset-class="reits"],
 .dossier-ivory-surface [data-asset-class="reits"],
 .dossier-ivory-surface[data-asset-class="reits"] {
@@ -3195,6 +3209,12 @@ html[data-theme="dark"] [data-asset-class="sovereign"] {
   --asset-accent: #A5B4FC;
   --asset-accent-subtle: rgba(165, 180, 252, 0.14);
   --asset-accent-border: rgba(165, 180, 252, 0.42);
+}
+
+html[data-theme="dark"] [data-asset-class="savings"] {
+  --asset-accent: #6EE7B7;
+  --asset-accent-subtle: rgba(110, 231, 183, 0.14);
+  --asset-accent-border: rgba(110, 231, 183, 0.42);
 }
 
 html[data-theme="dark"] [data-asset-class="reits"] {
@@ -6494,16 +6514,157 @@ html[data-theme="light"] .home-sector-pills::-webkit-scrollbar-thumb:hover {
   background: rgba(14, 61, 50, 0.45);
 }
 
+/* ==============================================================================
+   8th Asset Class: Fixed Savings, Term Deposits, Small Savings & DICGC Ladder
+   ============================================================================== */
+.savings-normalizer-shell {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  margin-bottom: 24px;
+}
 
+.savings-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
 
+.savings-field label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin-block-end: 6px;
+}
 
+.savings-field input,
+.savings-field select {
+  width: 100%;
+  font-size: 1rem;
+  min-height: 46px;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
 
+.savings-radio-group {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 
+.savings-yield-positive {
+  color: var(--accent-emerald);
+  font-weight: 800;
+}
 
+.savings-yield-negative {
+  color: var(--accent-rose);
+  font-weight: 800;
+}
 
+.savings-yield-neutral {
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
 
+.savings-badge-insured {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(16, 185, 129, 0.14);
+  color: var(--accent-emerald);
+  border: 1px solid rgba(16, 185, 129, 0.36);
+}
 
+.savings-badge-sovereign {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--asset-accent-subtle);
+  color: var(--asset-accent);
+  border: 1px solid var(--asset-accent-border);
+}
 
+.savings-badge-uninsured {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(245, 158, 11, 0.14);
+  color: var(--accent-amber);
+  border: 1px solid rgba(245, 158, 11, 0.38);
+}
 
+.savings-badge-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(244, 63, 94, 0.14);
+  color: var(--accent-rose);
+  border: 1px solid rgba(244, 63, 94, 0.38);
+}
 
+.dicgc-workbench-card,
+.savings-contagion-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 28px;
+}
 
+.dicgc-tranche-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.dicgc-tranche-item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+
+.table-sticky-wrap {
+  overflow-x: auto !important;
+  max-width: 100%;
+  container-type: inline-size;
+}
+
+@media (forced-colors: active) {
+  .savings-normalizer-shell,
+  .dicgc-workbench-card,
+  .savings-contagion-card,
+  .dicgc-tranche-item,
+  .savings-badge-insured,
+  .savings-badge-sovereign,
+  .savings-badge-uninsured,
+  .savings-badge-danger {
+    border: 1px solid CanvasText;
+  }
+}

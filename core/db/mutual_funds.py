@@ -453,22 +453,28 @@ def save_mutual_fund_holdings(scheme_code: str, holdings: List[Dict[str, Any]], 
                 clean_code, h_type, ident, name, weight, sector, det_json, port_date
             )
 
-        for row_vals in deduped_holdings.values():
+        pg_rows = list(deduped_holdings.values())
+        if pg_rows:
             if use_pg:
-                cursor.execute("""
+                from psycopg2.extras import execute_values
+
+                sql_pg = """
                     INSERT INTO mutual_fund_holdings (
                         scheme_code, holding_type, identifier, holding_name,
                         weight_pct, sector_or_rating, instrument_details, portfolio_date
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES %s
                     ON CONFLICT (scheme_code, holding_type, identifier) DO UPDATE SET
                         holding_name = EXCLUDED.holding_name,
                         weight_pct = EXCLUDED.weight_pct,
                         sector_or_rating = EXCLUDED.sector_or_rating,
                         instrument_details = EXCLUDED.instrument_details,
                         portfolio_date = EXCLUDED.portfolio_date;
-                """, row_vals)
+                """
+                raw_cur = getattr(cursor, "_cur", cursor)
+                for idx in range(0, len(pg_rows), 500):
+                    execute_values(raw_cur, sql_pg, pg_rows[idx:idx + 500])
             else:
-                cursor.execute("""
+                cursor.executemany("""
                     INSERT INTO mutual_fund_holdings (
                         scheme_code, holding_type, identifier, holding_name,
                         weight_pct, sector_or_rating, instrument_details, portfolio_date
@@ -479,7 +485,7 @@ def save_mutual_fund_holdings(scheme_code: str, holdings: List[Dict[str, Any]], 
                         sector_or_rating = excluded.sector_or_rating,
                         instrument_details = excluded.instrument_details,
                         portfolio_date = excluded.portfolio_date;
-                """, row_vals)
+                """, pg_rows)
 
         if connection is None:
             conn.commit()
@@ -651,10 +657,17 @@ def publish_mutual_fund_disclosure(
         conn.commit()
         return snapshot_id
     except Exception:
-        conn.rollback()
+        try:
+            if not getattr(conn, "closed", 0):
+                conn.rollback()
+        except Exception as rb_err:
+            logger.debug("Rollback skipped on closed connection for %s: %s", code, rb_err)
         raise
     finally:
-        cur.close()
+        try:
+            cur.close()
+        except Exception as cur_err:
+            logger.debug("Cursor close notice for %s: %s", code, cur_err)
         conn.close()
 
 

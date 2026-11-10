@@ -267,6 +267,31 @@ def run_evening_harvest_pipeline(
             force=force,
         )
 
+        def _savings_rate_sync():
+            from core.db.savings import verify_and_sync_automated_savings_rates
+
+            allow_net = os.environ.get("TESTING") != "1"
+            sav_res = verify_and_sync_automated_savings_rates(
+                edition_date=date_str,
+                allow_network=allow_net,
+            )
+            logger.info(
+                "Evening Phase 1B: Verified %s fixed-savings instruments (%s live changes, %s review-due).",
+                sav_res.get("total_active", 0),
+                sav_res.get("live_rate_changes", 0),
+                sav_res.get("review_due_count", 0),
+            )
+            return sav_res
+
+        _run_leased_phase(
+            results,
+            "savings_rate_sync",
+            f"savings_rate_sync_{date_str}",
+            "Evening Phase 1B: Statutory & Bank Savings Rate Verification",
+            _savings_rate_sync,
+            force=force,
+        )
+
     # 2. National ETF Matrix Synchronization (Mon-Fri post-close)
     if is_weekend_skip:
         results["etf_sync"] = "SKIPPED_MARKET_CLOSED"

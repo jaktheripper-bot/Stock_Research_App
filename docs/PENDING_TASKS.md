@@ -1,7 +1,7 @@
 # Platform Roadmap & Pending Tasks Register
 **Moatnomics — Multi-Asset Investment Research Platform**  
 *Document Target:* [`docs/PENDING_TASKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/PENDING_TASKS.md)  
-*Last Updated:* 2026-10-24 12:24:00 IST  
+*Last Updated:* 2026-11-09 18:15:00 IST
 
 ---
 
@@ -22,6 +22,11 @@
 ---
 
 ## 2. Completed Tasks (Moved to Bottom)
+
+### ~~🏦 Task 6: Unified Fixed Savings, Term Deposits, Small Savings & Retirement Universe (`/savings`)~~
+- ~~**Category:** 8th Asset Class Expansion, DICGC Sec 16(1) Safety & Cross-Surface Macro Parity~~
+- ~~**Status:** `Completed & Verified on Disk` (Shipped 2026-11-09)~~
+- ~~**Details:** Dual-dialect migration `v049_fixed_savings_and_deposit_universe`, `34` curated fixed-rate & retirement instruments (`core/db/savings.py`, `data/savings_rates/baseline_savings_universe.json`), Finance Act 2025 dual-regime tax waterfall, DICGC ₹5,00,000 principal + accrued-interest multi-charter ladder, FD ↔ Senior NCD ↔ Equity contagion bridge, pure Sec 112A arbitrage vs FoF guard (zero fabricated MF returns), shared `get_live_macro_anchors()`, 8-Asset Omni-Search, and full SSR `/savings` + `/savings/{instrument_id}` views.~~
 
 ### ~~📱 Task 4: Mobile Brief Mode (`/m`)~~
 - ~~**Category:** Mobile Experience & High-Density Commuter Research~~

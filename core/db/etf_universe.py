@@ -616,6 +616,23 @@ CANONICAL_ETF_UNIVERSE: List[Dict[str, Any]] = [
         "scheme_code": "115630",
         "isin": "INF179K01WU6"
     },
+    {
+        "symbol": "KOTAKBSESENSEX",
+        "scheme_name": "Kotak BSE Sensex ETF",
+        "category": "EQUITY_INDEX",
+        "underlying_index": "BSE Sensex TRI",
+        "last_price": 89.04,
+        "nav": 89.00,
+        "premium_discount_pct": 0.04,
+        "tracking_error_1y": 0.04,
+        "expense_ratio_pct": 0.05,
+        "aum_crores": 850.0,
+        "avg_daily_volume": 250000.0,
+        "avg_daily_turnover_cr": 4.5,
+        "liquidity_tier": "MODERATE_LIQUIDITY",
+        "scheme_code": "109010",
+        "isin": "INF174KA1JD7"
+    },
 
     # =========================================================================
     # 2. EQUITY_SECTORAL: Thematic & Sectoral ETFs (30 ETFs)

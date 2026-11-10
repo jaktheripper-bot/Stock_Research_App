@@ -9,9 +9,9 @@
 <div class="container py-8" data-asset-class="sovereign">
   <!-- Header Banner -->
   <div class="hero-portal-banner" data-hero="tax" style="border-radius: 16px; padding: 32px; margin-bottom: 32px; position: relative; overflow: hidden;">
-    <div class="section-accent-pill" style="display: inline-flex; align-items: center; gap: 8px; background: var(--asset-accent-subtle); border: 1px solid var(--asset-accent-border); border-radius: 9999px; padding: 4px 14px; margin-bottom: 16px;">
+      <div class="section-accent-pill" style="display: inline-flex; align-items: center; gap: 8px; background: var(--asset-accent-subtle); border: 1px solid var(--asset-accent-border); border-radius: 9999px; padding: 4px 14px; margin-bottom: 16px;">
       <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--asset-accent);"></span>
-      <span style="font-size: 12px; font-weight: 700; color: var(--asset-accent); text-transform: uppercase; letter-spacing: 0.05em;">Net Real Tax Calculator • Finance Act 2024 / FY 2025-26</span>
+      <span style="font-size: 12px; font-weight: 700; color: var(--asset-accent); text-transform: uppercase; letter-spacing: 0.05em;">Net Real Tax Calculator • Finance Act 2025 / FY 2025-26</span>
     </div>
 
     <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
@@ -19,24 +19,34 @@
     </h1>
     <p style="font-size: 15px; color: #94a3b8; max-width: 840px; line-height: 1.6; margin-bottom: 24px;">
       Nominal returns overstate what you keep. The better measure is <strong>purchasing power retention</strong> after deducting 
-      statutory taxes (Income Tax Slabs, Section 50AA Debt MF rules, Budget 2024 12.5% LTCG) and <strong>MOSPI Consumer Price Index (CPI) inflation</strong>.
+      statutory taxes (Finance Act 2025 Slabs, Section 50AA Debt MF rules, 12.5% Sec 112A LTCG) and <strong>MOSPI Consumer Price Index (CPI) Fisher deflation</strong>.
     </p>
 
     <!-- Evaluated Metadata Strip & Provenance Info -->
     <div class="dossier-meta-strip" style="margin-bottom: 20px;">
-      <span><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Evaluated: Live Benchmark • Verified Finance Act 2024 Rates • MOSPI CPI Inflation Basket</span>
+      <span><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Evaluated: Live Macro Anchors • Finance Act 2025 Tax Rules • {% if macro_anchors is defined and macro_anchors and macro_anchors.cpi_is_fallback %}Assumed CPI Deflator (Unverified: {{ macro_anchors.cpi_inflation_pct }}%){% elif macro_anchors is defined and macro_anchors %}MOSPI CPI Basket ({{ macro_anchors.cpi_inflation_pct }}% as of {{ macro_anchors.as_of }}){% else %}CPI Deflator ({{ inflation }}%){% endif %}</span>
     </div>
-    <p class="dossier-provenance-subline">Statutory tax deductions modeled under Union Budget 2024-25 Finance Act amendments and MOSPI retail inflation deflators.</p>
+    <p class="dossier-provenance-subline">Statutory tax deductions modeled under Finance Act 2025 rules and Fisher exact real-return deflation. For DICGC ₹5L multi-bank deposit splitting and NBFC seniority audits, open the <a href="/savings">Fixed Savings &amp; Term Deposits Universe &rarr;</a></p>
 
     {% set active_slab = (tax_slab if tax_slab is defined and tax_slab is not none else current_slab)|default(30.0)|float %}
-    {% set inflation = (inflation if inflation is defined and inflation is not none else current_inflation)|default(5.0)|float %}
+    {% set inflation = (inflation if inflation is defined and inflation is not none else current_inflation)|default(3.65)|float %}
     {% set active_matrix = (matrix if matrix is defined and matrix is not none else assets)|default([]) %}
+    {% set active_regime = current_regime|default('NEW_115BAC') %}
+    {% set active_senior = current_senior|default(false) %}
 
     <!-- Interactive Tax Slab Selector Form -->
     <form method="GET" action="/calculator/tax" style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; background: rgba(15, 23, 42, 0.6); padding: 20px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);">
       <div>
+        <label for="taxRegimeSelect" style="display: block; font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">Tax Regime:</label>
+        <select id="taxRegimeSelect" name="tax_regime" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.2); color: #f8fafc; padding: 10px 14px; border-radius: 8px; font-size: 16px; font-weight: 700;">
+          <option value="NEW_115BAC" {% if active_regime == 'NEW_115BAC' %}selected{% endif %}>New Regime (115BAC)</option>
+          <option value="OLD_REGIME" {% if active_regime == 'OLD_REGIME' %}selected{% endif %}>Old Regime (80TTB / 80C)</option>
+        </select>
+      </div>
+      <div>
         <label for="taxSlabSelect" style="display: block; font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">Effective Marginal Tax Slab (incl. 4% Cess &amp; Surcharge):</label>
         <select id="taxSlabSelect" name="tax_slab" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.2); color: #f8fafc; padding: 10px 14px; border-radius: 8px; font-size: 16px; font-weight: 700;">
+          <option value="42.744" {% if active_slab == 42.744 %}selected{% endif %}>42.74% — Old Regime Ultra-HNI (&gt;₹5 Cr: 30% + 37% Surcharge + 4% Cess)</option>
           <option value="39.0" {% if active_slab == 39.0 %}selected{% endif %}>39.00% — Ultra-HNI (&gt;₹2 Cr: 30% + 25% Surcharge + 4% Cess)</option>
           <option value="35.88" {% if active_slab == 35.88 %}selected{% endif %}>35.88% — HNI (₹1 Cr–₹2 Cr: 30% + 15% Surcharge + 4% Cess)</option>
           <option value="34.32" {% if active_slab == 34.32 %}selected{% endif %}>34.32% — Affluent (₹50L–₹1 Cr: 30% + 10% Surcharge + 4% Cess)</option>
@@ -54,7 +64,7 @@
 
       <div>
         <label for="inflationInput" style="display: block; font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">MOSPI CPI Inflation Deflator (%):</label>
-        <input type="number" id="inflationInput" name="inflation" value="{{ inflation }}" step="0.1" min="0" max="25" required
+        <input type="number" id="inflationInput" name="inflation" value="{{ inflation }}" step="0.01" min="0" max="25" required
                style="width:100%; padding:0.6rem; border-radius:6px; border:1px solid var(--border-subtle); background:var(--bg-secondary); color:var(--text-primary); font-size: 16px;">
       </div>
 

@@ -688,6 +688,11 @@ def resolve_non_equity_dossier_redirect(symbol: str) -> Optional[str]:
         return "/msme"
     if _SOVEREIGN_ISIN_RE.match(clean_sym):
         return "/sovereign"
+    if clean_sym.startswith(("SAV-", "FD-", "HYSA-")):
+        from core.db.savings import get_savings_instrument_by_id
+
+        sav_inst = get_savings_instrument_by_id(clean_sym)
+        return f"/savings/{sav_inst['instrument_id']}" if sav_inst else "/savings"
 
     from bse_master import get_bse_scrips_cache, PRIMARY_BSE_MAP, NSE_ONLY_EQUITIES
     from core.db.connection import get_db_connection, get_placeholder

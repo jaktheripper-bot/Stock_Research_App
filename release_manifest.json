@@ -1,6 +1,6 @@
 {
-  "release_id": "moatnomics-pilot-r0-r2-v047",
-  "base_commit": "da1046cf99de0fd70b7ba32aae922125361bdce3",
+  "release_id": "moatnomics-savings-8asset-v049",
+  "base_commit": "0aeb9e15caf477c01cae2c57222522d637f91e63",
   "expected_branch": "dev",
   "minimum_python": "3.12",
   "exact_python": "",
@@ -8,7 +8,8 @@
   "superseded_w1_commits": [
     "3fe9a50",
     "32e56b0",
-    "da1046c"
+    "da1046c",
+    "0aeb9e1"
   ],
   "migrations": [
     "v043_p0_billing_intents_and_admin_proposals",
@@ -16,9 +17,12 @@
     "v045_durable_fund_audit_queue_v2",
     "v046_payment_receipts_and_settlement_ledger",
     "v047_terminal_market_observations",
-    "v048_reconcile_v2_column_contracts"
+    "v048_reconcile_v2_column_contracts",
+    "v049_fixed_savings_and_deposit_universe",
+    "v050_reconcile_savings_observations_and_table_names",
+    "v051_savings_global_observation_ids_and_override_audit"
   ],
-  "notes": "Commits 3fe9a50..da1046c on dev already shipped Milestone 1 (v043 billing intents, Razorpay payment.fetch + webhook verification, serialized admin grant caps, and PG concurrency tests). W0-W6 work packages are integrated directly onto da1046c using incremental migrations v044..v048.",
+  "notes": "Aligned onto dev HEAD 0aeb9e1 (W0-W6 MF disclosure snapshots, durable paid audit worker & terminal v2 observations) and ships v049 Fixed Savings & Term Deposits universe, monotonic rate sync, honest macro fallback provenance, HNI surcharge & deduction/pension tax models, strict HTTP 422 DICGC ladder validation, dynamic Morning Bouquet savings rates, and 8-Asset Omni-Search.",
   "patches": [],
   "test_command": [
     "-m", "pytest", "-q",
@@ -26,10 +30,11 @@
     "tests/unit/test_metric_and_financial_invariants.py",
     "tests/unit/test_release_fund_audit.py",
     "tests/unit/test_opportunity_terminal_evidence.py",
+    "tests/unit/test_savings_universe_and_dicgc.py",
+    "tests/unit/test_omni_search_ws3.py",
     "tests/unit/test_findings_fixes.py",
     "tests/unit/test_mf_portfolio_parser_matching.py",
     "tests/unit/test_pipeline_sync_and_timeouts.py",
     "tests/integration/test_mutual_funds_suite.py"
   ]
 }
-

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""7-Asset Omni-Search Coverage & Reliability Validation CLI (Feedback #7).
+"""8-Asset Omni-Search Coverage & Reliability Validation CLI (Feedback #7).
 
-Audits and verifies the unified 7-asset investment search engine (`core.search.product_search`):
-1. Verifies search coverage across all 7 asset classes (Equities, MFs, ETFs, Debt, Sovereign, REITs/InvITs, MSMEs).
+Audits and verifies the unified 8-asset investment search engine (`core.search.product_search`):
+1. Verifies search coverage across all 8 asset classes (Equities, MFs, ETFs, Debt, Sovereign, REITs/InvITs, MSMEs, Fixed Savings & Deposits).
 2. Verifies 6-digit BSE scrip code resolution (`500209` -> INFY, `532540` -> TCS, etc.).
 3. Verifies robustness against variable P/E formats (`NM`, `BFSI`, `—`, `25.4x`, `None`) without string format crashes.
 4. Verifies SQL parameter binding safety (zero unescaped `%` injection in `LIKE` queries).
 5. Measures query latency per asset class to ensure sub-50ms execution.
 
 Usage Examples:
-  # 1. Full audit of all 7 asset classes
+  # 1. Full audit of all 8 asset classes
   python3 scripts/validate_omni_search_coverage.py
 
   # 2. Test specific search query
@@ -60,6 +60,7 @@ def run_search_validation(test_query: str = "") -> Dict[str, Any]:
         "reits_invits": ["Embassy", "Mindspace", "Nexus", "SGB"],
         "sovereign": ["10Y", "7.10%", "G-Sec", "T-Bill"],
         "msmes": ["Engineering", "Textiles", "Auto", "Pharma"],
+        "savings_deposits": ["PPF", "SCSS", "Bajaj", "Suryoday", "NPS"],
     }
 
     if test_query:
@@ -150,7 +151,7 @@ def run_search_validation(test_query: str = "") -> Dict[str, Any]:
 def _print_report(s: Dict[str, Any]) -> None:
     status_color = "\033[1;32mPASS\033[0m" if s["overall_status"] == "PASS" else "\033[1;31mFAIL\033[0m"
     print("\n" + "=" * 80)
-    print(f" 7-ASSET OMNI-SEARCH ENGINE VALIDATION [{status_color}]")
+    print(f" 8-ASSET OMNI-SEARCH ENGINE VALIDATION [{status_color}]")
     print(f" Total Time: {s.get('total_elapsed_ms', 0):.2f} ms")
     print("=" * 80)
 
@@ -176,12 +177,12 @@ def _print_report(s: Dict[str, Any]) -> None:
         for f in s["failures"]:
             print(f"   - {f}")
     else:
-        print("\n\033[1;32m✓ All 7 asset classes, scrip resolvers, and formatters validated successfully.\033[0m")
+        print("\n\033[1;32m✓ All 8 asset classes, scrip resolvers, and formatters validated successfully.\033[0m")
     print("=" * 80 + "\n")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Validate 7-asset omni-search coverage and speed.")
+    parser = argparse.ArgumentParser(description="Validate 8-asset omni-search coverage and speed.")
     parser.add_argument("--query", help="Specific custom query to test (e.g. 'HDFC')")
     parser.add_argument("--json", action="store_true", help="Output summary as JSON")
 

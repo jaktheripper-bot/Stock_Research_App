@@ -430,12 +430,71 @@ def _compile_msme(ident: str, is_unlocked: bool) -> Optional[Dict[str, Any]]:
     }
 
 
+def _compile_savings(ident: str, is_unlocked: bool) -> Optional[Dict[str, Any]]:
+    from core.analysis.savings_engine import get_savings_instrument_dossier
+
+    dossier = get_savings_instrument_dossier(ident.strip().upper())
+    if not dossier:
+        return None
+    inst = dossier["instrument"]
+    ev = dossier["tax_eval"]
+    contagion = dossier["contagion"]
+    inst_id = inst["instrument_id"]
+
+    guarantee_txt = (
+        "100% Sovereign Guarantee"
+        if inst["sovereign_backed"]
+        else (
+            "DICGC ₹5,00,000 Principal + Interest Insured"
+            if inst["dicgc_insured"]
+            else f"0% DICGC Unsecured Deposit ({inst['credit_rating']})"
+        )
+    )
+    lines = _lines(
+        f"Published Rate: {_num(ev['nominal_rate_pct'], 2, '%')} ({_num(ev['gross_apy_pct'], 2, '%')} Gross APY, "
+        f"{inst['compounding_freq'].replace('_', ' ').title()}) · {guarantee_txt}.",
+        f"New Regime 30% Slab Post-Tax: {_num(ev['post_tax_yield_pct'], 2, '%')} · "
+        f"Fisher Real Return (vs {_num(ev['cpi_inflation_used_pct'], 2, '%')} CPI): {_num(ev['fisher_real_yield_pct'], 2, '%')}.",
+        f"Safety Posture: {contagion['composite_safety_score']}/100 · {ev['tax_treatment_badge']} · "
+        f"Source: {inst['source_authority']} (eff. {inst['effective_from']}).",
+    )
+
+    risk_flag = (
+        contagion["contagion_summary"]
+        if contagion["contagion_flag"] == "SENIORITY_YIELD_INVERSION"
+        else (inst.get("premature_exit_rule") or "Verify lock-in, TDS Sec 194A threshold, and DICGC charter aggregation.")
+    )
+
+    return {
+        "asset_type": "savings",
+        "asset_class_token": "savings",
+        "asset_id": inst_id,
+        "title": inst["scheme_name"],
+        "subtitle": f"{inst['issuer_name']} · {inst['category_label']}",
+        "headline_score": (
+            f"Gross APY: {_num(ev['gross_apy_pct'], 2, '%')} · "
+            f"Post-Tax: {_num(ev['post_tax_yield_pct'], 2, '%')} · "
+            f"Real: {_num(ev['fisher_real_yield_pct'], 2, '%')}"
+        ),
+        "brief_lines": lines[:4],
+        "top_risk_flag": re.sub(r"\[(?:VERIFIED FACT|CALCULATED METRIC|MODEL INTERPRETATION)\]\s*", "", risk_flag),
+        "matrix": {},
+        "pillar_chips": [],
+        "is_unlocked": is_unlocked,
+        "desktop_url": f"/savings/{inst_id}",
+        "brief_url": f"/m/savings/{inst_id}",
+        "last_updated": _freshness(inst.get("effective_from")),
+        "sebi_disclaimer": MANDATORY_SEBI_DISCLAIMER,
+    }
+
+
 _COMPILERS = (
     (("equity", "equities", "stock"), _compile_equity),
     (("fund", "funds", "mf"), _compile_fund),
     (("debt", "bond", "ncd"), _compile_debt),
     (("reit", "reits", "invit"), _compile_reit),
     (("msme", "sme"), _compile_msme),
+    (("savings", "deposit", "fd", "small_savings"), _compile_savings),
 )
 
 

@@ -255,10 +255,41 @@ def _load_live_sovereign_posture(date_str: str) -> Dict[str, Any]:
             f"10Y G-Sec at {ten_yr:.2f}% vs 364D T-Bill at {one_yr:.2f}%.{sdl_clause}"
         )
 
+        statutory_parts: List[str] = []
+        ppf_rate_val: Optional[float] = None
+        scss_rate_val: Optional[float] = None
+        try:
+            from core.db.savings import get_savings_instrument_by_id
+
+            ppf_inst = get_savings_instrument_by_id("SAV-PPF", reference_date=date_str)
+            scss_inst = get_savings_instrument_by_id("SAV-SCSS", reference_date=date_str)
+            if (
+                ppf_inst
+                and ppf_inst.get("is_active")
+                and str((ppf_inst.get("staleness") or {}).get("status") or "").upper()
+                not in ("STALE_TARIFF", "UNVERIFIED_PROVENANCE")
+            ):
+                ppf_rate_val = round(float(ppf_inst["base_rate_pct"]), 2)
+                statutory_parts.append(f"PPF EEE {ppf_rate_val:.2f}%")
+            if (
+                scss_inst
+                and scss_inst.get("is_active")
+                and str((scss_inst.get("staleness") or {}).get("status") or "").upper()
+                not in ("STALE_TARIFF", "UNVERIFIED_PROVENANCE")
+            ):
+                scss_rate_val = round(float(scss_inst["base_rate_pct"]), 2)
+                statutory_parts.append(f"SCSS {scss_rate_val:.2f}%")
+        except Exception as sav_err:
+            logger.debug("Bouquet statutory savings lookup notice: %s", sav_err)
+
+        statutory_clause = f"; Statutory {' / '.join(statutory_parts)}" if statutory_parts else ""
+
         return {
             "ten_year_gsec": round(ten_yr, 2),
             "one_year_tbill": round(one_yr, 2),
             "repo_rate": round(repo_rate, 2),
+            "ppf_rate_pct": ppf_rate_val,
+            "scss_rate_pct": scss_rate_val,
             "term_spread_bps": spread_bps,
             "yield_wedge_bps": spread_bps,
             "curve_shape": curve_shape,
@@ -267,7 +298,7 @@ def _load_live_sovereign_posture(date_str: str) -> Dict[str, Any]:
             "signal_summary": duration_summary,
             "tax_free_highlight": (
                 f"Sovereign 10Y G-Sec settled at {ten_yr:.2f}% (Policy Repo {repo_rate:.2f}%, "
-                f"Term Spread {spread_bps:+d} bps)."
+                f"Term Spread {spread_bps:+d} bps{statutory_clause})."
             ),
         }
     except Exception as e:
@@ -661,12 +692,65 @@ def _load_live_msme_highlight(date_str: str) -> Dict[str, Any]:
         return {}
 
 
+def _load_live_savings_posture(date_str: str) -> Dict[str, Any]:
+    """Selects a live, provenance-verified Fixed Savings / Small Savings highlight from `savings_instruments`."""
+    try:
+        from core.analysis.savings_engine import evaluate_savings_post_tax
+        from core.db.savings import get_active_savings_instruments
+
+        rows = [
+            r
+            for r in get_active_savings_instruments(reference_date=date_str)
+            if str((r.get("staleness") or {}).get("status") or "").upper()
+            not in ("STALE_TARIFF", "UNVERIFIED_PROVENANCE")
+        ]
+        if not rows:
+            return {}
+
+        by_id = {r["instrument_id"]: r for r in rows}
+        picked = rows[_date_index("fixed_savings", date_str, len(rows))]
+        tax_ev = evaluate_savings_post_tax(picked, tax_regime="NEW_115BAC", slab_rate_pct=30.0)
+
+        bench_parts: List[str] = []
+        for sid, label in (("SAV-PPF", "PPF"), ("SAV-SCSS", "SCSS"), ("SAV-NSC", "NSC")):
+            srow = by_id.get(sid)
+            if srow:
+                bench_parts.append(f"{label} {float(srow['base_rate_pct']):.2f}%")
+        bench_clause = f" Statutory anchors: {' · '.join(bench_parts)}." if bench_parts else ""
+
+        inst_id = str(picked["instrument_id"])
+        summary = (
+            f"{picked['issuer_name']} · Gross APY {tax_ev['gross_apy_pct']:.2f}% · "
+            f"New-Regime 30% Post-Tax {tax_ev['post_tax_yield_pct']:.2f}% · "
+            f"Fisher Real {tax_ev['fisher_real_yield_pct']:+.2f}% ({picked['staleness']['badge_label']})."
+            f"{bench_clause}"
+        )
+        return {
+            "instrument_id": inst_id,
+            "scheme_name": str(picked["scheme_name"]),
+            "issuer_name": str(picked["issuer_name"]),
+            "category": str(picked["category"]),
+            "base_rate_pct": round(float(picked["base_rate_pct"]), 2),
+            "gross_apy_pct": tax_ev["gross_apy_pct"],
+            "post_tax_yield_pct": tax_ev["post_tax_yield_pct"],
+            "fisher_real_yield_pct": tax_ev["fisher_real_yield_pct"],
+            "ppf_rate_pct": round(float(by_id["SAV-PPF"]["base_rate_pct"]), 2) if "SAV-PPF" in by_id else None,
+            "scss_rate_pct": round(float(by_id["SAV-SCSS"]["base_rate_pct"]), 2) if "SAV-SCSS" in by_id else None,
+            "nsc_rate_pct": round(float(by_id["SAV-NSC"]["base_rate_pct"]), 2) if "SAV-NSC" in by_id else None,
+            "summary": summary,
+            "detail_url": f"/savings/{inst_id}",
+        }
+    except Exception as e:
+        logger.error("Failed loading live fixed-savings posture for %s: %s", date_str, e)
+        return {}
+
+
 def compile_research_bouquet(
     edition_date: Optional[str] = None,
     require_live_data: bool = False,
 ) -> Dict[str, Any]:
     """
-    Compiles the 7-asset Day-End Market Wrap from live database tables.
+    Compiles the multi-asset Day-End Market Wrap from live database tables.
     When `require_live_data=True`, raises `BouquetDataUnavailableError` if any required live pillar is empty.
     """
     from core.db.connection import IST
@@ -681,6 +765,7 @@ def compile_research_bouquet(
     reits_sgb = _load_live_reits_and_sgb(date_str)
     mf_highlight = _load_live_mf_highlight(date_str)
     msme_highlight = _load_live_msme_highlight(date_str)
+    savings_highlight = _load_live_savings_posture(date_str)
 
     if require_live_data:
         required_map = {
@@ -701,7 +786,7 @@ def compile_research_bouquet(
     return {
         "edition_date": date_str[:10],
         "formatted_date": formatted_date,
-        "subject": f"Moatnomics Day-End Market Wrap: 7-Asset Close & Forensic Signals ({date_str[:10]})",
+        "subject": f"Moatnomics Day-End Market Wrap: Multi-Asset Close & Forensic Signals ({date_str[:10]})",
         "equities": equity_picks,
         "sovereign": sovereign_posture,
         "corporate_debt": corporate_debt,
@@ -710,6 +795,7 @@ def compile_research_bouquet(
         "mutual_funds": mf_highlight,
         "mutual_fund": mf_highlight,
         "msme": msme_highlight,
+        "fixed_savings": savings_highlight,
         "tracking_domain": get_tracking_base_url(),
     }
 
@@ -920,6 +1006,32 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
       </div>
         """
 
+    sav = bouquet.get("fixed_savings") or {}
+    sav_html = ""
+    if sav:
+        sav_link = build_tracked_link(
+            sav.get("detail_url") or "/savings",
+            token=token,
+            edition_date=edition_date,
+            utm_content="fixed_savings",
+            utm_term=str(sav.get("instrument_id") or ""),
+        )
+        sav_html = f"""
+      <div class="section-title">8. Fixed Savings, Term Deposits &amp; Statutory Small Savings</div>
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px;">
+          <span style="font-weight: 700; font-size: 13.5px; color: #0f172a;">{sav.get('scheme_name')} ({sav.get('instrument_id')})</span>
+          <span class="pill">{sav.get('base_rate_pct')}% Tariff</span>
+        </div>
+        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; margin-bottom: 8px;">
+          {sav.get('summary')}
+        </div>
+        <div style="font-size: 11.5px; text-align: right;">
+          <a href="{sav_link}" style="color: #0E3D32; font-weight: 700; text-decoration: none;">Open Fixed Savings Dossier &rarr;</a>
+        </div>
+      </div>
+        """
+
     terminal_cta_link = build_tracked_link(
         "/",
         token=token,
@@ -970,6 +1082,7 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
       {reits_html}
       {mf_html}
       {msme_html}
+      {sav_html}
 
       <div style="text-align: center; margin: 28px 0 12px 0;">
         <a href="{terminal_cta_link}" style="background: #0E3D32; color: #F7F5EE; font-weight: 800; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px; display: inline-block;">
@@ -1122,6 +1235,20 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
                 f"{msme.get('company_name')} ({msme.get('cluster')}) | {msme.get('roce_pct')}",
                 f"{msme.get('moat_note')}",
                 f"Inspect MSME Dossier: {build_tracked_link(msme_path, token=token, edition_date=edition_date, utm_content='msme_spotlight', utm_term=str(msme.get('uin') or ''))}",
+                "",
+            ]
+        )
+
+    sav = bouquet.get("fixed_savings") or {}
+    if sav:
+        lines.extend(
+            [
+                "---------------------------------------------------------------",
+                "8. FIXED SAVINGS, TERM DEPOSITS & STATUTORY SMALL SAVINGS",
+                "---------------------------------------------------------------",
+                f"{sav.get('scheme_name')} ({sav.get('instrument_id')}) | {sav.get('base_rate_pct')}%",
+                f"{sav.get('summary')}",
+                f"Dossier: {build_tracked_link(sav.get('detail_url') or '/savings', token=token, edition_date=edition_date, utm_content='fixed_savings', utm_term=str(sav.get('instrument_id') or ''))}",
                 "",
             ]
         )

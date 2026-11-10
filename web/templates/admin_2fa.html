@@ -12,7 +12,8 @@
   padding: 40px 16px;
 }
 .auth-2fa-box {
-  background: var(--card-bg, #0f172a);
+  background: var(--bg-card, #0f172a);
+  color: var(--text-primary, #f8fafc);
   border: 1px solid var(--border-subtle, #1e293b);
   border-radius: 14px;
   max-width: 480px;
@@ -21,8 +22,11 @@
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
   text-align: center;
 }
+html[data-theme="light"] .auth-2fa-box {
+  box-shadow: 0 12px 32px rgba(11, 35, 55, 0.12);
+}
 .secret-badge {
-  background: rgba(15, 23, 42, 0.9);
+  background: var(--bg-secondary, rgba(15, 23, 42, 0.9));
   border: 1px dashed var(--accent-cyan, #0ea5e9);
   color: var(--accent-cyan, #0ea5e9);
   font-family: 'JetBrains Mono', monospace;
@@ -40,8 +44,8 @@
   font-size: 26px;
   letter-spacing: 8px;
   text-align: center;
-  background: rgba(15, 23, 42, 0.9);
-  border: 2px solid var(--border-subtle, #1e293b);
+  background: var(--bg-secondary, rgba(15, 23, 42, 0.9));
+  border: 2px solid var(--border-color, #1e293b);
   color: var(--text-primary, #f8fafc);
   border-radius: 10px;
   padding: 12px;
@@ -49,10 +53,59 @@
   box-sizing: border-box;
   transition: all 0.2s ease;
 }
+.code-input::placeholder {
+  color: var(--text-muted, #64748b);
+  opacity: 0.65;
+}
 .code-input:focus {
   outline: none;
   border-color: var(--accent-cyan, #0ea5e9);
-  box-shadow: 0 0 15px rgba(14, 165, 233, 0.3);
+  box-shadow: 0 0 15px var(--accent-cyan-glow, rgba(14, 165, 233, 0.3));
+}
+.auth-2fa-error {
+  background: rgba(190, 18, 60, 0.12);
+  border: 1px solid rgba(190, 18, 60, 0.35);
+  color: var(--accent-rose, #be123c);
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 18px;
+}
+html[data-theme="dark"] .auth-2fa-error {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+.auth-2fa-dev-notice {
+  background: var(--asset-accent-subtle, rgba(14, 61, 50, 0.10));
+  border: 1px solid var(--asset-accent-border, rgba(14, 61, 50, 0.36));
+  color: var(--text-primary, #0b2337);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  margin-bottom: 18px;
+  text-align: left;
+  line-height: 1.5;
+}
+html[data-theme="dark"] .auth-2fa-dev-notice {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.35);
+  color: #38bdf8;
+}
+.auth-2fa-dev-code {
+  font-weight: 800;
+  background: var(--bg-card, #ffffff);
+  color: var(--text-primary, #0b2337);
+  border: 1px solid var(--border-color, #cfc8b8);
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.1em;
+}
+html[data-theme="dark"] .auth-2fa-dev-code {
+  background: rgba(0, 0, 0, 0.4);
+  color: #ffffff;
+  border-color: transparent;
 }
 </style>
 
@@ -60,18 +113,18 @@
   <div class="auth-2fa-box">
     {% if mode == 'setup' %}
       <div style="font-size: 44px; margin-bottom: 12px;">📲</div>
-      <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 6px;">Set Up Google Authenticator</h2>
+      <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 6px; color: var(--text-primary, #f8fafc);">Set Up Google Authenticator</h2>
       <p style="color: var(--text-secondary, #94a3b8); font-size: 13px; margin-bottom: 20px;">
-        Account: <strong style="color: #f8fafc;">{{ email }}</strong>
+        Account: <strong style="color: var(--text-primary, #f8fafc);">{{ email }}</strong>
       </p>
 
       {% if error %}
-      <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 18px;">
+      <div class="auth-2fa-error">
         ❌ {{ error }}
       </div>
       {% endif %}
 
-      <div style="background: #ffffff; padding: 14px; border-radius: 10px; display: inline-block; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+      <div style="background: #ffffff; padding: 14px; border-radius: 10px; display: inline-block; margin-bottom: 16px; border: 1px solid var(--border-subtle, #e2ddd0); box-shadow: 0 4px 12px rgba(0,0,0,0.12);">
         <img src="{{ qr_img_url }}" alt="2FA QR Code" width="180" height="180" style="display: block;">
       </div>
 
@@ -88,8 +141,8 @@
       </div>
 
       {% if is_local_dev %}
-      <div style="background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.35); color: #38bdf8; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; margin-bottom: 18px; text-align: left; line-height: 1.5;">
-        🛠️ <strong>Local Development Notice:</strong> Enter your 6-digit Authenticator code, or use emergency local bypass code <code style="font-weight: 800; background: rgba(0,0,0,0.4); color: #fff; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.1em;">000000</code>.
+      <div class="auth-2fa-dev-notice">
+        🛠️ <strong>Local Development Notice:</strong> Enter your 6-digit Authenticator code, or use emergency local bypass code <code class="auth-2fa-dev-code">000000</code>.
       </div>
       {% endif %}
 
@@ -117,22 +170,22 @@
       </form>
 
     {% else %}
-      <div style="font-size: 44px; margin-bottom: 12px;"><svg class="glyph"><use href="#glyph-shield"></use></svg></div>
-      <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 6px;">Two-Factor Authentication</h2>
+      <div style="font-size: 44px; margin-bottom: 12px; color: var(--accent-cyan, #0ea5e9);"><svg class="glyph"><use href="#glyph-shield"></use></svg></div>
+      <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 6px; color: var(--text-primary, #f8fafc);">Two-Factor Authentication</h2>
       <p style="color: var(--text-secondary, #94a3b8); font-size: 13px; margin-bottom: 24px;">
-        Identity verified for <strong style="color: #f8fafc;">{{ email }}</strong>.<br>
+        Identity verified for <strong style="color: var(--text-primary, #f8fafc);">{{ email }}</strong>.<br>
         Enter the 6-digit security code generated by your Authenticator app.
       </p>
 
       {% if error %}
-      <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 20px;">
+      <div class="auth-2fa-error" style="margin-bottom: 20px;">
         ❌ {{ error }}
       </div>
       {% endif %}
 
       {% if is_local_dev %}
-      <div style="background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.35); color: #38bdf8; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; margin-bottom: 20px; text-align: left; line-height: 1.5;">
-        🛠️ <strong>Local Development Notice:</strong> Enter your 6-digit Authenticator code, or use emergency local bypass code <code style="font-weight: 800; background: rgba(0,0,0,0.4); color: #fff; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.1em;">000000</code>.
+      <div class="auth-2fa-dev-notice" style="margin-bottom: 20px;">
+        🛠️ <strong>Local Development Notice:</strong> Enter your 6-digit Authenticator code, or use emergency local bypass code <code class="auth-2fa-dev-code">000000</code>.
       </div>
       {% endif %}
 
@@ -157,10 +210,10 @@
       </form>
 
       <div style="margin-top: 24px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <a href="/admin/logout" style="color: var(--accent-cyan, #0ea5e9); text-decoration: none;">
+        <a href="/admin/logout" style="color: var(--accent-cyan, #0ea5e9); font-weight: 600; text-decoration: none;">
           ← Switch Account / Cancel
         </a>
-        <a href="/admin/setup-2fa?reset=1{% if next_url %}&next={{ next_url | urlencode }}{% endif %}" style="color: #94a3b8; text-decoration: underline;" title="Generate a fresh QR code to scan">
+        <a href="/admin/setup-2fa?reset=1{% if next_url %}&next={{ next_url | urlencode }}{% endif %}" style="color: var(--text-secondary, #46545e); text-decoration: underline;" title="Generate a fresh QR code to scan">
           🔄 Re-scan / Reset 2FA
         </a>
       </div>

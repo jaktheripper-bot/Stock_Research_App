@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}7-Asset Investment Search | Moatnomics{% endblock %}
-{% block meta_desc %}Unified search across Indian listed equities, AMFI mutual funds, ETFs, corporate bonds, REITs/InvITs/SGBs, RBI sovereign benchmarks, and unlisted MSMEs.{% endblock %}
+{% block title %}8-Asset Investment Search | Moatnomics{% endblock %}
+{% block meta_desc %}Unified search across Indian listed equities, AMFI mutual funds, ETFs, corporate bonds, fixed savings & bank FDs, REITs/InvITs/SGBs, RBI sovereign benchmarks, and unlisted MSMEs.{% endblock %}
 
 {% block content %}
 {% set cats = search_results.categories or {} %}
@@ -10,25 +10,25 @@
   <div class="hero-portal-banner search-results-hero">
     <div class="search-hero-pill">
       <span class="search-hero-dot" aria-hidden="true"></span>
-      <span>7-Asset Omni-Search</span>
+      <span>8-Asset Omni-Search</span>
     </div>
 
     <h1 class="search-hero-heading">
-      Search Investment Products Across Seven Asset Classes
+      Search Investment Products Across Eight Asset Classes
     </h1>
     <p class="search-hero-subtitle">
-      Locate <strong>Listed Equities</strong>, <strong>AMFI Mutual Funds</strong>, <strong>ETFs</strong>, <strong>Corporate Bonds &amp; SDIs</strong>, <strong>REITs / InvITs / SGBs</strong>, <strong>RBI Sovereign Benchmarks</strong>, and <strong>Unlisted MSMEs</strong> by ticker, scheme code, ISIN, BSE scrip code, or Udyam UIN.
+      Locate <strong>Listed Equities</strong>, <strong>AMFI Mutual Funds</strong>, <strong>ETFs</strong>, <strong>Corporate Bonds &amp; SDIs</strong>, <strong>Fixed Savings, Bank FDs &amp; Small Savings</strong>, <strong>REITs / InvITs / SGBs</strong>, <strong>RBI Sovereign Benchmarks</strong>, and <strong>Unlisted MSMEs</strong> by ticker, scheme code, ISIN, BSE scrip code, PPF/SCSS/FD ID, or Udyam UIN.
     </p>
 
     <form action="/search" method="GET" class="search-page-form">
       <div class="search-page-input-wrap">
-        <label for="omniSearchInput" class="visually-hidden">Search across all 7 asset classes</label>
+        <label for="omniSearchInput" class="visually-hidden">Search across all 8 asset classes</label>
         <input
           type="search"
           name="q"
           id="omniSearchInput"
           value="{{ query or '' }}"
-          placeholder="e.g. TCS, Parag Parikh, NIFTYBEES, INE002A, EMBASSY, 10Y G-Sec, UDYAM..."
+          placeholder="e.g. TCS, Parag Parikh, NIFTYBEES, INE002A, PPF, SCSS, SBI FD, EMBASSY, 10Y G-Sec..."
           autocomplete="off"
           style="font-size: 16px;"
           class="form-control search-page-input"
@@ -42,7 +42,7 @@
   </div>
 
   {% if query %}
-  <!-- 7-Asset Category Filter Pills -->
+  <!-- 8-Asset Category Filter Pills -->
   <div class="search-category-pills" role="navigation" aria-label="Filter search results by asset class">
     <a href="/search?q={{ query|urlencode }}&type=ALL" class="btn btn-sm {% if selected_type == 'ALL' or not selected_type %}btn-primary{% else %}btn-secondary{% endif %} search-cat-pill">
       All Categories ({{ search_results.total_matches }})
@@ -58,6 +58,9 @@
     </a>
     <a href="/search?q={{ query|urlencode }}&type=DEBT" class="btn btn-sm {% if selected_type in ['DEBT', 'BOND', 'NCD'] %}btn-primary{% else %}btn-secondary{% endif %} search-cat-pill">
       <svg class="glyph" aria-hidden="true"><use href="#icon-risk"></use></svg> Bonds &amp; NCDs ({{ (cats.corporate_debt or [])|length }})
+    </a>
+    <a href="/search?q={{ query|urlencode }}&type=SAVINGS_DEPOSIT" class="btn btn-sm {% if selected_type in ['SAVINGS_DEPOSIT', 'SAVINGS', 'FD', 'DEPOSIT', 'SMALL_SAVINGS'] %}btn-primary{% else %}btn-secondary{% endif %} search-cat-pill">
+      <svg class="glyph" aria-hidden="true"><use href="#glyph-bank"></use></svg> Savings &amp; FDs ({{ (cats.savings_deposits or [])|length }})
     </a>
     <a href="/search?q={{ query|urlencode }}&type=REIT_INVIT" class="btn btn-sm {% if selected_type in ['REIT', 'REIT_INVIT', 'INVIT', 'SGB'] %}btn-primary{% else %}btn-secondary{% endif %} search-cat-pill">
       <svg class="glyph" aria-hidden="true"><use href="#icon-sector-realestate"></use></svg> REITs &amp; SGBs ({{ (cats.reits_invits or [])|length }})
@@ -187,6 +190,30 @@
   </section>
   {% endif %}
 
+  <!-- 4B. Fixed Savings, Bank FDs & Small Savings Section -->
+  {% if cats.savings_deposits and (selected_type in ['ALL', 'SAVINGS_DEPOSIT', 'SAVINGS', 'FD', 'DEPOSIT', 'SMALL_SAVINGS'] or not selected_type) %}
+  <section class="search-category-section">
+    <h2 class="search-section-heading">
+      <svg class="glyph" aria-hidden="true"><use href="#glyph-bank"></use></svg>
+      <span>Fixed Savings, Bank FDs &amp; Small Savings ({{ cats.savings_deposits|length }})</span>
+    </h2>
+    <div class="search-cards-grid">
+      {% for sv in cats.savings_deposits %}
+      <a href="{{ sv.url }}" class="search-card-link">
+        <div class="card asset-card-accent search-result-card" data-asset-class="savings">
+          <div class="search-card-top">
+            <span class="mono search-card-id">{{ sv.identifier }}</span>
+            <span class="search-card-badge">{{ sv.badge or 'Savings / FD' }}</span>
+          </div>
+          <div class="search-card-title">{{ sv.title }}</div>
+          <div class="search-card-subtitle">{{ sv.subtitle }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   <!-- 5. REITs, SM REITs, InvITs & SGBs Section -->
   {% if cats.reits_invits and (selected_type in ['ALL', 'REIT', 'REIT_INVIT', 'INVIT', 'SGB'] or not selected_type) %}
   <section class="search-category-section">
@@ -261,7 +288,7 @@
 
   {% endif %}
   {% else %}
-  <!-- Initial 7-Asset Explore Grid -->
+  <!-- Initial 8-Asset Explore Grid -->
   <div class="search-explore-grid">
     <div class="search-explore-card">
       <div class="search-explore-icon"><svg class="glyph" style="width: 24px; height: 24px;" aria-hidden="true"><use href="#icon-markets"></use></svg></div>
@@ -304,6 +331,17 @@
       <div class="search-explore-chips">
         <a href="/search?q=NCD&type=DEBT" class="btn btn-secondary btn-sm">Listed NCDs</a>
         <a href="/debt" class="btn btn-secondary btn-sm">Directory →</a>
+      </div>
+    </div>
+
+    <div class="search-explore-card">
+      <div class="search-explore-icon"><svg class="glyph" style="width: 24px; height: 24px;" aria-hidden="true"><use href="#glyph-bank"></use></svg></div>
+      <h3 class="search-explore-title">Fixed Savings &amp; Bank FDs</h3>
+      <p class="search-explore-desc">Finance Act 2025 post-tax &amp; Fisher real yields across PPF, SCSS, Bank FDs, NBFC FDs, and DICGC ₹5L ladders.</p>
+      <div class="search-explore-chips">
+        <a href="/search?q=PPF&type=SAVINGS_DEPOSIT" class="btn btn-secondary btn-sm">PPF</a>
+        <a href="/search?q=SCSS&type=SAVINGS_DEPOSIT" class="btn btn-secondary btn-sm">SCSS</a>
+        <a href="/savings" class="btn btn-secondary btn-sm">Directory →</a>
       </div>
     </div>
 

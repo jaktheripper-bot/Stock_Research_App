@@ -4188,9 +4188,9 @@ window.toggleDossierReadingMode = function () {
 };
 
 /**
- * 7. Global 7-Asset Header Omni-Search Command Palette (#omniSearchModal)
+ * 7. Global 8-Asset Header Omni-Search Command Palette (#omniSearchModal)
  * Supports instant '/' shortcut everywhere, ⌘K / Ctrl+K on directory/home pages,
- * category filter pills across all 7 asset classes, and ↑/↓/↵ keyboard navigation.
+ * category filter pills across all 8 asset classes, and ↑/↓/↵ keyboard navigation.
  */
 let _omniSearchCategory = "ALL";
 let _omniSearchDebounceTimer = null;
@@ -4205,6 +4205,7 @@ const OMNI_CATEGORY_META = [
   { key: "mutual_funds", label: "Mutual Fund Schemes", icon: "#icon-portfolio", assetAttr: "funds" },
   { key: "etfs", label: "Exchange-Traded Funds (ETFs)", icon: "#icon-screen", assetAttr: "etfs" },
   { key: "corporate_debt", label: "Corporate Bonds, NCDs & SDIs", icon: "#icon-risk", assetAttr: "debt" },
+  { key: "savings_deposits", label: "Fixed Savings, Bank FDs & Small Savings", icon: "#glyph-bank", assetAttr: "savings" },
   { key: "reits_invits", label: "REITs, SM REITs, InvITs & SGBs", icon: "#icon-sector-realestate", assetAttr: "reits" },
   { key: "sovereign", label: "Sovereign Curve, T-Bills & SDLs", icon: "#icon-pillar-04", assetAttr: "sovereign" },
   { key: "msmes", label: "Unlisted MSMEs & Emerging SMEs", icon: "#icon-sector-industrials", assetAttr: "msme" },
@@ -4293,7 +4294,7 @@ function _renderOmniGroupedResults(payload, queryStr) {
     container.innerHTML =
       `<div class="omni-empty-state">` +
       `<div class="omni-empty-title">No direct matches for "${safeQ}"</div>` +
-      `<div class="omni-empty-sub">Search with a company name, NSE/BSE ticker, 6-digit BSE code, AMFI scheme, ETF symbol, bond ISIN, REIT, RBI tenor, or Udyam UIN.</div>` +
+      `<div class="omni-empty-sub">Search with a company name, NSE/BSE ticker, 6-digit BSE code, AMFI scheme, ETF symbol, bond ISIN, PPF/SCSS/Bank FD, REIT, RBI tenor, or Udyam UIN.</div>` +
       `<div class="omni-empty-actions">` +
       `<a href="/search?q=${encodeURIComponent(queryStr)}" class="btn btn-secondary btn-sm">Run Full Search Page →</a>` +
       `<button type="button" class="btn btn-primary btn-sm" onclick="switchOmniToGenerateModal()">Synthesize Stock Dossier</button>` +

@@ -353,6 +353,7 @@ def main() -> int:
                 candidate_pg_suites = [
                     "tests/unit/test_p0_credit_and_db_containment.py",
                     "tests/integration/test_postgres_credit_grant_concurrency.py",
+                    "tests/integration/test_postgres_savings_package01.py",
                     "tests/unit/test_release_fund_audit.py",
                 ]
                 active_pg_suites = [s for s in candidate_pg_suites if (scratch / s).is_file()]

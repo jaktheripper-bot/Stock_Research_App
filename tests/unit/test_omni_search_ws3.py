@@ -31,6 +31,7 @@ from core.search.product_search import (
     search_msmes,
     search_mutual_funds,
     search_reits_and_sgbs,
+    search_savings_instruments,
     search_sovereign,
 )
 from web.main import app
@@ -41,12 +42,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 class TestOmniSearchWS3(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        from core.db.sovereign import DEFAULT_ETF_MATRIX, save_etf_matrix_items
+        save_etf_matrix_items(DEFAULT_ETF_MATRIX)
         cls.client = TestClient(app)
 
     def test_empty_categories_has_all_seven_asset_keys(self):
         cats = empty_search_categories()
         self.assertEqual(tuple(cats.keys()), CATEGORY_ORDER)
-        self.assertEqual(len(cats), 7)
+        self.assertEqual(len(cats), 8)
+        self.assertIn("savings_deposits", cats)
 
     def test_seven_asset_search_functions_return_valid_routes(self):
         eq = search_equities("TCS", limit=5)
@@ -98,6 +102,14 @@ class TestOmniSearchWS3(unittest.TestCase):
         mfs = search_mutual_funds("HDFC", limit=5)
         self.assertIsInstance(mfs, list)
 
+        sav = search_savings_instruments("PPF", limit=5)
+        self.assertTrue(len(sav) >= 1)
+        self.assertEqual(sav[0]["product_type"], "SAVINGS_DEPOSIT")
+        self.assertEqual(sav[0]["url"], "/savings/SAV-PPF")
+
+        scss = search_savings_instruments("SCSS", limit=5)
+        self.assertTrue(any(item["identifier"] == "SAV-SCSS" for item in scss))
+
     def test_master_search_investment_products_returns_all_seven_categories(self):
         res = search_investment_products("India", product_type="ALL", limit_per_category=4)
         self.assertIn("categories", res)
@@ -116,7 +128,7 @@ class TestOmniSearchWS3(unittest.TestCase):
         self.assertGreaterEqual(len(payload["categories"]["reits_invits"]), 1)
 
     def test_search_page_renders_seven_asset_explore_and_filtered_cards(self):
-        # Empty query -> 7-asset explore cards
+        # Empty query -> 8-asset explore cards
         empty_resp = self.client.get("/search")
         self.assertEqual(empty_resp.status_code, 200)
         html_empty = empty_resp.text
@@ -125,10 +137,10 @@ class TestOmniSearchWS3(unittest.TestCase):
         self.assertNotIn('\\"', html_empty)
         soup_empty = BeautifulSoup(html_empty, "html.parser")
         explore_cards = soup_empty.select(".search-explore-card")
-        self.assertEqual(len(explore_cards), 7)
+        self.assertEqual(len(explore_cards), 8)
 
-        # Sovereign & MSME queries render clickable asset-card-accent cards wrapped in <a href>
-        for q in ("EMBASSY", "10Y", "UDYAM"):
+        # Sovereign, MSME & Fixed Savings queries render clickable asset-card-accent cards wrapped in <a href>
+        for q in ("EMBASSY", "10Y", "UDYAM", "PPF"):
             r = self.client.get(f"/search?q={q}")
             self.assertEqual(r.status_code, 200)
             soup = BeautifulSoup(r.text, "html.parser")
@@ -178,9 +190,9 @@ class TestOmniSearchWS3(unittest.TestCase):
         self.assertEqual(live_region.get("aria-live"), "polite")
         self.assertIsNone(live_region.find_parent("main"))
 
-        # 4. 8 category filter chips (ALL + 7 asset classes)
+        # 4. 9 category filter chips (ALL + 8 asset classes)
         chips = modal.select(".omni-filter-chip[data-omni-cat]")
-        self.assertEqual(len(chips), 8)
+        self.assertEqual(len(chips), 9)
 
         # 5. JS wiring & shortcut coordination
         main_js = (PROJECT_ROOT / "web" / "static" / "js" / "main.js").read_text(encoding="utf-8")
@@ -233,7 +245,17 @@ class TestOmniSearchWS3(unittest.TestCase):
         self.assertEqual(infer_canonical_asset_path("PPFAS_FLEXICAP_DIR"), "/funds/PPFAS_FLEXICAP_DIR")
         self.assertEqual(infer_canonical_asset_path("500209"), "/dossier/500209")
         self.assertEqual(infer_canonical_asset_path("EMBASSY"), "/reits/EMBASSY")
+        self.assertEqual(infer_canonical_asset_path("SAV-PPF"), "/savings/SAV-PPF")
+        self.assertEqual(infer_canonical_asset_path("FD-SBI-444D"), "/savings/FD-SBI-444D")
         self.assertEqual(infer_canonical_asset_path("INFY"), "/dossier/INFY")
+
+        # HTTP 302 -> HTTP 200 end-to-end on /dossier/SAV-PPF
+        r_sav = self.client.get("/dossier/SAV-PPF", follow_redirects=False)
+        self.assertEqual(r_sav.status_code, 302)
+        self.assertEqual(r_sav.headers.get("location"), "/savings/SAV-PPF")
+        r_sav_final = self.client.get("/dossier/SAV-PPF", follow_redirects=True)
+        self.assertEqual(r_sav_final.status_code, 200)
+        self.assertIn("Public Provident Fund", r_sav_final.text)
 
         # HTTP 302 -> HTTP 200 end-to-end on /dossier/UDYAM-AP-07-0056192
         r_msme = self.client.get("/dossier/UDYAM-AP-07-0056192", follow_redirects=False)

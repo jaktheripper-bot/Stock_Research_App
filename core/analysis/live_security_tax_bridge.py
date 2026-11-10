@@ -12,8 +12,14 @@ logger = logging.getLogger("equity_research.core.analysis.live_security_tax_brid
 
 from core.db.debt import get_active_debt_securities
 from core.db.reits import get_all_reits_invits, get_all_sgb_tranches
+from core.db.savings import get_active_savings_instruments
 from core.db.sovereign import get_sovereign_yield_curve
-from core.analysis.net_real_tax_calculator import calculate_net_real_return, DEFAULT_CPI_INFLATION
+from core.analysis.net_real_tax_calculator import (
+    calculate_net_real_return,
+    DEFAULT_CPI_INFLATION,
+    get_default_cpi_inflation,
+)
+from core.analysis.savings_engine import evaluate_savings_post_tax
 
 HNI_EFFECTIVE_SLABS = {
     "SLAB_0": 0.0,
@@ -75,10 +81,13 @@ def _resolve_reit_taxable_share(trust: Dict[str, Any]) -> Optional[float]:
 
 def compare_live_tracked_yield_instruments(
     slab_key: Any = "SLAB_30_BASE",
-    cpi_inflation_pct: float = DEFAULT_CPI_INFLATION,
+    cpi_inflation_pct: Optional[float] = None,
     limit_per_class: int = 5,
+    tax_regime: str = "NEW_115BAC",
+    is_senior: bool = False,
 ) -> List[Dict[str, Any]]:
     eff_slab = resolve_effective_slab_pct(slab_key)
+    resolved_cpi = _to_float(cpi_inflation_pct, get_default_cpi_inflation()) if cpi_inflation_pct is not None else get_default_cpi_inflation()
     cap = max(1, int(limit_per_class or 5))
     rows: List[Dict[str, Any]] = []
 
@@ -98,7 +107,7 @@ def compare_live_tracked_yield_instruments(
         ytm = _to_float(sec.get("ytm_pct") or sec.get("coupon_rate_pct"), 0.0)
         if ytm <= 0:
             continue
-        calc = calculate_net_real_return(ytm, eff_slab, cpi_inflation_pct)
+        calc = calculate_net_real_return(ytm, eff_slab, resolved_cpi)
         rows.append({
             "asset_class": "CORPORATE_DEBT",
             "asset_class_label": "Corporate Bond / NCD",
@@ -129,7 +138,7 @@ def compare_live_tracked_yield_instruments(
         if taxable_share is None:
             continue
         blended_tax_rate = eff_slab * taxable_share
-        calc = calculate_net_real_return(gross_yield, blended_tax_rate, cpi_inflation_pct)
+        calc = calculate_net_real_return(gross_yield, blended_tax_rate, resolved_cpi)
         rows.append({
             "asset_class": "REIT_INVIT",
             "asset_class_label": "SEBI REIT / InvIT",
@@ -158,7 +167,7 @@ def compare_live_tracked_yield_instruments(
             continue
         coupon = max(0.0, min(ytm, _to_float(sgb.get("annual_coupon_rate"), 2.5)))
         sgb_blended_tax = eff_slab * (coupon / ytm)
-        calc = calculate_net_real_return(ytm, sgb_blended_tax, cpi_inflation_pct)
+        calc = calculate_net_real_return(ytm, sgb_blended_tax, resolved_cpi)
         rows.append({
             "asset_class": "SGB",
             "asset_class_label": "Sovereign Gold Bond",
@@ -171,10 +180,16 @@ def compare_live_tracked_yield_instruments(
         })
         added_sgb += 1
 
-    # 4. Live Sovereign G-Secs / T-Bills (RBI / FBIL Par Yield Curve)
+    # 4. Live Sovereign G-Secs / T-Bills (RBI / FBIL Par Yield Curve — do NOT auto-seed assumed curve)
     try:
         sov_items = sorted(
-            get_sovereign_yield_curve() or [],
+            [
+                g
+                for g in (get_sovereign_yield_curve(auto_seed=False) or [])
+                if not g.get("is_fallback")
+                and "FALLBACK" not in str(g.get("source") or "").upper()
+                and "STATIC_BASELINE" not in str(g.get("source") or "").upper()
+            ],
             key=lambda g: _to_float(g.get("cut_off_yield"), 0.0),
             reverse=True,
         )
@@ -189,7 +204,7 @@ def compare_live_tracked_yield_instruments(
         ytm = _to_float(gsec.get("cut_off_yield"), 0.0)
         if not tenor or "TEST" in tenor.upper() or ytm <= 0:
             continue
-        calc = calculate_net_real_return(ytm, eff_slab, cpi_inflation_pct)
+        calc = calculate_net_real_return(ytm, eff_slab, resolved_cpi)
         rows.append({
             "asset_class": "SOVEREIGN_GSEC",
             "asset_class_label": "Sovereign G-Sec / T-Bill",
@@ -201,6 +216,45 @@ def compare_live_tracked_yield_instruments(
             **calc,
         })
         added_sov += 1
+
+    # 5. Live Statutory Small Savings, Term Deposits & Retirement Schemes (full HNI surcharge & staleness fidelity)
+    try:
+        sav_items = [
+            s
+            for s in get_active_savings_instruments()
+            if str((s.get("staleness") or {}).get("status") or "FRESH").upper()
+            not in ("STALE_TARIFF", "UNVERIFIED_PROVENANCE")
+        ]
+        sav_scored = []
+        for sv in sav_items:
+            ev = evaluate_savings_post_tax(
+                sv,
+                tax_regime=tax_regime,
+                slab_rate_pct=eff_slab,
+                effective_tax_rate_pct=eff_slab,
+                is_senior=is_senior,
+                cpi_inflation_pct=resolved_cpi,
+            )
+            sav_scored.append((sv, ev))
+        sav_scored.sort(key=lambda pair: pair[1]["fisher_real_yield_pct"], reverse=True)
+        for sv, ev in sav_scored[:cap]:
+            rows.append({
+                "asset_class": "SAVINGS_DEPOSIT",
+                "asset_class_label": sv.get("category_label", "Fixed Savings & Deposit"),
+                "identifier": sv["instrument_id"],
+                "name": sv["scheme_name"],
+                "rating": sv.get("credit_rating", "DICGC / Sovereign"),
+                "dossier_url": f"/savings/{sv['instrument_id']}",
+                "tax_treatment": ev["tax_treatment_badge"],
+                "nominal_return_pct": ev["gross_apy_pct"],
+                "post_tax_nominal_pct": ev["post_tax_yield_pct"],
+                "cpi_inflation_pct": resolved_cpi,
+                "net_real_return_pct": ev["fisher_real_yield_pct"],
+                "tax_drag_pct": round(ev["gross_apy_pct"] - ev["post_tax_yield_pct"], 2),
+                "purchasing_power_verdict": "Real Growth" if ev["fisher_real_yield_pct"] > 1.5 else ("Capital Preserved" if ev["fisher_real_yield_pct"] >= 0 else "Negative Real Return"),
+            })
+    except Exception as sav_err:
+        logger.warning("Savings bridge lookup notice in live_security_tax_bridge: %s", sav_err)
 
     for r in rows:
         r.setdefault("nominal_yield_pct", r.get("nominal_return_pct", 0.0))

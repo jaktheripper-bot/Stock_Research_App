@@ -1742,7 +1742,7 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertIn("Glass-Box Multi-Agent AI", disciplines_showcase.get_text())
 
         pillar_cards = soup_home.select(".pillars-grid .pillar-card")
-        self.assertEqual(len(pillar_cards), 7)
+        self.assertEqual(len(pillar_cards), 8)
         for pcard in pillar_cards:
             self.assertTrue(pcard.get("data-asset-class"), "Homepage .pillar-card missing data-asset-class")
             self.assertTrue(pcard.get("data-href"), "Homepage .pillar-card missing data-href for whole-card link navigation")

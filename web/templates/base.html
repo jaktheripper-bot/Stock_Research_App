@@ -34,9 +34,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="preload" href="/static/css/style.css?v=20261103_0955" as="style" onload="this.rel='stylesheet'">
-  <link rel="preload" href="/static/js/main.js?v=20261103_0955" as="script">
-  <link rel="stylesheet" href="/static/css/style.css?v=20261103_0955">
+  <link rel="preload" href="/static/css/style.css?v=20261109_1330" as="style" onload="this.rel='stylesheet'">
+  <link rel="preload" href="/static/js/main.js?v=20261109_1330" as="script">
+  <link rel="stylesheet" href="/static/css/style.css?v=20261109_1330">
 
   <!-- Schema.org Unified Entity Graph Structured Data (SEO & GEO) -->
   {% block schema_jsonld %}
@@ -414,7 +414,7 @@
           </button>
 
           <!-- Markets & Multi-Asset Sub-Tabs -->
-          <div class="nav-item dropdown {% if active_page in ['home', 'equities', 'opportunities', 'debt', 'funds', 'sovereign', 'etfs', 'reits', 'dossier', 'msme'] %}active-parent{% endif %}" id="navMarketsDropdown">
+          <div class="nav-item dropdown {% if active_page in ['home', 'equities', 'opportunities', 'debt', 'funds', 'sovereign', 'savings', 'etfs', 'reits', 'dossier', 'msme'] %}active-parent{% endif %}" id="navMarketsDropdown">
             <button class="nav-link dropdown-toggle" aria-haspopup="true" aria-expanded="false" id="marketsDropdownBtn">
               <span>Markets</span>
               <svg class="dropdown-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -456,6 +456,13 @@
                 <div class="dropdown-content">
                   <div class="dropdown-title">Sovereign Curve & T-Bills</div>
                   <div class="dropdown-desc">RBI T-Bills, 10Y G-Sec & SDL auction benchmarks</div>
+                </div>
+              </a>
+              <a href="/savings" data-asset-class="savings" class="dropdown-item {% if active_page == 'savings' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-bank"></use></svg></div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Fixed Savings, FDs &amp; PPF</div>
+                  <div class="dropdown-desc">Post-tax yields, DICGC ₹5L ladder &amp; NBFC seniority check</div>
                 </div>
               </a>
               <a href="/reits" data-asset-class="reits" class="dropdown-item {% if active_page == 'reits' %}active{% endif %}" role="menuitem">
@@ -599,21 +606,21 @@
     {% block content %}{% endblock %}
   </main>
 
-  <!-- Global 7-Asset Omni-Search Command Palette Modal -->
+  <!-- Global 8-Asset Omni-Search Command Palette Modal -->
   <div id="omniSearchModal" class="modal-backdrop omni-search-backdrop">
     <div class="modal-dialog omni-search-dialog" role="dialog" aria-modal="true" aria-labelledby="omniSearchModalTitle">
       <div class="modal-header omni-modal-header">
         <h3 id="omniSearchModalTitle" class="omni-modal-title">
           <svg class="glyph" aria-hidden="true"><use href="#glyph-search"></use></svg>
-          <span>Search Across 7 Asset Classes</span>
+          <span>Search Across 8 Asset Classes</span>
         </h3>
         <button type="button" id="closeOmniSearchModalBtn" class="modal-close-btn" onclick="closeOmniSearchModal()" aria-label="Close Omni-Search">&times;</button>
       </div>
 
       <form id="omniSearchModalForm" class="omni-search-form" onsubmit="handleOmniSearchSubmit(event)">
-        <label for="omniSearchModalInput" class="visually-hidden">Search stocks, mutual funds, ETFs, corporate bonds, REITs, Sovereign G-Secs, or MSMEs</label>
+        <label for="omniSearchModalInput" class="visually-hidden">Search stocks, mutual funds, ETFs, corporate bonds, fixed savings &amp; FDs, REITs, Sovereign G-Secs, or MSMEs</label>
         <div id="omniSearchInputHint" class="omni-search-hint">
-          Ticker, company name, 6-digit BSE code, AMFI scheme, ETF symbol, bond ISIN, REIT/SGB, RBI tenor, or Udyam UIN
+          Ticker, company name, 6-digit BSE code, AMFI scheme, ETF symbol, bond ISIN, PPF/SCSS/Bank FD, REIT/SGB, RBI tenor, or Udyam UIN
         </div>
         <div class="omni-search-input-shell">
           <svg class="glyph omni-input-icon" aria-hidden="true"><use href="#glyph-search"></use></svg>
@@ -626,7 +633,7 @@
             autocapitalize="off"
             spellcheck="false"
             aria-describedby="omniSearchInputHint"
-            placeholder="Search TCS, Parag Parikh, NIFTYBEES, INE002A, EMBASSY, 10Y G-Sec, UDYAM..."
+            placeholder="Search TCS, Parag Parikh, NIFTYBEES, INE002A, PPF, SCSS, EMBASSY, 10Y G-Sec..."
             style="font-size: 16px;"
           >
           <span id="omniSearchSpinner" class="omni-search-spinner" hidden>Searching...</span>
@@ -634,11 +641,12 @@
       </form>
 
       <div class="omni-filter-toolbar" role="toolbar" aria-label="Filter search by asset class">
-        <button type="button" class="btn btn-secondary btn-sm omni-filter-chip active" data-omni-cat="ALL" aria-pressed="true" onclick="setOmniSearchCategory('ALL')">All (7)</button>
+        <button type="button" class="btn btn-secondary btn-sm omni-filter-chip active" data-omni-cat="ALL" aria-pressed="true" onclick="setOmniSearchCategory('ALL')">All (8)</button>
         <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="EQUITY" aria-pressed="false" onclick="setOmniSearchCategory('EQUITY')">Equities</button>
         <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="MUTUAL_FUND" aria-pressed="false" onclick="setOmniSearchCategory('MUTUAL_FUND')">Mutual Funds</button>
         <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="ETF" aria-pressed="false" onclick="setOmniSearchCategory('ETF')">ETFs</button>
         <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="DEBT" aria-pressed="false" onclick="setOmniSearchCategory('DEBT')">Bonds &amp; NCDs</button>
+        <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="SAVINGS_DEPOSIT" aria-pressed="false" onclick="setOmniSearchCategory('SAVINGS_DEPOSIT')">Savings &amp; FDs</button>
         <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="REIT_INVIT" aria-pressed="false" onclick="setOmniSearchCategory('REIT_INVIT')">REITs &amp; SGBs</button>
         <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="SOVEREIGN" aria-pressed="false" onclick="setOmniSearchCategory('SOVEREIGN')">Sovereign</button>
         <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="MSME" aria-pressed="false" onclick="setOmniSearchCategory('MSME')">MSMEs</button>
@@ -676,6 +684,13 @@
               <span class="omni-result-sub">Seniority waterfall, credit spreads, YTM &amp; modified duration</span>
             </div>
             <span class="omni-result-badge">Debt →</span>
+          </a>
+          <a href="/savings" class="omni-result-item" data-omni-item data-asset-class="savings">
+            <div class="omni-result-main">
+              <span class="omni-result-title"><svg class="glyph" aria-hidden="true"><use href="#glyph-bank"></use></svg> Fixed Savings, Bank FDs &amp; Small Savings</span>
+              <span class="omni-result-sub">Finance Act 2025 post-tax yields, DICGC ₹5L ladder &amp; NBFC seniority</span>
+            </div>
+            <span class="omni-result-badge">Savings →</span>
           </a>
           <a href="/reits" class="omni-result-item" data-omni-item data-asset-class="reits">
             <div class="omni-result-main">
@@ -1111,6 +1126,7 @@
             <li><a href="/equities">Equities Directory</a></li>
             <li><a href="/opportunities">Opportunity Terminal</a></li>
             <li><a href="/funds">Mutual Funds Look-Through</a></li>
+            <li><a href="/savings">Savings, Bank FDs &amp; PPF</a></li>
             <li><a href="/pricing">Pricing & Credit Packs</a></li>
             <li><a href="/admin"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-lock"></use></svg>Executive Admin Hub</a></li>
           </ul>
@@ -1149,6 +1165,6 @@
     </div>
   </footer>
 
-  <script src="/static/js/main.js?v=20261103_0905"></script>
+  <script src="/static/js/main.js?v=20261109_1330"></script>
 </body>
 </html>

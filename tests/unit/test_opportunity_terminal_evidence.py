@@ -55,7 +55,7 @@ class TestTerminalEvidence(TestCase):
             ],
             get_all_reits_and_invits=lambda: [],
             get_all_sgb_tranches=lambda: [],
-            get_sovereign_yield_curve=lambda: [],
+            get_sovereign_yield_curve=lambda **_: [],
             get_active_mutual_funds=lambda **_: [
                 {"scheme_code": "MFOLD", "returns_5y_cagr": 99},
                 {
@@ -108,7 +108,7 @@ class TestTerminalEvidence(TestCase):
                     "metadata": {"ytm_source": "NSE secondary quote"},
                 },
             ],
-            get_sovereign_yield_curve=lambda: [],
+            get_sovereign_yield_curve=lambda **_: [],
             get_active_mutual_funds=lambda **_: [],
             get_etf_matrix=lambda: [
                 {"symbol": "GOLDBEES", "fund_name": "Nippon India ETF Gold BeES", "underlying_index": "Domestic Gold"},
@@ -202,3 +202,84 @@ class TestTerminalEvidence(TestCase):
                 self.assertEqual(rows[isin]["gross_yield_pct"], 9.5)
             db_conn._DB_INITIALIZED = False
             db_conn._INITIALIZED_DBS.clear()
+
+    def test_stale_and_unverified_savings_tariffs_are_withheld_in_terminal(self):
+        with patch.multiple(
+            terminal,
+            _load_latest_debt_quote_observations=lambda: {},
+            _load_latest_instrument_observations=lambda: {},
+            get_active_debt_securities=lambda **_: [],
+            get_all_reits_and_invits=lambda: [],
+            get_all_sgb_tranches=lambda: [],
+            get_sovereign_yield_curve=lambda **_: [],
+            get_active_mutual_funds=lambda **_: [],
+            get_etf_matrix=lambda: [],
+            get_archived_reports=lambda **_: [],
+            get_active_savings_instruments=lambda **_: [
+                {
+                    "instrument_id": "SAV-FRESH-TEST",
+                    "scheme_name": "Fresh Statutory Scheme",
+                    "issuer_name": "Government of India",
+                    "category": "SMALL_SAVINGS",
+                    "base_rate_pct": 7.50,
+                    "compounding_freq": "ANNUAL",
+                    "tenure_max_months": 60,
+                    "lock_in_months": 60,
+                    "sovereign_backed": 1,
+                    "dicgc_insured": 0,
+                    "credit_rating": "SOV",
+                    "interest_taxability": "SLAB_TAXABLE",
+                    "effective_from": days_ago(10),
+                    "source_authority": "Ministry of Finance DEA Notification",
+                    "source_url": "https://dea.gov.in",
+                    "staleness": {"status": "FRESH", "age_days": 10},
+                },
+                {
+                    "instrument_id": "SAV-STALE-TEST",
+                    "scheme_name": "Expired Bank Special FD",
+                    "issuer_name": "Sample Bank",
+                    "category": "SCHEDULED_BANK_FD",
+                    "base_rate_pct": 7.80,
+                    "compounding_freq": "QUARTERLY",
+                    "tenure_max_months": 18,
+                    "lock_in_months": 0,
+                    "sovereign_backed": 0,
+                    "dicgc_insured": 1,
+                    "credit_rating": "DICGC_INSURED",
+                    "interest_taxability": "SLAB_TAXABLE",
+                    "effective_from": days_ago(200),
+                    "source_authority": "Sample Bank Tariff",
+                    "source_url": "https://sbi.co.in",
+                    "staleness": {"status": "STALE_TARIFF", "age_days": 200},
+                },
+                {
+                    "instrument_id": "SAV-UNVERIFIED-TEST",
+                    "scheme_name": "Unverified Provenance Deposit",
+                    "issuer_name": "Sample Issuer",
+                    "category": "CORPORATE_FD",
+                    "base_rate_pct": 9.10,
+                    "compounding_freq": "ANNUAL",
+                    "tenure_max_months": 36,
+                    "lock_in_months": 12,
+                    "sovereign_backed": 0,
+                    "dicgc_insured": 0,
+                    "credit_rating": "AA",
+                    "interest_taxability": "SLAB_TAXABLE",
+                    "effective_from": "",
+                    "source_authority": "",
+                    "source_url": "",
+                    "staleness": {"status": "UNVERIFIED_PROVENANCE", "age_days": None},
+                },
+            ],
+        ):
+            universe = terminal.get_normalized_opportunity_universe()
+            rows = {row["id"]: row for row in universe}
+            self.assertEqual(rows["SAV-FRESH-TEST"]["metric_status"], "available")
+            self.assertEqual(rows["SAV-FRESH-TEST"]["gross_yield_pct"], 7.50)
+
+            self.assertEqual(rows["SAV-STALE-TEST"]["metric_status"], "stale")
+            self.assertIsNone(rows["SAV-STALE-TEST"]["gross_yield_pct"])
+            self.assertIsNone(rows["SAV-STALE-TEST"]["net_yield_pct"])
+
+            self.assertEqual(rows["SAV-UNVERIFIED-TEST"]["metric_status"], "unavailable")
+            self.assertIsNone(rows["SAV-UNVERIFIED-TEST"]["gross_yield_pct"])

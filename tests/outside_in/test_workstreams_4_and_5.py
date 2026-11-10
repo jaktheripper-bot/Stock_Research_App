@@ -111,7 +111,7 @@ Zero long-term debt and high FCF conversion.
         pillars_grid = soup.find(class_="pillars-grid")
         self.assertIsNotNone(pillars_grid)
         cards = pillars_grid.find_all(class_="pillar-card")
-        self.assertEqual(len(cards), 7, "Must render exactly 7 asset class framework cards")
+        self.assertEqual(len(cards), 8, "Must render all 8 asset class framework cards")
         equities_card = cards[0]
         self.assertIn("See cash flow, debt burden, and valuation floor", equities_card.text)
         self.assertIn("Models: Reverse-DCF • DuPont • ASRI", equities_card.text)

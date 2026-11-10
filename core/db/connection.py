@@ -2356,19 +2356,19 @@ def init_db(force: bool = False):
                         DO $$
                         BEGIN
                             IF EXISTS (
-                                SELECT 1 FROM information_schema.columns 
+                                SELECT 1 FROM information_schema.columns
                                 WHERE table_name='sovereign_macro_rates' AND column_name='period_label'
                             ) THEN
                                 ALTER TABLE sovereign_macro_rates ALTER COLUMN period_label TYPE VARCHAR(120);
                             END IF;
                             IF EXISTS (
-                                SELECT 1 FROM information_schema.columns 
+                                SELECT 1 FROM information_schema.columns
                                 WHERE table_name='sovereign_macro_rates' AND column_name='metric_name'
                             ) THEN
                                 ALTER TABLE sovereign_macro_rates ALTER COLUMN metric_name TYPE VARCHAR(120);
                             END IF;
                             IF EXISTS (
-                                SELECT 1 FROM information_schema.columns 
+                                SELECT 1 FROM information_schema.columns
                                 WHERE table_name='sovereign_macro_rates' AND column_name='indicator_name'
                             ) THEN
                                 ALTER TABLE sovereign_macro_rates ALTER COLUMN indicator_name TYPE VARCHAR(120);
@@ -2927,6 +2927,145 @@ def init_db(force: bool = False):
 
                 cursor.execute(
                     "INSERT INTO schema_migrations (version) VALUES ('v048_reconcile_v2_column_contracts') ON CONFLICT DO NOTHING;"
+                )
+                conn.commit()
+
+            # Migration v049: Fixed Savings, Term Deposits, Statutory Small Savings & Retirement Universe
+            if "v049_fixed_savings_and_deposit_universe" not in applied:
+                logger.info("Applying schema migration: v049_fixed_savings_and_deposit_universe...")
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS savings_instruments (
+                        instrument_id TEXT PRIMARY KEY,
+                        scheme_name TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        issuer_name TEXT NOT NULL,
+                        issuer_ticker TEXT,
+                        issuer_type TEXT NOT NULL,
+                        sovereign_backed INTEGER NOT NULL DEFAULT 0,
+                        dicgc_insured INTEGER NOT NULL DEFAULT 0,
+                        dicgc_limit_inr REAL NOT NULL DEFAULT 0.0,
+                        credit_rating TEXT NOT NULL DEFAULT 'UNRATED',
+                        base_rate_pct REAL NOT NULL,
+                        senior_citizen_bonus_bps REAL NOT NULL DEFAULT 0.0,
+                        rate_type TEXT NOT NULL DEFAULT 'FIXED',
+                        floating_benchmark TEXT,
+                        floating_spread_bps REAL NOT NULL DEFAULT 0.0,
+                        compounding_freq TEXT NOT NULL DEFAULT 'QUARTERLY',
+                        payout_options_json TEXT NOT NULL DEFAULT '["CUMULATIVE"]',
+                        tenure_min_months INTEGER NOT NULL DEFAULT 0,
+                        tenure_max_months INTEGER NOT NULL DEFAULT 0,
+                        lock_in_months INTEGER NOT NULL DEFAULT 0,
+                        premature_exit_rule TEXT,
+                        min_investment_inr REAL NOT NULL DEFAULT 500.0,
+                        max_investment_inr REAL,
+                        tax_section_80c_eligible INTEGER NOT NULL DEFAULT 0,
+                        interest_taxability TEXT NOT NULL DEFAULT 'SLAB_TAXABLE',
+                        maturity_taxability TEXT NOT NULL DEFAULT 'EXEMPT',
+                        tds_applicable INTEGER NOT NULL DEFAULT 0,
+                        tds_threshold_regular_inr REAL NOT NULL DEFAULT 0.0,
+                        tds_threshold_senior_inr REAL NOT NULL DEFAULT 0.0,
+                        effective_from TEXT NOT NULL,
+                        next_review_date TEXT,
+                        source_authority TEXT NOT NULL,
+                        source_url TEXT NOT NULL,
+                        notes_json TEXT NOT NULL DEFAULT '{}',
+                        is_active INTEGER NOT NULL DEFAULT 1,
+                        updated_at TEXT NOT NULL,
+                        override_epoch INTEGER NOT NULL DEFAULT 0,
+                        active_observation_id TEXT
+                    );
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS savings_rate_observations (
+                        observation_id TEXT PRIMARY KEY,
+                        instrument_id TEXT NOT NULL,
+                        base_rate_pct REAL NOT NULL,
+                        senior_citizen_bonus_bps REAL NOT NULL DEFAULT 0.0,
+                        effective_from TEXT NOT NULL,
+                        effective_to TEXT,
+                        revision_seq INTEGER NOT NULL DEFAULT 1,
+                        rate_circular_ref TEXT NOT NULL DEFAULT '',
+                        source_authority TEXT NOT NULL,
+                        source_url TEXT NOT NULL,
+                        material_terms_hash TEXT NOT NULL DEFAULT '',
+                        terms_snapshot_json TEXT NOT NULL DEFAULT '{}',
+                        change_reason TEXT NOT NULL DEFAULT 'INITIAL_SEED',
+                        observation_status TEXT NOT NULL DEFAULT 'ACTIVE',
+                        origin_db TEXT NOT NULL DEFAULT 'local',
+                        observed_at TEXT NOT NULL,
+                        superseded_at TEXT,
+                        superseded_by_observation_id TEXT,
+                        evidence_sha256 TEXT
+                    );
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS tax_rule_registry (
+                        rule_version TEXT PRIMARY KEY,
+                        finance_act_label TEXT NOT NULL,
+                        effective_from TEXT NOT NULL,
+                        effective_to TEXT,
+                        rules_json TEXT NOT NULL,
+                        source_authority TEXT NOT NULL,
+                        source_url TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    );
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS savings_override_audit_log (
+                        override_id TEXT PRIMARY KEY,
+                        instrument_id TEXT NOT NULL,
+                        operator_id TEXT NOT NULL,
+                        override_reason TEXT NOT NULL,
+                        override_epoch INTEGER NOT NULL,
+                        prior_observation_id TEXT,
+                        prior_effective_from TEXT,
+                        prior_rate_pct REAL,
+                        replacement_observation_id TEXT NOT NULL,
+                        replacement_effective_from TEXT NOT NULL,
+                        replacement_rate_pct REAL NOT NULL,
+                        dependent_updates_json TEXT NOT NULL DEFAULT '[]',
+                        created_at TEXT NOT NULL
+                    );
+                """)
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_savings_instruments_cat ON savings_instruments(category, is_active);"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_savings_instruments_ticker ON savings_instruments(issuer_ticker);"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_savings_rate_obs_inst ON savings_rate_observations(instrument_id, effective_from DESC, revision_seq DESC);"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_savings_rate_obs_sched ON savings_rate_observations(observation_status, effective_from);"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_savings_override_audit_inst ON savings_override_audit_log(instrument_id, override_epoch DESC);"
+                )
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version) VALUES ('v049_fixed_savings_and_deposit_universe') ON CONFLICT DO NOTHING;"
+                )
+                conn.commit()
+
+            # Migration v050: Non-destructive reconciliation of legacy v049 draft tables (retains legacy tables for rollback)
+            if "v050_reconcile_savings_observations_and_table_names" not in applied:
+                logger.info("Applying schema migration: v050_reconcile_savings_observations_and_table_names...")
+                from core.db.savings import reconcile_savings_schema_and_legacy_tables
+
+                reconcile_savings_schema_and_legacy_tables(cursor, is_pg=bool(supabase_url))
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version) VALUES ('v050_reconcile_savings_observations_and_table_names') ON CONFLICT DO NOTHING;"
+                )
+                conn.commit()
+
+            # Migration v051: Globally unique observation_id PK, future-rate status, material terms hash & override audit log
+            if "v051_savings_global_observation_ids_and_override_audit" not in applied:
+                logger.info("Applying schema migration: v051_savings_global_observation_ids_and_override_audit...")
+                from core.db.savings import reconcile_savings_schema_and_legacy_tables
+
+                reconcile_savings_schema_and_legacy_tables(cursor, is_pg=bool(supabase_url))
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version) VALUES ('v051_savings_global_observation_ids_and_override_audit') ON CONFLICT DO NOTHING;"
                 )
                 conn.commit()
 

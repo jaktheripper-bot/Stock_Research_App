@@ -48,12 +48,12 @@ def get_local_reports(sqlite_path: str = None) -> List[Dict[str, Any]]:
     if not os.path.exists(path):
         logger.warning(f"Local SQLite database not found at {path}")
         return []
-    
+
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT ticker, short_name, report_text, timestamp, baseline_price, 
+        SELECT ticker, short_name, report_text, timestamp, baseline_price,
                baseline_pe, baseline_mcap, latest_announcement, citations_json
         FROM reports
         ORDER BY ticker ASC
@@ -67,13 +67,13 @@ def get_local_revisions(sqlite_path: str = None) -> List[Dict[str, Any]]:
     path = sqlite_path or get_db_path()
     if not os.path.exists(path):
         return []
-    
+
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT ticker, short_name, report_text, timestamp, baseline_price, 
+            SELECT ticker, short_name, report_text, timestamp, baseline_price,
                    baseline_pe, baseline_mcap, latest_announcement, revision_trigger, citations_json
             FROM report_revisions
             ORDER BY id ASC
@@ -156,8 +156,13 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
     # 1. Initialize complete schema migrations on PostgreSQL and release pool sockets immediately
     logger.info("Ensuring PostgreSQL schema migrations are initialized...")
     try:
+        from core.db.savings import reconcile_savings_schema_and_legacy_tables
+
+        reconcile_savings_schema_and_legacy_tables(cursor, is_pg=True)
+        conn.commit()
         init_db(force=False)
     except Exception as mig_err:
+        conn.rollback()
         logger.debug("Schema migration notice: %s", mig_err)
     finally:
         close_all_pg_pools()
@@ -192,6 +197,10 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
         ("msme_firms", "uin", True, "last_updated"),
         ("equity_price_history_cache", "ticker, period", True, "updated_at"),
         ("instrument_metric_observations", "instrument_id, asset_class, measure_type, as_of, source_name", True, "recorded_at"),
+        ("savings_override_audit_log", "override_id", False, "created_at"),
+        ("savings_rate_observations", "__savings_observations_reconcile__", True, "observed_at"),
+        ("savings_instruments", "__savings_instruments_reconcile__", True, "updated_at"),
+        ("tax_rule_registry", "rule_version", True, "updated_at"),
     ]
     forbidden_overlap = AUTHORITATIVE_PG_ONLY_TABLES.intersection({t[0] for t in sync_targets})
     if forbidden_overlap:
@@ -361,7 +370,310 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
                         page_size=2000,
                     )
                 batch_count = len(to_insert)
+            elif conflict_col == "__savings_observations_reconcile__":
+                from core.db.savings import validate_observation_provenance
+
+                valid_obs_rows = []
+                for r in rows:
+                    try:
+                        validate_observation_provenance(dict(r))
+                        valid_obs_rows.append(dict(r))
+                    except ValueError as obs_err:
+                        logger.warning(
+                            "Skipped savings_rate_observations row failing provenance check: %s",
+                            obs_err,
+                        )
+                if not valid_obs_rows:
+                    continue
+
+                sq_sup_chain: Dict[str, Any] = {
+                    str(r["observation_id"]): (
+                        str(r["superseded_by_observation_id"])
+                        if r.get("superseded_by_observation_id")
+                        else None
+                    )
+                    for r in valid_obs_rows
+                }
+
+                def _sq_causally_superseded(ancestor_id: str, descendant_id: str) -> bool:
+                    cur_id = ancestor_id
+                    visited = set()
+                    while cur_id and cur_id not in visited and len(visited) < 64:
+                        visited.add(cur_id)
+                        nxt = sq_sup_chain.get(cur_id)
+                        if nxt == descendant_id:
+                            return True
+                        cur_id = nxt
+                    return False
+
+                cursor.execute(
+                    "SELECT instrument_id, effective_from, COALESCE(override_epoch, 0), active_observation_id "
+                    "FROM savings_instruments;"
+                )
+                pg_inst_state = {
+                    str(r[0]): (str(r[1] or "")[:10], int(r[2] or 0), str(r[3]) if r[3] else None)
+                    for r in cursor.fetchall()
+                }
+                cursor.execute(
+                    "SELECT instrument_id, effective_from, observation_id, observation_status "
+                    "FROM savings_rate_observations WHERE superseded_at IS NULL;"
+                )
+                pg_unsup_by_inst_eff: Dict[Any, str] = {
+                    (str(r[0]), str(r[1])[:10]): str(r[2]) for r in cursor.fetchall()
+                }
+                cursor.execute(
+                    "SELECT instrument_id, override_epoch, dependent_updates_json FROM savings_override_audit_log;"
+                )
+                audited_epochs: Dict[str, int] = {}
+                for ov_inst, ov_ep, ov_deps_raw in cursor.fetchall():
+                    ov_i = str(ov_inst)
+                    ov_e = int(ov_ep or 0)
+                    if ov_e > audited_epochs.get(ov_i, 0):
+                        audited_epochs[ov_i] = ov_e
+                    try:
+                        for dep in json.loads(ov_deps_raw or "[]"):
+                            d_id = str(dep.get("instrument_id") or "")
+                            d_ep = int(dep.get("override_epoch") or ov_e)
+                            if d_id and d_ep > audited_epochs.get(d_id, 0):
+                                audited_epochs[d_id] = d_ep
+                    except Exception as dep_err:
+                        logger.debug("Audit dependent_updates_json parse notice: %s", dep_err)
+                sqlite_cur.execute("SELECT instrument_id, COALESCE(override_epoch, 0) FROM savings_instruments;")
+                sq_inst_epochs = {str(r[0]): int(r[1] or 0) for r in sqlite_cur.fetchall()}
+
+                now_sync_iso = datetime.now(IST).isoformat()
+                conflicts_detected = 0
+                to_upsert_obs = []
+                pg_obs_to_supersede = []
+
+                for r in valid_obs_rows:
+                    obs_id_val = str(r["observation_id"])
+                    inst_id_val = str(r["instrument_id"])
+                    eff_val = str(r["effective_from"])[:10]
+                    is_unsup = r.get("superseded_at") is None
+                    pg_existing_unsup = pg_unsup_by_inst_eff.get((inst_id_val, eff_val))
+                    _pg_eff, pg_epoch, _pg_act = pg_inst_state.get(inst_id_val, ("", 0, None))
+                    sq_epoch = sq_inst_epochs.get(inst_id_val, 0)
+                    sq_has_higher_audited_override = (
+                        sq_epoch > pg_epoch and audited_epochs.get(inst_id_val, 0) >= sq_epoch
+                    )
+
+                    row_mut = dict(r)
+                    if is_unsup and pg_existing_unsup and pg_existing_unsup != obs_id_val:
+                        if _sq_causally_superseded(pg_existing_unsup, obs_id_val) or sq_has_higher_audited_override:
+                            pg_obs_to_supersede.append((now_sync_iso, obs_id_val, pg_existing_unsup))
+                            pg_unsup_by_inst_eff[(inst_id_val, eff_val)] = obs_id_val
+                        else:
+                            # Independent split-brain revision across DBs: PostgreSQL is authoritative;
+                            # record SQLite's divergent observation as SUPERSEDED_CONFLICT without losing history.
+                            row_mut["superseded_at"] = now_sync_iso
+                            row_mut["superseded_by_observation_id"] = pg_existing_unsup
+                            row_mut["observation_status"] = "SUPERSEDED_CONFLICT"
+                            conflicts_detected += 1
+
+                    to_upsert_obs.append(
+                        tuple(_transform_cell(row_mut.get(c), pg_col_types.get(c, "")) for c in cols)
+                    )
+
+                for sup_ts, new_oid, old_oid in pg_obs_to_supersede:
+                    cursor.execute(
+                        """
+                        UPDATE savings_rate_observations
+                        SET superseded_at = %s,
+                            superseded_by_observation_id = %s,
+                            observation_status = 'SUPERSEDED'
+                        WHERE observation_id = %s AND superseded_at IS NULL;
+                        """,
+                        (sup_ts, new_oid, old_oid),
+                    )
+
+                obs_query = (
+                    f"INSERT INTO savings_rate_observations ({cols_joined}) VALUES ({placeholders}) "
+                    f"ON CONFLICT (observation_id) DO UPDATE SET "
+                    f"effective_to = COALESCE(savings_rate_observations.effective_to, EXCLUDED.effective_to), "
+                    f"superseded_at = COALESCE(savings_rate_observations.superseded_at, EXCLUDED.superseded_at), "
+                    f"superseded_by_observation_id = COALESCE("
+                    f"savings_rate_observations.superseded_by_observation_id, "
+                    f"EXCLUDED.superseded_by_observation_id), "
+                    f"observation_status = CASE "
+                    f"WHEN savings_rate_observations.superseded_at IS NULL AND EXCLUDED.superseded_at IS NOT NULL "
+                    f"THEN EXCLUDED.observation_status "
+                    f"WHEN savings_rate_observations.observation_status = 'SCHEDULED_FUTURE' "
+                    f"AND EXCLUDED.observation_status = 'ACTIVE' THEN 'ACTIVE' "
+                    f"ELSE savings_rate_observations.observation_status END"
+                )
+                execute_batch(cursor, obs_query, to_upsert_obs, page_size=500)
+                batch_count = len(to_upsert_obs)
+                if conflicts_detected:
+                    sync_summary["savings_conflicts_detected"] = (
+                        sync_summary.get("savings_conflicts_detected", 0) + conflicts_detected
+                    )
+            elif conflict_col == "__savings_instruments_reconcile__":
+                from core.db.savings import is_valid_savings_provenance
+
+                valid_inst_rows = [dict(r) for r in rows if is_valid_savings_provenance(dict(r))]
+                if len(valid_inst_rows) < len(rows):
+                    logger.warning(
+                        "Skipped %d savings_instruments rows failing official provenance check.",
+                        len(rows) - len(valid_inst_rows),
+                    )
+                if not valid_inst_rows:
+                    continue
+
+                sqlite_cur.execute(
+                    "SELECT observation_id, superseded_by_observation_id FROM savings_rate_observations;"
+                )
+                sq_sup_map = {
+                    str(r[0]): (str(r[1]) if r[1] else None) for r in sqlite_cur.fetchall()
+                }
+
+                def _is_causal_successor_sq(ancestor_oid: str, successor_oid: str) -> bool:
+                    cur_id = ancestor_oid
+                    seen = set()
+                    while cur_id and cur_id not in seen and len(seen) < 64:
+                        seen.add(cur_id)
+                        nxt = sq_sup_map.get(cur_id)
+                        if nxt == successor_oid:
+                            return True
+                        cur_id = nxt
+                    return False
+
+                cursor.execute(
+                    "SELECT instrument_id, effective_from, COALESCE(override_epoch, 0), "
+                    "active_observation_id, updated_at FROM savings_instruments;"
+                )
+                pg_cur_inst = {
+                    str(r[0]): (
+                        str(r[1] or "")[:10],
+                        int(r[2] or 0),
+                        str(r[3]) if r[3] else None,
+                        _coerce_datetime(r[4]),
+                    )
+                    for r in cursor.fetchall()
+                }
+                cursor.execute(
+                    "SELECT instrument_id, override_epoch, dependent_updates_json FROM savings_override_audit_log;"
+                )
+                pg_audited_epochs: Dict[str, int] = {}
+                for ov_inst, ov_ep, ov_deps_raw in cursor.fetchall():
+                    ov_i = str(ov_inst)
+                    ov_e = int(ov_ep or 0)
+                    if ov_e > pg_audited_epochs.get(ov_i, 0):
+                        pg_audited_epochs[ov_i] = ov_e
+                    try:
+                        for dep in json.loads(ov_deps_raw or "[]"):
+                            d_id = str(dep.get("instrument_id") or "")
+                            d_ep = int(dep.get("override_epoch") or ov_e)
+                            if d_id and d_ep > pg_audited_epochs.get(d_id, 0):
+                                pg_audited_epochs[d_id] = d_ep
+                    except Exception as dep_err:
+                        logger.debug("Audit dependent_updates_json parse notice: %s", dep_err)
+
+                allowed_inst_rows = []
+                now_inst_iso = datetime.now(IST).isoformat()
+                for r in valid_inst_rows:
+                    iid = str(r["instrument_id"])
+                    sq_eff = str(r.get("effective_from") or "")[:10]
+                    sq_epoch = int(r.get("override_epoch") or 0)
+                    sq_act_obs = str(r["active_observation_id"]) if r.get("active_observation_id") else None
+                    sq_upd_dt = _coerce_datetime(r.get("updated_at"))
+
+                    if iid not in pg_cur_inst:
+                        allowed_inst_rows.append(r)
+                        continue
+
+                    pg_eff, pg_epoch, pg_act_obs, pg_upd_dt = pg_cur_inst[iid]
+                    if sq_epoch > pg_epoch:
+                        if pg_audited_epochs.get(iid, 0) >= sq_epoch:
+                            # Supersede any newer PG observations rolled back by the audited override
+                            if sq_act_obs:
+                                cursor.execute(
+                                    """
+                                    UPDATE savings_rate_observations
+                                    SET superseded_at = %s,
+                                        superseded_by_observation_id = %s,
+                                        observation_status = 'SUPERSEDED'
+                                    WHERE instrument_id = %s
+                                      AND superseded_at IS NULL
+                                      AND observation_id <> %s
+                                      AND effective_from >= %s;
+                                    """,
+                                    (now_inst_iso, sq_act_obs, iid, sq_act_obs, sq_eff),
+                                )
+                            allowed_inst_rows.append(r)
+                        else:
+                            logger.warning(
+                                "Rejected unaudited override_epoch=%d on %s during Supabase upload.",
+                                sq_epoch,
+                                iid,
+                            )
+                    elif sq_epoch < pg_epoch:
+                        continue
+                    elif sq_eff > pg_eff:
+                        cursor.execute(
+                            """
+                            UPDATE savings_rate_observations
+                            SET effective_to = COALESCE(effective_to, %s),
+                                observation_status = CASE
+                                    WHEN observation_status = 'ACTIVE' THEN 'HISTORICAL'
+                                    ELSE observation_status
+                                END
+                            WHERE instrument_id = %s
+                              AND superseded_at IS NULL
+                              AND effective_to IS NULL
+                              AND effective_from < %s;
+                            """,
+                            (sq_eff, iid, sq_eff),
+                        )
+                        allowed_inst_rows.append(r)
+                    elif sq_eff < pg_eff:
+                        continue
+                    else:
+                        # Same override_epoch and same effective_from
+                        if sq_act_obs and pg_act_obs and sq_act_obs != pg_act_obs:
+                            if _is_causal_successor_sq(pg_act_obs, sq_act_obs):
+                                allowed_inst_rows.append(r)
+                            # Else split-brain conflict: keep PostgreSQL's authoritative active row!
+                        elif pg_upd_dt is None or (sq_upd_dt is not None and sq_upd_dt >= pg_upd_dt):
+                            allowed_inst_rows.append(r)
+
+                if allowed_inst_rows:
+                    upd_inst_sql = ", ".join(
+                        [f"{c} = EXCLUDED.{c}" for c in cols if c != "instrument_id"]
+                    )
+                    inst_upsert_q = (
+                        f"INSERT INTO savings_instruments ({cols_joined}) VALUES ({placeholders}) "
+                        f"ON CONFLICT (instrument_id) DO UPDATE SET {upd_inst_sql}"
+                    )
+                    inst_batch = [
+                        tuple(_transform_cell(r.get(c), pg_col_types.get(c, "")) for c in cols)
+                        for r in allowed_inst_rows
+                    ]
+                    execute_batch(cursor, inst_upsert_q, inst_batch, page_size=500)
+                batch_count = len(allowed_inst_rows)
             else:
+                if table_name == "savings_override_audit_log":
+                    valid_ovr_rows = [
+                        r
+                        for r in rows
+                        if str(r["operator_id"] or "").strip()
+                        and len(str(r["override_reason"] or "").strip()) >= 8
+                    ]
+                    rows = valid_ovr_rows
+                elif table_name == "tax_rule_registry":
+                    from core.db.savings import validate_tax_rule_provenance
+
+                    valid_tax_rows = []
+                    for r in rows:
+                        try:
+                            validate_tax_rule_provenance(dict(r))
+                            valid_tax_rows.append(r)
+                        except ValueError as tv_err:
+                            logger.warning("Skipped tax_rule_registry row failing provenance check: %s", tv_err)
+                    rows = valid_tax_rows
+                if not rows:
+                    continue
+
                 if do_update and conflict_col:
                     conflict_targets = [c.strip() for c in conflict_col.split(",")]
                     conflict_target_sql = ", ".join(conflict_targets)
@@ -485,7 +797,7 @@ def upload_sqlite_backup_to_storage(sqlite_path: str, supabase_url: str, service
     import requests
     if not os.path.exists(sqlite_path):
         return False
-    
+
     from core.db.connection import IST
     timestamp = datetime.now(IST).strftime("%Y%m%d_%H%M%S")
     target_name = f"reports_db_{timestamp}.sqlite"
@@ -526,7 +838,7 @@ def pull_from_supabase_rest(sqlite_path: str, supabase_url: str, service_key: st
     if resp.status_code != 200:
         logger.error(f"Failed to fetch reports from Supabase: {resp.status_code} {resp.text}")
         return 0
-    
+
     rows = resp.json()
     if not rows:
         logger.info("No reports found in Supabase.")
@@ -628,4 +940,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

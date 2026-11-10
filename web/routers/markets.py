@@ -18,7 +18,7 @@ import re
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, Request, HTTPException, Query, Body, BackgroundTasks
 from fastapi.encoders import jsonable_encoder
@@ -112,9 +112,21 @@ class IngestDebtRequest(BaseModel):
 class ArbitrageDocketRequest(BaseModel):
     item_ids: List[str]
     tax_slab: float = 30.0
-    cpi_inflation: float = 4.5
+    cpi_inflation: float = 3.65
 
 ArbitrageDocketRequest.model_rebuild()
+
+
+class DicgcLadderRequest(BaseModel):
+    corpus_inr: float = Field(2000000.0, ge=1000.0, le=500000000.0)
+    tenure_months: int = Field(36, ge=3, le=120)
+    payout_mode: str = "CUMULATIVE"
+    is_senior: bool = False
+    tax_regime: str = "NEW_115BAC"
+    slab_rate_pct: float = Field(30.0, ge=0.0, le=42.75)
+    surcharge_rate_pct: float = Field(0.0, ge=0.0, le=37.0)
+    include_sfb: bool = True
+    max_banks: Optional[int] = Field(None, ge=1, le=25)
 
 
 class AnnouncementClassifyRequest(BaseModel):
@@ -1219,6 +1231,210 @@ async def api_thesis_checkpoint(payload: ThesisCheckpointRequest, request: Reque
         "success": True,
         "message": f"Thesis Checkpoint ('Would you buy today?') verdict committed for {canonical}!"
     })
+
+
+# ==============================================================================
+# Fixed Savings, Term Deposits, Statutory Small Savings & DICGC Endpoints
+# ==============================================================================
+@router.get("/api/savings/instruments")
+@router.get("/api/savings/directory")
+def api_get_savings_instruments(
+    category: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    tax_regime: str = Query("NEW_115BAC"),
+    slab_rate_pct: float = Query(30.0, ge=0.0, le=42.75),
+    surcharge_rate_pct: float = Query(0.0, ge=0.0, le=37.0),
+    is_senior: bool = Query(False),
+    dicgc_only: bool = Query(False),
+    sovereign_only: bool = Query(False),
+    tax_80c_only: bool = Query(False),
+    sort_by: str = Query("post_tax_desc"),
+):
+    """Public API: Tax-normalized Fixed Savings, Term Deposits & Small Savings directory."""
+    init_db()
+    from core.analysis.savings_engine import get_enriched_savings_directory
+
+    data = get_enriched_savings_directory(
+        category=category,
+        query=q,
+        tax_regime=tax_regime,
+        slab_rate_pct=slab_rate_pct,
+        surcharge_rate_pct=surcharge_rate_pct,
+        is_senior=is_senior,
+        dicgc_only=dicgc_only,
+        sovereign_only=sovereign_only,
+        tax_80c_only=tax_80c_only,
+        sort_by=sort_by,
+    )
+    return json_response_with_cache({"status": "success", **data}, max_age=60)
+
+
+@router.get("/api/savings/instrument/{instrument_id}")
+def api_get_savings_instrument_detail(
+    instrument_id: str,
+    tax_regime: str = Query("NEW_115BAC"),
+    slab_rate_pct: float = Query(30.0, ge=0.0, le=42.75),
+    surcharge_rate_pct: float = Query(0.0, ge=0.0, le=37.0),
+    is_senior: bool = Query(False),
+    principal_inr: float = Query(500000.0, ge=1000.0, le=100000000.0),
+):
+    """Public API: Single Fixed Savings / Term Deposit analytical dossier."""
+    init_db()
+    from core.analysis.savings_engine import get_savings_instrument_dossier
+
+    dossier = get_savings_instrument_dossier(
+        instrument_id,
+        tax_regime=tax_regime,
+        slab_rate_pct=slab_rate_pct,
+        surcharge_rate_pct=surcharge_rate_pct,
+        is_senior=is_senior,
+        principal_inr=principal_inr,
+    )
+    if not dossier:
+        raise HTTPException(status_code=404, detail=f"Savings instrument '{instrument_id}' not found.")
+    return json_response_with_cache({"status": "success", **dossier}, max_age=60)
+
+
+@router.get("/api/savings/dicgc-ladder")
+def api_get_dicgc_ladder(
+    corpus_inr: float = Query(2000000.0, ge=1000.0, le=500000000.0),
+    tenure_months: int = Query(36, ge=3, le=120),
+    payout_mode: str = Query("CUMULATIVE"),
+    is_senior: bool = Query(False),
+    tax_regime: str = Query("NEW_115BAC"),
+    slab_rate_pct: float = Query(30.0, ge=0.0, le=42.75),
+    surcharge_rate_pct: float = Query(0.0, ge=0.0, le=37.0),
+    include_sfb: bool = Query(True),
+    max_banks: Optional[int] = Query(None, ge=1, le=25),
+):
+    """Public API: Solves exact ₹5,00,000 principal + accrued interest DICGC split across distinct bank charters."""
+    init_db()
+    from core.analysis.savings_engine import compute_dicgc_safe_ladder
+
+    try:
+        ladder = compute_dicgc_safe_ladder(
+            corpus_inr=corpus_inr,
+            tenure_months=tenure_months,
+            payout_mode=payout_mode,
+            is_senior=is_senior,
+            tax_regime=tax_regime,
+            slab_rate_pct=slab_rate_pct,
+            surcharge_rate_pct=surcharge_rate_pct,
+            include_sfb=include_sfb,
+            max_banks=max_banks,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return JSONResponse(jsonable_encoder({"status": "success", **ladder}))
+
+
+@router.post("/api/savings/dicgc-ladder")
+def api_post_dicgc_ladder(payload: DicgcLadderRequest):
+    """Public API: POST solver for exact ₹5,00,000 DICGC principal + accrued interest split."""
+    init_db()
+    from core.analysis.savings_engine import compute_dicgc_safe_ladder
+
+    try:
+        ladder = compute_dicgc_safe_ladder(
+            corpus_inr=float(payload.corpus_inr),
+            tenure_months=int(payload.tenure_months),
+            payout_mode=payload.payout_mode,
+            is_senior=payload.is_senior,
+            tax_regime=payload.tax_regime,
+            slab_rate_pct=float(payload.slab_rate_pct),
+            surcharge_rate_pct=float(payload.surcharge_rate_pct),
+            include_sfb=payload.include_sfb,
+            max_banks=payload.max_banks,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return JSONResponse(jsonable_encoder({"status": "success", **ladder}))
+
+
+@router.get("/api/savings/cash-park")
+def api_get_savings_cash_park(
+    tax_regime: str = Query("NEW_115BAC"),
+    slab_rate_pct: float = Query(30.0, ge=0.0, le=42.75),
+    surcharge_rate_pct: float = Query(0.0, ge=0.0, le=37.0),
+    holding_months: int = Query(13, ge=1, le=60),
+    is_senior: bool = Query(False),
+):
+    """Public API: Short-term Cash-Park & Pure Sec 112A Arbitrage Comparator sleeve."""
+    init_db()
+    from core.analysis.savings_engine import get_cash_park_sleeve
+
+    sleeve = get_cash_park_sleeve(
+        tax_regime=tax_regime,
+        slab_rate_pct=slab_rate_pct,
+        surcharge_rate_pct=surcharge_rate_pct,
+        holding_months=holding_months,
+        is_senior=is_senior,
+    )
+    return json_response_with_cache({"status": "success", **sleeve}, max_age=60)
+
+
+@router.post("/api/admin/savings/import-rates")
+def api_admin_import_savings_rates(
+    request: Request,
+    payload: Dict[str, Any] = Body(default={}),
+):
+    """Admin API: Triggers automated savings rate verification or applies an explicit instrument update."""
+    init_db()
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=401, detail="Administrator authentication required.")
+
+    from core.db.savings import (
+        get_savings_instrument_by_id,
+        upsert_savings_instrument,
+        verify_and_sync_automated_savings_rates,
+    )
+
+    instruments_in = payload.get("instruments")
+    force_batch = bool(payload.get("force_overwrite") or payload.get("force"))
+    batch_reason = str(payload.get("override_reason") or "").strip() or None
+    web_user = _get_current_web_user(request)
+    resolved_admin_op = str(
+        payload.get("override_operator")
+        or (web_user.get("id") if isinstance(web_user, dict) and web_user.get("id") else "")
+        or "admin_web_session"
+    ).strip()
+    ref_date_param = str(payload.get("reference_date") or "").strip()[:10] or None
+
+    if isinstance(instruments_in, list) and instruments_in:
+        updated = []
+        try:
+            for entry in instruments_in:
+                inst_id = str(entry.get("instrument_id") or "").strip().upper()
+                if not inst_id:
+                    continue
+                existing = get_savings_instrument_by_id(inst_id, reference_date=ref_date_param) or {}
+                merged = dict(existing)
+                merged.update(entry)
+                force_item = bool(force_batch or entry.get("force_overwrite") or entry.get("force"))
+                item_reason = str(entry.get("override_reason") or batch_reason or "").strip() or None
+                item_operator = str(entry.get("override_operator") or resolved_admin_op).strip()
+                updated.append(
+                    upsert_savings_instrument(
+                        merged,
+                        force_overwrite=force_item,
+                        override_reason=item_reason if force_item else None,
+                        override_operator=item_operator if force_item else None,
+                        baseline_seed=False,
+                        reference_date=ref_date_param,
+                    )
+                )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return JSONResponse(jsonable_encoder({"status": "success", "updated": updated}))
+
+    allow_net = bool(payload.get("allow_network", os.environ.get("TESTING") != "1"))
+    summary = verify_and_sync_automated_savings_rates(
+        edition_date=ref_date_param,
+        allow_network=allow_net,
+    )
+    return JSONResponse(jsonable_encoder({"status": "success", "sync_summary": summary}))
 
 
 # ==============================================================================

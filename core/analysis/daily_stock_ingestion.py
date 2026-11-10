@@ -778,10 +778,32 @@ def synthesize_and_archive_stock_dossier(
     }
 
 
-def recalculate_affected_mutual_funds(ingested_tickers: List[str]) -> List[Dict[str, Any]]:
+def _safe_float(val: Any, default: Optional[float] = 0.0) -> Optional[float]:
+    """Safely converts a numeric value or string (ignoring 'N/A', '—', None) to float."""
+    if val is None or isinstance(val, bool):
+        return default
+    if isinstance(val, (int, float)):
+        return float(val) if math.isfinite(float(val)) else default
+    s = str(val).strip().replace(",", "").rstrip("%xX")
+    if not s or s.lower() in {"n/a", "na", "none", "null", "-", "—", "fair", "unknown"}:
+        return default
+    try:
+        parsed = float(s)
+        return parsed if math.isfinite(parsed) else default
+    except ValueError:
+        return default
+
+
+def recalculate_affected_mutual_funds(
+    ingested_tickers: List[str],
+    max_narrative_syntheses: int = 3,
+) -> List[Dict[str, Any]]:
     """
     Finds all mutual fund schemes holding any of the newly ingested stocks,
     invalidates their cached look-through dossiers, and re-computes their forensic coverage.
+    Caps live LLM narrative syntheses per batch (`max_narrative_syntheses`) so bulk portfolio
+    expansions never block daily equity ingestion for hours; remaining narratives are compiled
+    by the dedicated nightly/paid MF rotation worker.
     """
     from core.analysis.fund_overlap_auditor import compute_fund_forensic_lookthrough
 
@@ -804,6 +826,7 @@ def recalculate_affected_mutual_funds(ingested_tickers: List[str]) -> List[Dict[
     logger.info(f"Identified {len(affected_schemes_map)} mutual fund schemes affected by ingestion of {len(clean_tickers)} stocks.")
 
     updated_funds = []
+    synthesized_narratives_count = 0
     for scheme_code, scheme_name in affected_schemes_map.items():
         try:
             # Check old coverage if existing dossier exists
@@ -824,13 +847,17 @@ def recalculate_affected_mutual_funds(ingested_tickers: List[str]) -> List[Dict[
 
             if old_text and not (was_paused and has_sufficient):
                 new_dossier["dossier_text"] = old_text
-            else:
+            elif has_sufficient and synthesized_narratives_count < max_narrative_syntheses:
                 try:
                     from core.analysis.fund_overlap_auditor import synthesize_fund_forensic_narrative
                     new_dossier["dossier_text"] = synthesize_fund_forensic_narrative(new_dossier, scheme)
+                    if (new_dossier.get("dossier_text") or "").strip():
+                        synthesized_narratives_count += 1
                 except Exception as synth_err:
                     logger.debug(f"Notice synthesizing narrative for scheme {scheme_code}: {synth_err}")
                     new_dossier["dossier_text"] = old_text
+            else:
+                new_dossier["dossier_text"] = old_text
 
             save_fund_forensic_dossier(new_dossier)
 
@@ -952,19 +979,21 @@ def ingest_daily_stock_cohort(
 
             # Build rich discovery reel item with mutual fund footprint (exclude unpriced or Mega-Caps >= ₹1L Cr)
             ticker = res["ticker"]
-            curr_px = float(res.get("current_price") or 0.0)
-            mcap_raw = float(res.get("market_cap") or 0.0)
+            curr_px = float(_safe_float(res.get("current_price"), 0.0) or 0.0)
+            mcap_raw = float(_safe_float(res.get("market_cap"), 0.0) or 0.0)
             mcap_cr = mcap_raw / 1e7 if mcap_raw > 1e6 else mcap_raw
             if curr_px <= 0 or mcap_cr >= 100000:
                 continue
 
             scnt = item.get("scheme_count") or 1
-            aum_cr = item.get("estimated_aum_cr") or 0.0
+            aum_cr = float(_safe_float(item.get("estimated_aum_cr"), 0.0) or 0.0)
             top_schemes = item.get("top_schemes") or []
             schemes_str = f"held by {top_schemes[0]}" if top_schemes else "core fund allocation"
 
-            roce_val = res.get("roce") if res.get("roce") is not None else item.get("default_roce")
-            de_val = res.get("debt_to_equity") if res.get("debt_to_equity") is not None else item.get("default_de")
+            roce_raw = res.get("roce") if res.get("roce") is not None else item.get("default_roce")
+            de_raw = res.get("debt_to_equity") if res.get("debt_to_equity") is not None else item.get("default_de")
+            roce_val = _safe_float(roce_raw, None)
+            de_val = _safe_float(de_raw, None)
             if mcap_cr >= 25000:
                 cap_tier = "Large-Cap"
             elif mcap_cr >= 5000:
@@ -978,8 +1007,8 @@ def ingest_daily_stock_cohort(
                 mode="STRICT",
             )
 
-            roce_clause = f"ROCE of {float(roce_val):.1f}%" if roce_val is not None else "statutory capital efficiency tracking"
-            de_clause = f"debt-to-equity of {float(de_val):.2f}x" if de_val is not None else "audited solvency review"
+            roce_clause = f"ROCE of {roce_val:.1f}%" if roce_val is not None else "statutory capital efficiency tracking"
+            de_clause = f"debt-to-equity of {de_val:.2f}x" if de_val is not None else "audited solvency review"
 
             discovery_reel_items.append({
                 "ticker": ticker,
@@ -988,8 +1017,8 @@ def ingest_daily_stock_cohort(
                 "market_cap_tier": cap_tier,
                 "current_price": curr_px,
                 "pe_ratio": res["pe_ratio"],
-                "roce_pct": float(roce_val) if roce_val is not None else None,
-                "debt_to_equity": float(de_val) if de_val is not None else None,
+                "roce_pct": roce_val,
+                "debt_to_equity": de_val,
                 "sales_growth_3y": item.get("sales_growth_3y"),
                 "ria_thesis": (
                     f"Institutional holding across {scnt} mutual funds with an estimated ₹{aum_cr:,.0f} Cr footprint ({schemes_str}); "
@@ -997,8 +1026,8 @@ def ingest_daily_stock_cohort(
                 ),
                 "catalyst_headline": f"Statutory Mutual Fund Constituent Induction • {scnt} Schemes",
                 "key_metrics": {
-                    "roce": f"{float(roce_val):.1f}%" if roce_val is not None else "—",
-                    "debt_to_equity": f"{float(de_val):.2f}x" if de_val is not None else "—",
+                    "roce": f"{roce_val:.1f}%" if roce_val is not None else "—",
+                    "debt_to_equity": f"{de_val:.2f}x" if de_val is not None else "—",
                     "pe": str(res["pe_ratio"]),
                     "scheme_count": scnt,
                     "estimated_aum_cr": f"₹{aum_cr:,.0f} Cr",
