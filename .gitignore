@@ -36,6 +36,7 @@ web/static/img/Moatnomics-*/
 .github/*
 !.github/workflows/
 .github/workflows/*
+!.github/workflows/ci.yml
 !.github/workflows/p0_release_gate.yml
 !.github/workflows/scheduled_pipeline.yml
 !.github/workflows/subscription_renewal_reminder.yml

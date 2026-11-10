@@ -1,0 +1,42 @@
+name: Pre-Flight CI & Contract Audit
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+
+jobs:
+  audit-and-test:
+    runs-on: ubuntu-latest
+    env:
+      # Same isolated test environment as p0_release_gate.yml: local SQLite, test-only secrets.
+      TESTING: "1"
+      FORCE_LOCAL_SQLITE: "1"
+      ADMIN_PASSWORD: ci_test_admin_pwd_default
+      RAZORPAY_WEBHOOK_SECRET: ci_test_webhook_secret
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: "pip"
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run System Contract & Integrity Audit
+      env:
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'MOCK_CI_KEY_FOR_STATIC_AUDIT' }}
+      run: |
+        python check_system.py
+
+    - name: Run Python Regression Test Suite
+      run: |
+        python -m unittest discover -s tests
