@@ -487,6 +487,69 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
 
     @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
     @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
+    @patch("scripts.run_discovery_worker.run_discovery_pipeline", return_value=True)
+    @patch("core.msme.daily_ingest.ingest_daily_msme_cohort", return_value=15)
+    @patch("core.db.digest.has_edition_been_dispatched", return_value=True)
+    def test_evening_phase6_fails_visibly_only_on_total_ai_outage(
+        self,
+        mock_has_dispatched,
+        mock_msme,
+        mock_disc,
+        mock_record_event,
+        mock_prune,
+    ):
+        """L6: 0 compiled with pending > 0 -> FAILED; partial compile or no candidates -> not failed."""
+        from scripts.run_scheduled_pipeline import _failed_phases, run_evening_harvest_pipeline
+
+        outage_payload = {
+            "status": "pending_synthesis",
+            "ingested_count": 0,
+            "ingested_tickers": [],
+            "pending_count": 15,
+            "pending_tickers": [f"PEND{i}" for i in range(15)],
+        }
+        no_candidates_payload = {
+            "status": "no_candidates",
+            "ingested_count": 0,
+            "ingested_tickers": [],
+            "pending_count": 0,
+            "pending_tickers": [],
+        }
+        cases = [
+            # (stock payload, synthesize_pending_cohort behaviour, expect failed)
+            (outage_payload, {"return_value": 0}, True),
+            (outage_payload, {"side_effect": RuntimeError("403 PERMISSION_DENIED")}, True),
+            (outage_payload, {"return_value": 3}, False),
+            (no_candidates_payload, {"return_value": 0}, False),
+        ]
+        for payload, synth_kwargs, expect_failed in cases:
+            with self.subTest(payload=payload["status"], synth=synth_kwargs, expect_failed=expect_failed), \
+                 patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease), \
+                 patch("core.analysis.daily_stock_ingestion.ingest_daily_stock_cohort", return_value=dict(payload)), \
+                 patch("scripts.synthesize_pending_equities.synthesize_pending_cohort", **synth_kwargs):
+                res = run_evening_harvest_pipeline("2026-11-01", force=False, respect_market_calendar=True)
+                failed = _failed_phases(res)
+                if expect_failed:
+                    self.assertEqual(failed, ["stock_ingestion"])
+                    self.assertIn("SynthesisUnavailableError", res["stock_ingestion"])
+                    self.assertIn("0 of 15 pending equities compiled", res["stock_ingestion"])
+                else:
+                    self.assertEqual(failed, [])
+
+    def test_raise_if_synthesis_unavailable_guard_matrix(self):
+        from scripts.run_scheduled_pipeline import SynthesisUnavailableError, _raise_if_synthesis_unavailable
+
+        with self.assertRaises(SynthesisUnavailableError):
+            _raise_if_synthesis_unavailable({"pending_count": 2}, 0, 0, "Evening Phase 6")
+        # Directly ingested or compiled from pending -> healthy
+        _raise_if_synthesis_unavailable({"pending_count": 2}, 1, 0, "Evening Phase 6")
+        _raise_if_synthesis_unavailable({"pending_count": 2}, 0, 1, "Evening Phase 6")
+        # Nothing needed AI (weekend / no candidates / degraded payloads) -> never raises
+        for degraded in ({}, {"pending_count": 0}, {"pending_count": None}, None, "N/A"):
+            _raise_if_synthesis_unavailable(degraded, 0, 0, "Evening Phase 6")
+
+    @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
+    @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
     @patch("core.ingestion.etf_ingest.ingest_all_amfi_etfs", return_value={"persisted_to_db": 5})
     @patch("core.db.sovereign.refresh_daily_sovereign_benchmarks", return_value={"benchmarks_updated": 16})
     @patch("core.analysis.asset_scanner.run_comprehensive_asset_scan", return_value={"status": "OK"})

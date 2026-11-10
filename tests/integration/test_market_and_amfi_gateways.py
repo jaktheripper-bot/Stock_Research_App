@@ -10,6 +10,8 @@ Consolidated Market Gateways & Ingestion Pipelines:
 import os
 os.environ["TESTING"] = "1"
 
+import threading
+import time
 import unittest
 from unittest.mock import patch, MagicMock
 """
@@ -1379,6 +1381,98 @@ class TestOrchestratorSkipAndReplace(unittest.TestCase):
             self.assertEqual(saved_scheme["metadata"]["holdings_as_on"], "2026-08-31")
 
 
+@unittest.skipUnless(HAS_OPENPYXL, "openpyxl is required for synthetic workbook ingestion tests")
+class TestOrchestratorParallelFetchBudget(unittest.TestCase):
+    """Bounded parallel AMC prefetch with per-AMC deadlines and an overall time budget (L1-L5)."""
+
+    # Reuse the synthetic universe/workbooks without re-running the parent class's tests.
+    _universe = TestOrchestratorSkipAndReplace._universe
+    _provider = TestOrchestratorSkipAndReplace._provider
+
+    def _provider_with_sbi(self, sbi_behaviour):
+        nippon = self._provider()
+
+        def provider(key, cfg):
+            if key == "sbi":
+                return sbi_behaviour()
+            return nippon(key, cfg)
+        return provider
+
+    @patch("core.ingestion.mf_portfolio_ingest.fetch_amfi_nav_raw", return_value="")
+    def test_l5_parallel_prefetch_matches_serial_results(self, _):
+        serial = ingest_top_funds(target=10, dry_run=True, universe=self._universe(),
+                                  workbook_provider=self._provider(), isin_map={})
+        parallel = ingest_top_funds(target=10, dry_run=True, universe=self._universe(),
+                                    workbook_provider=self._provider(), isin_map={},
+                                    fetch_workers=4, per_amc_timeout_s=30)
+        self.assertEqual([f["scheme_code"] for f in parallel["ingested"]],
+                         [f["scheme_code"] for f in serial["ingested"]])
+        self.assertEqual({s["scheme_code"]: s["reason"] for s in parallel["skipped"]},
+                         {s["scheme_code"]: s["reason"] for s in serial["skipped"]})
+        self.assertEqual(parallel["timed_out_amcs"], [])
+        self.assertFalse(parallel["budget_exhausted"])
+
+    @patch("core.ingestion.mf_portfolio_ingest.fetch_amfi_nav_raw", return_value="")
+    def test_l1_l2_hung_amc_is_abandoned_without_blocking_others(self, _):
+        release = threading.Event()
+        try:
+            started = time.monotonic()
+            report = ingest_top_funds(
+                target=10, dry_run=True, universe=self._universe(), isin_map={},
+                workbook_provider=self._provider_with_sbi(lambda: release.wait(60)),
+                fetch_workers=4, per_amc_timeout_s=0.3)
+            elapsed = time.monotonic() - started
+        finally:
+            release.set()
+        self.assertLess(elapsed, 5.0)
+        self.assertEqual([f["scheme_code"] for f in report["ingested"]], ["9001", "9004"])
+        self.assertEqual(report["timed_out_amcs"], ["sbi"])
+        reasons = {s["scheme_code"]: s["reason"] for s in report["skipped"]}
+        self.assertIn("timed out", reasons["9002"])
+        self.assertNotIn("9002", [f["scheme_code"] for f in report["ingested"]])
+
+    @patch("core.ingestion.mf_portfolio_ingest.fetch_amfi_nav_raw", return_value="")
+    def test_l3_provider_error_is_skipped_fail_closed(self, _):
+        def boom():
+            raise RuntimeError("portal returned HTML error page")
+        with patch("core.ingestion.mf_portfolio_ingest.publish_mutual_fund_disclosure") as pub_disc:
+            report = ingest_top_funds(
+                target=10, dry_run=True, universe=self._universe(), isin_map={},
+                workbook_provider=self._provider_with_sbi(boom), fetch_workers=4)
+            pub_disc.assert_not_called()
+        reasons = {s["scheme_code"]: s["reason"] for s in report["skipped"]}
+        self.assertIn("workbook fetch error", reasons["9002"])
+        self.assertEqual([f["scheme_code"] for f in report["ingested"]], ["9001", "9004"])
+
+    @patch("core.ingestion.mf_portfolio_ingest.fetch_amfi_nav_raw", return_value="")
+    def test_l4_exhausted_budget_skips_everything_and_fetches_nothing(self, _):
+        calls = []
+
+        def provider(key, cfg):
+            calls.append(key)
+            return None
+        report = ingest_top_funds(
+            target=10, dry_run=True, universe=self._universe(), isin_map={},
+            workbook_provider=provider, fetch_workers=4, deadline_monotonic=time.monotonic() - 1)
+        self.assertEqual(calls, [])
+        self.assertEqual(report["ingested_count"], 0)
+        self.assertTrue(report["budget_exhausted"])
+        self.assertEqual(sorted(report["timed_out_amcs"]), ["nippon", "sbi"])
+        self.assertTrue(all(s["reason"] == "time budget exhausted" for s in report["skipped"]))
+
+    def test_prefetch_hands_abandoned_slot_to_next_amc(self):
+        from core.ingestion.mf_portfolio_ingest import _prefetch_amc_workbooks
+
+        release = threading.Event()
+        try:
+            outcomes, unfinished = _prefetch_amc_workbooks(
+                ["slow", "fast"],
+                lambda k: release.wait(60) if k == "slow" else (b"x", k),
+                workers=1, per_amc_timeout_s=0.2)
+        finally:
+            release.set()
+        self.assertEqual(unfinished, {"slow": "workbook fetch timed out after 0.2s"})
+        self.assertEqual(outcomes, {"fast": ("ok", (b"x", "fast"))})
 
 
 if __name__ == "__main__":

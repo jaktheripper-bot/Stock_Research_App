@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -1224,6 +1225,79 @@ def get_monthly_mf_universe() -> List[Dict[str, Any]]:
 
 
 # --------------------------------------------------------------------------- #
+# Bounded Parallel AMC Workbook Prefetch
+# --------------------------------------------------------------------------- #
+def _prefetch_amc_workbooks(
+    keys: List[str],
+    fetch: Callable[[str], Optional[Tuple[bytes, str]]],
+    *,
+    workers: int,
+    per_amc_timeout_s: Optional[float] = None,
+    deadline_monotonic: Optional[float] = None,
+) -> Tuple[Dict[str, Tuple[str, Any]], Dict[str, str]]:
+    """Fetches AMC workbooks on at most `workers` concurrent daemon threads.
+
+    Returns `(outcomes, unfinished)`:
+      * `outcomes[key]` is `("ok", (bytes, label) | None)` or `("error", exc)`.
+      * `unfinished[key]` is a human-readable reason for AMCs that overran their own deadline
+        or were still running / queued when the overall budget ran out.
+
+    Fetch threads are daemons: an AMC that overruns is abandoned (its slot is handed to the next
+    queued AMC) and its late result is discarded, so a hung AMC portal can never block process exit
+    or the rest of the scheduled pipeline. Nothing is written for unfinished AMCs (fail-closed).
+    """
+    queue = list(dict.fromkeys(keys))
+    active: Dict[str, float] = {}
+    finished: Dict[str, Tuple[str, Any]] = {}
+    outcomes: Dict[str, Tuple[str, Any]] = {}
+    unfinished: Dict[str, str] = {}
+    cond = threading.Condition()
+
+    def _worker(key: str) -> None:
+        try:
+            outcome: Tuple[str, Any] = ("ok", fetch(key))
+        except Exception as exc:  # recorded as a fetch error; never fabricates a workbook
+            logger.warning("[%s] workbook fetch error: %s", key, exc)
+            outcome = ("error", exc)
+        with cond:
+            finished[key] = outcome
+            cond.notify_all()
+
+    with cond:
+        while queue or active:
+            now = time.monotonic()
+            if deadline_monotonic is not None and now >= deadline_monotonic:
+                for key in active:
+                    unfinished[key] = "time budget exhausted before workbook fetch completed"
+                for key in queue:
+                    unfinished[key] = "time budget exhausted before workbook fetch started"
+                break
+            while queue and len(active) < max(1, workers):
+                key = queue.pop(0)
+                active[key] = now
+                threading.Thread(target=_worker, args=(key,), name=f"amc-fetch-{key}", daemon=True).start()
+            for key, started in list(active.items()):
+                if key in finished:
+                    outcomes[key] = finished[key]
+                    del active[key]
+                elif per_amc_timeout_s is not None and now - started >= per_amc_timeout_s:
+                    unfinished[key] = f"workbook fetch timed out after {per_amc_timeout_s:g}s"
+                    logger.warning("[%s] workbook fetch abandoned after %gs", key, per_amc_timeout_s)
+                    del active[key]
+            if not (queue or active):
+                break
+            if queue and len(active) < max(1, workers):
+                continue  # a slot just freed up; launch the next AMC immediately
+            wake = 1.0
+            if per_amc_timeout_s is not None and active:
+                wake = min(wake, min(started + per_amc_timeout_s for started in active.values()) - now)
+            if deadline_monotonic is not None:
+                wake = min(wake, deadline_monotonic - now)
+            cond.wait(timeout=max(0.01, wake))
+    return outcomes, unfinished
+
+
+# --------------------------------------------------------------------------- #
 # Orchestrator
 # --------------------------------------------------------------------------- #
 def ingest_top_funds(
@@ -1237,8 +1311,17 @@ def ingest_top_funds(
     sync_twins: bool = True,
     only_scheme_codes: Optional[set[str]] = None,
     target_month_end: Optional[str] = None,
+    fetch_workers: int = 1,
+    per_amc_timeout_s: Optional[float] = None,
+    deadline_monotonic: Optional[float] = None,
 ) -> Dict[str, Any]:
-    """Ingests real SEBI statutory portfolios across AMCs up to `target` funds."""
+    """Ingests real SEBI statutory portfolios across AMCs up to `target` funds.
+
+    `fetch_workers > 1` opts into bounded parallel workbook prefetch with an optional per-AMC
+    deadline (`per_amc_timeout_s`) and an overall `time.monotonic()` deadline. AMCs that do not
+    finish in time are skipped with an explicit reason and nothing is written for them. Defaults
+    keep the original serial behaviour for every existing caller.
+    """
     t0 = time.time()
     sources = load_sources()
     if universe is not None:
@@ -1285,10 +1368,44 @@ def ingest_top_funds(
     ingested: List[Dict[str, Any]] = []
     skipped: List[Dict[str, Any]] = []
 
+    prefetched: Dict[str, Tuple[str, Any]] = {}
+    unfinished_amcs: Dict[str, str] = {}
+    if fetch_workers > 1:
+        needed_amcs: List[str] = []
+        for row in ranked:
+            if only_scheme_codes is not None and str(row["scheme_code"]).strip() not in only_scheme_codes:
+                continue
+            k = amc_key_for_fund_house(row["fund_house"], sources)
+            if k and (not only_amcs or k in only_amcs) and k not in needed_amcs:
+                needed_amcs.append(k)
+        logger.info(
+            "Prefetching %d AMC workbooks (%d workers, per-AMC deadline %s).",
+            len(needed_amcs), fetch_workers, f"{per_amc_timeout_s:g}s" if per_amc_timeout_s else "none",
+        )
+        prefetched, unfinished_amcs = _prefetch_amc_workbooks(
+            needed_amcs,
+            lambda k: provider(k, sources[k]),
+            workers=fetch_workers,
+            per_amc_timeout_s=per_amc_timeout_s,
+            deadline_monotonic=deadline_monotonic,
+        )
+
     def load_amc(key: str) -> Optional[Dict[str, Any]]:
         if key in workbook_cache:
             return workbook_cache[key]
-        got = provider(key, sources[key])
+        if key in unfinished_amcs:
+            amc_status[key] = unfinished_amcs[key]
+            workbook_cache[key] = None
+            return None
+        if key in prefetched:
+            kind, payload = prefetched[key]
+            if kind == "error":
+                amc_status[key] = f"workbook fetch error: {payload}"
+                workbook_cache[key] = None
+                return None
+            got = payload
+        else:
+            got = provider(key, sources[key])
         if not got:
             amc_status[key] = "no workbook available (no verified URL and no manual upload)"
             workbook_cache[key] = None
@@ -1312,10 +1429,15 @@ def ingest_top_funds(
         amc_sheet_claims[key] = match_schemes_to_workbook_sheets(schemes_by_amc.get(key, []), sheets)
         return workbook_cache[key]
 
+    budget_exhausted = bool(unfinished_amcs) and deadline_monotonic is not None and time.monotonic() >= deadline_monotonic
     for row in ranked:
         if len(ingested) >= target:
             break
         if only_scheme_codes is not None and str(row["scheme_code"]).strip() not in only_scheme_codes:
+            continue
+        if deadline_monotonic is not None and time.monotonic() >= deadline_monotonic:
+            budget_exhausted = True
+            skipped.append({**_brief(row), "reason": "time budget exhausted"})
             continue
         key = amc_key_for_fund_house(row["fund_house"], sources)
         if not key or (only_amcs and key not in only_amcs):
@@ -1379,7 +1501,9 @@ def ingest_top_funds(
 
     twin_stats = {"mapped_twins": 0, "upgraded_slugs": 0}
     isin_backfilled = 0
-    if not dry_run and sync_twins and workbook_provider is None:
+    if budget_exhausted and sync_twins and not dry_run:
+        logger.warning("MF ingest time budget exhausted; deferring legacy slug-twin sync to the next run.")
+    if not dry_run and sync_twins and workbook_provider is None and not budget_exhausted:
         try:
             isin_backfilled = backfill_existing_raw_equity_isins(isin_map)
             twin_stats = sync_legacy_slug_twins_from_verified_numeric(isin_map)
@@ -1405,6 +1529,8 @@ def ingest_top_funds(
         "skipped_count": len(skipped),
         "skipped": skipped,
         "amc_status": amc_status,
+        "timed_out_amcs": sorted(unfinished_amcs),
+        "budget_exhausted": budget_exhausted,
         "aaum_backfill": aaum_stats,
         "twin_sync": twin_stats,
         "raw_isins_resolved": isin_backfilled,

@@ -18,6 +18,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 from zoneinfo import ZoneInfo
@@ -34,6 +35,32 @@ from core.logging_config import flush_betterstack_logs, setup_logging
 
 IST = ZoneInfo("Asia/Kolkata")
 DAILY_LEASE_TTL_SECONDS = 28800  # 8 hours: coordinates cloud + failover workers without locking same-day post-close runs
+
+# Morning SEBI MF portfolio sync budget. The GitHub Actions job is capped at 45 minutes and the
+# morning catch-up still runs stock, discovery and MSME phases afterwards, so the sync stops at
+# 25 minutes and leaves slow or unpublished AMCs for the next morning (nothing written for them).
+MF_SYNC_FETCH_WORKERS = 4
+MF_SYNC_PER_AMC_TIMEOUT_SECONDS = 600
+MF_SYNC_BUDGET_SECONDS = 25 * 60
+
+
+class SynthesisUnavailableError(RuntimeError):
+    """Raised when a phase needed live AI synthesis for at least one item and compiled none."""
+
+
+def _raise_if_synthesis_unavailable(res: dict, ingested_n: int, synth_count: int, phase_label: str) -> None:
+    """Turns a total AI outage into a visible phase failure instead of a silent green run.
+
+    Fires only when at least one equity needed synthesis (`pending_count > 0`) and nothing was
+    archived, neither directly (`ingested_n`) nor from the pending retry pass (`synth_count`).
+    Partial outages stay green; pending items remain queued (unarchived) for the next run.
+    """
+    pending_n = int((res or {}).get("pending_count") or 0) if isinstance(res, dict) else 0
+    if pending_n > 0 and ingested_n == 0 and synth_count == 0:
+        raise SynthesisUnavailableError(
+            f"{phase_label}: AI synthesis unavailable — 0 of {pending_n} pending equities compiled; "
+            f"all remain PENDING (unarchived) for retry."
+        )
 
 logging.basicConfig(
     level=logging.INFO,
@@ -382,6 +409,7 @@ def run_evening_harvest_pipeline(
 
         # If any candidate equities were deferred to the pending queue under fail-closed integrity,
         # automatically trigger the batch synthesis worker to compile them immediately.
+        synth_count = 0
         if res.get("pending_count", 0) > 0 or ingested_n == 0:
             try:
                 from scripts.synthesize_pending_equities import synthesize_pending_cohort
@@ -400,6 +428,7 @@ def run_evening_harvest_pipeline(
             except Exception as synth_err:
                 logger.warning("Pending synthesis pass notice: %s", synth_err)
 
+        _raise_if_synthesis_unavailable(res, ingested_n, synth_count, "Evening Phase 6")
         return res
 
     _run_leased_phase(
@@ -516,6 +545,8 @@ def run_monthly_mf_portfolio_pipeline(
         if not coverage["expected_scheme_codes"]:
             raise RuntimeError("No canonical schemes in the scheduled portfolio scope")
         codes = coverage["expected_scheme_codes"] if force else missing
+        # Bounded parallel AMC fetch + overall budget so the sync finishes (as PARTIAL if needed)
+        # well inside the 45-minute GitHub Actions job limit instead of being killed mid-run.
         outcome = ingest_top_funds(
             target=len(codes),
             dry_run=False,
@@ -523,7 +554,15 @@ def run_monthly_mf_portfolio_pipeline(
             universe=universe,
             only_scheme_codes=set(codes),
             target_month_end=coverage["target_date"],
+            fetch_workers=MF_SYNC_FETCH_WORKERS,
+            per_amc_timeout_s=MF_SYNC_PER_AMC_TIMEOUT_SECONDS,
+            deadline_monotonic=time.monotonic() + MF_SYNC_BUDGET_SECONDS,
         )
+        if outcome.get("timed_out_amcs"):
+            logger.warning(
+                "MF portfolio sync left %d AMC(s) for the next run: %s",
+                len(outcome["timed_out_amcs"]), ", ".join(outcome["timed_out_amcs"]),
+            )
         coverage = _monthly_mf_coverage(date_str, universe)
         results["mf_portfolio_coverage"] = coverage
         return {**outcome, "status": "SYNCED" if coverage["complete"] else "PARTIAL"}
