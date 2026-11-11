@@ -1,128 +1,30 @@
+# Render Blueprint for Moatnomics scheduled jobs (Option B).
+#
+# What this file manages: ONLY the four cron jobs below. They build from the same Dockerfile and
+# branch as the website and run scripts/run_scheduled_pipeline.py with a mode per job.
+#
+# What it deliberately does NOT manage:
+#   - The website ("Moatnomics.com", Docker web service, Singapore). It was created in the Render
+#     dashboard; a new Blueprint would create a second, suffixed copy rather than adopt it, so it
+#     stays dashboard-managed. Its env vars live on that service.
+#   - The paid fund audit worker (scripts/run_paid_fund_audit_worker.py). It is not deployed on
+#     Render today; add it here deliberately if paid deep-dive audits should run off the website.
+#
+# Secrets use `sync: false`: Render asks for each value when the Blueprint is first created, and
+# keeps existing values on later syncs. Schedules are UTC (IST = UTC + 5:30).
+
 services:
-  - type: web
-    name: stock-research-app
-    env: python
-    buildCommand: "pip install -r requirements.txt && TESTING=1 python3 scripts/verify_reality_audit.py && TESTING=1 pytest -q"
-    startCommand: "uvicorn web.main:app --host 0.0.0.0 --port $PORT --workers 1 --limit-concurrency 60 --timeout-keep-alive 5 --proxy-headers --forwarded-allow-ips='*'"
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.14.0
-      - key: MALLOC_TRIM_THRESHOLD_
-        value: "65536"
-      - key: PYTHONMALLOC
-        value: malloc
-      - key: SUPABASE_DB_URL
-        sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_ANON_KEY
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: PERPLEXITY_API_KEY
-        sync: false
-      - key: SMARTAPI_PROXY_URL
-        sync: false
-      - key: ANGEL_API_KEY
-        sync: false
-      - key: ANGEL_CLIENT_CODE
-        sync: false
-      - key: ANGEL_PIN
-        sync: false
-      - key: ANGEL_TOTP_KEY
-        sync: false
-      - key: RAZORPAY_KEY_ID
-        sync: false
-      - key: RAZORPAY_KEY_SECRET
-        sync: false
-      - key: SECRET_KEY
-        sync: false
-      - key: ADMIN_API_KEY
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: ENABLE_LIVE_EMAIL_DISPATCH
-        value: "1"
-      - key: SMTP_FROM
-        value: "Moatnomics Service Desk <desk@moatnomics.com>"
-      - key: ADMIN_ALERT_EMAIL
-        sync: false
-      - key: CANONICAL_DOMAIN
-        value: https://moatnomics.com
-      - key: BETTER_STACK_SOURCE_TOKEN
-        sync: false
-      - key: BETTER_STACK_INGESTING_HOST
-        value: "s2808842.us-west-2a.betterstackdata.com"
-      - key: BETTER_STACK_TELEMETRY_TOKEN
-        sync: false
-      - key: BETTER_STACK_INCIDENTS_TOKEN
-        sync: false
-      - key: ENABLE_BACKGROUND_SCHEDULERS
-        value: "1"
-      - key: ENABLE_DURABLE_FUND_AUDITS
-        value: "1"
-      - key: GOOGLE_GENAI_USE_VERTEXAI
-        value: "true"
-      - key: SUPABASE_STORAGE_LIMIT_MB
-        value: "2048"
-      - key: HOST_MEMORY_LIMIT_MB
-        value: "2048"
-
-  - type: worker
-    name: paid-fund-audit-worker
-    env: python
-    buildCommand: "pip install -r requirements.txt && TESTING=1 python3 scripts/verify_reality_audit.py && TESTING=1 pytest -q"
-    startCommand: "python3 -m scripts.run_paid_fund_audit_worker"
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.14.0
-      - key: MALLOC_TRIM_THRESHOLD_
-        value: "65536"
-      - key: PYTHONMALLOC
-        value: malloc
-      - key: SUPABASE_DB_URL
-        sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_ANON_KEY
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: PERPLEXITY_API_KEY
-        sync: false
-      - key: SMARTAPI_PROXY_URL
-        sync: false
-      - key: ANGEL_API_KEY
-        sync: false
-      - key: ANGEL_CLIENT_CODE
-        sync: false
-      - key: ANGEL_PIN
-        sync: false
-      - key: ANGEL_TOTP_KEY
-        sync: false
-      - key: SECRET_KEY
-        sync: false
-      - key: ENABLE_BACKGROUND_SCHEDULERS
-        value: "0"
-      - key: ENABLE_DURABLE_FUND_AUDITS
-        value: "1"
-      - key: GOOGLE_GENAI_USE_VERTEXAI
-        value: "true"
-
-  # 18:30 IST: re-runs any unfinished 16:30 IST GitHub close-run phase (finished/in-progress phases are skipped)
+  # 18:30 IST: re-runs any unfinished 16:30 IST GitHub close-run phase (finished/in-progress phases are skipped).
   - type: cron
     name: close-run-backup
-    env: python
+    runtime: docker
+    region: singapore
+    branch: main
+    plan: standard
+    dockerfilePath: ./Dockerfile
     schedule: "0 13 * * *"
-    buildCommand: "pip install -r requirements.txt && TESTING=1 python3 scripts/verify_reality_audit.py && TESTING=1 pytest -q"
-    startCommand: "python3 scripts/run_scheduled_pipeline.py --mode close-backup"
+    dockerCommand: "python3 scripts/run_scheduled_pipeline.py --mode close-backup"
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.14.0
-      - key: TZ
-        value: Asia/Kolkata
       - key: SUPABASE_DB_URL
         sync: false
       - key: SUPABASE_URL
@@ -156,18 +58,17 @@ services:
       - key: ENABLE_LIVE_EMAIL_DISPATCH
         value: "0"
 
-  # 19:30 IST Mon-Fri: sends the Market Close Wrap once its phases are done (waits up to 60 min; fails closed on empty sections)
+  # 19:30 IST Mon-Fri: sends the Market Close Wrap once its phases are done (waits up to 60 min; fails closed on empty sections).
   - type: cron
     name: market-close-wrap-sender
-    env: python
+    runtime: docker
+    region: singapore
+    branch: main
+    plan: starter
+    dockerfilePath: ./Dockerfile
     schedule: "0 14 * * 1-5"
-    buildCommand: "pip install -r requirements.txt && TESTING=1 python3 scripts/verify_reality_audit.py && TESTING=1 pytest -q"
-    startCommand: "python3 scripts/run_scheduled_pipeline.py --mode send-close-wrap"
+    dockerCommand: "python3 scripts/run_scheduled_pipeline.py --mode send-close-wrap"
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.14.0
-      - key: TZ
-        value: Asia/Kolkata
       - key: SUPABASE_DB_URL
         sync: false
       - key: SUPABASE_URL
@@ -209,18 +110,17 @@ services:
       - key: SMTP_FROM
         value: "Moatnomics Service Desk <desk@moatnomics.com>"
 
-  # 01:00 IST: re-runs any unfinished 23:15 IST GitHub fund-run phase for the previous date
+  # 01:00 IST: re-runs any unfinished 23:15 IST GitHub fund-run phase for the previous date.
   - type: cron
     name: fund-run-backup
-    env: python
+    runtime: docker
+    region: singapore
+    branch: main
+    plan: standard
+    dockerfilePath: ./Dockerfile
     schedule: "30 19 * * *"
-    buildCommand: "pip install -r requirements.txt && TESTING=1 python3 scripts/verify_reality_audit.py && TESTING=1 pytest -q"
-    startCommand: "python3 scripts/run_scheduled_pipeline.py --mode fund-backup"
+    dockerCommand: "python3 scripts/run_scheduled_pipeline.py --mode fund-backup"
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.14.0
-      - key: TZ
-        value: Asia/Kolkata
       - key: SUPABASE_DB_URL
         sync: false
       - key: SUPABASE_URL
@@ -254,18 +154,17 @@ services:
       - key: ENABLE_LIVE_EMAIL_DISPATCH
         value: "0"
 
-  # 07:30 IST Tue-Sat: sends the Fund NAV Update for the prior trading day (waits up to 45 min; fails closed on empty sections)
+  # 07:30 IST Tue-Sat: sends the Fund NAV Update for the prior trading day (waits up to 45 min; fails closed on empty sections).
   - type: cron
     name: fund-nav-update-sender
-    env: python
+    runtime: docker
+    region: singapore
+    branch: main
+    plan: starter
+    dockerfilePath: ./Dockerfile
     schedule: "0 2 * * 2-6"
-    buildCommand: "pip install -r requirements.txt && TESTING=1 python3 scripts/verify_reality_audit.py && TESTING=1 pytest -q"
-    startCommand: "python3 scripts/run_scheduled_pipeline.py --mode send-fund-update"
+    dockerCommand: "python3 scripts/run_scheduled_pipeline.py --mode send-fund-update"
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.14.0
-      - key: TZ
-        value: Asia/Kolkata
       - key: SUPABASE_DB_URL
         sync: false
       - key: SUPABASE_URL

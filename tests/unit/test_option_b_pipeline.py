@@ -419,7 +419,16 @@ class TestScheduleContracts(unittest.TestCase):
                 )
                 self.assertRegex(block, r'key: ENABLE_BACKGROUND_SCHEDULERS\n\s+value: "0"')
                 self.assertIn("key: SUPABASE_DB_URL", block)
-                self.assertIn("pytest -q", block)
+                # Same Docker image as the live website, built from main in the website's region.
+                self.assertIn("runtime: docker", block)
+                self.assertIn("dockerfilePath: ./Dockerfile", block)
+                self.assertIn("branch: main", block)
+                self.assertIn("region: singapore", block)
+                self.assertIn(f'dockerCommand: "python3 scripts/run_scheduled_pipeline.py {mode}"', block)
+
+    def test_render_blueprint_never_defines_a_second_website(self):
+        services = self._render_services()
+        self.assertEqual({s["type"] for s in services.values()}, {"cron"})
 
 
 if __name__ == "__main__":

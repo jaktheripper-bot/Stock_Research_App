@@ -8,6 +8,7 @@ Unifies:
 """
 import asyncio
 import os
+import re
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -383,12 +384,17 @@ class TestRenderHardening(unittest.TestCase):
         with open(render_yaml_path, "r", encoding="utf-8") as f:
             content = f.read()
 
-        self.assertRegex(content, r"startCommand:\s*.*--workers 1", "render.yaml startCommand must configure --workers 1")
+        # The live website builds from the Dockerfile (single uvicorn worker); render.yaml manages cron jobs.
+        dockerfile = (PROJECT_ROOT / "Dockerfile").read_text(encoding="utf-8")
+        self.assertRegex(dockerfile, r"CMD .*uvicorn web\.main:app.*--workers 1", "Dockerfile CMD must run --workers 1")
 
-        required_secrets = ["SECRET_KEY", "ADMIN_API_KEY", "ADMIN_PASSWORD"]
-        for sec in required_secrets:
-            pattern = rf"- key:\s*{sec}\s*\n\s*sync:\s*false"
-            self.assertRegex(content, pattern, f"Secret {sec} in render.yaml must be declared with sync: false")
+        # Every secret-like key in render.yaml must be declared with sync: false (never a committed value).
+        secret_like = re.compile(r"(KEY|SECRET|PASSWORD|TOKEN|PIN|DB_URL|PROXY_URL|HEARTBEAT_URL|ALERT_EMAIL)")
+        keys = re.findall(r"- key:\s*(\S+)\s*\n\s*(sync:\s*false|value:)", content)
+        self.assertTrue(keys, "render.yaml declares no environment variables")
+        for key, decl in keys:
+            if secret_like.search(key):
+                self.assertTrue(decl.startswith("sync"), f"Secret {key} in render.yaml must be declared with sync: false")
 
     def test_production_boot_guard_rejects_missing_secret_key(self):
         test_app = FastAPI()

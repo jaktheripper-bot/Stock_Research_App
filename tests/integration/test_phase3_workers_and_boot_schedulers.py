@@ -16,18 +16,17 @@ class TestPhase3WorkersAndBootSchedulers(unittest.TestCase):
     """Empirical verification suite for Phase 3 worker consolidation and boot guards."""
 
     def test_action_3_1_render_yaml_and_dockerfile_configuration(self):
-        """Action 3.1: Verify render.yaml and Dockerfile match single-worker and memory settings."""
-        # 1. Inspect render.yaml
+        """Action 3.1: The live website (Render Docker service) runs single-worker with memory settings.
+
+        The website builds from the Dockerfile; render.yaml manages only the scheduled cron jobs and
+        must never define a second web service (a new Blueprint would create a duplicate site)."""
+        # 1. render.yaml: cron jobs only, all on the same Dockerfile
         with open("render.yaml", "r", encoding="utf-8") as f:
             render_text = f.read()
 
-        self.assertIn("--workers 1", render_text)
-        self.assertIn("--limit-concurrency 60", render_text)
-        self.assertIn("--timeout-keep-alive 5", render_text)
-        self.assertIn("MALLOC_TRIM_THRESHOLD_", render_text)
-        self.assertIn("PYTHONMALLOC", render_text)
-        self.assertIn("value: \"65536\"", render_text)
-        self.assertIn("value: malloc", render_text)
+        self.assertNotIn("type: web", render_text)
+        self.assertIn("type: cron", render_text)
+        self.assertNotIn("dockerfilePath: ./Dockerfile.", render_text)
 
         # 2. Inspect Dockerfile
         with open("Dockerfile", "r", encoding="utf-8") as f:
