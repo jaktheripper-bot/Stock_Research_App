@@ -4686,3 +4686,23 @@ if (document.readyState === "loading") {
 
 
 
+
+// Genuine PDF exports: record a trusted click on any /api/pdf/* link under the visitor's own
+// sessionStorage session, so the export joins their page-view session and counts as human.
+// Direct server hits on /api/pdf/* (crawlers) are still logged server-side as `pdf_download`,
+// but no longer qualify as human engagement on their own.
+document.addEventListener('click', function(event) {
+  try {
+    if (!event.isTrusted) return;
+    const link = event.target && event.target.closest ? event.target.closest('a[href^="/api/pdf/"]') : null;
+    if (!link || typeof window.trackUserEvent !== 'function') return;
+    const parts = (link.getAttribute('href') || '').split('?')[0].split('/').filter(Boolean);
+    window.trackUserEvent('pdf_export_click', parts[parts.length - 1] || '', {
+      has_interacted: true,
+      pdf_kind: parts[2] || '',
+      pdf_href: link.getAttribute('href') || ''
+    });
+  } catch (err) {
+    console.warn('PDF export click telemetry notice:', err);
+  }
+}, true);

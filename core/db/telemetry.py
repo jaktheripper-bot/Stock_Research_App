@@ -686,6 +686,8 @@ def record_usage_event(
 # - OR details JSON has is_automated = true
 # - OR passive page/compare load with zero trusted interaction, <15% scroll (blocking programmatic 11% scroll bots),
 #   <45s dwell, no internal link navigation, and no authenticated/interactive action
+# Server-side `pdf_download` hits never qualify on their own: crawlers fetch /api/pdf/* directly with a
+# same-origin Referer. Genuine exports are recorded client-side as `pdf_export_click` (has_interacted=true).
 HUMAN_ENGAGEMENT_CONDITION = """
     (
         (event_type IS NULL OR event_type NOT IN ('BOT_CRAWL'))
@@ -699,10 +701,6 @@ HUMAN_ENGAGEMENT_CONDITION = """
                 'FULL_SYNTHESIS', 'SEARCH', 'QUERY', 'SEARCH_QUERY',
                 'WATCHLIST_ADD', 'WATCHLIST_REMOVE', 'WATCHLIST',
                 'share_click', 'user_signin', 'SIGN_IN_SUCCESS', 'purchase_success'
-            )
-            OR (
-                event_type IN ('pdf_download', 'PDF_DOWNLOAD')
-                AND ((session_id IS NOT NULL AND session_id != '') OR (user_id IS NOT NULL AND user_id != ''))
             )
             OR COALESCE(LOWER(NULLIF(details, '')::json->>'has_interacted'), 'false') IN ('true', '1')
             OR COALESCE(NULLIF(details, '')::json->>'to_path', '') != ''
@@ -727,10 +725,6 @@ HUMAN_ENGAGEMENT_CONDITION_SQLITE = """
                 'FULL_SYNTHESIS', 'SEARCH', 'QUERY', 'SEARCH_QUERY',
                 'WATCHLIST_ADD', 'WATCHLIST_REMOVE', 'WATCHLIST',
                 'share_click', 'user_signin', 'SIGN_IN_SUCCESS', 'purchase_success'
-            )
-            OR (
-                event_type IN ('pdf_download', 'PDF_DOWNLOAD')
-                AND ((session_id IS NOT NULL AND session_id != '') OR (user_id IS NOT NULL AND user_id != ''))
             )
             OR COALESCE(LOWER(CAST(json_extract(CASE WHEN json_valid(details) THEN details ELSE '{}' END, '$.has_interacted') AS TEXT)), '0') IN ('true', '1')
             OR COALESCE(CAST(json_extract(CASE WHEN json_valid(details) THEN details ELSE '{}' END, '$.to_path') AS TEXT), '') != ''
@@ -904,6 +898,7 @@ def get_site_usage_summary(
         "total_cost_saved_usd": 0.0,
         "total_cost_saved_inr": 0.0,
         "pdf_downloads": 0,
+        "pdf_export_clicks": 0,
         "comparisons": 0,
         "watchlist_actions": 0,
         "action_breakdown": {},
@@ -998,6 +993,8 @@ def get_site_usage_summary(
                 summary["full_syntheses"] += count
             elif ev in ("PDF_DOWNLOAD", "pdf_download"):
                 summary["pdf_downloads"] += count
+            elif ev == "pdf_export_click":
+                summary["pdf_export_clicks"] += count
             elif ev in ["COMPARE", "COMPARE_STOCKS", "PEER_COMPARISON"]:
                 summary["comparisons"] += count
             elif ev in ["WATCHLIST_ADD", "WATCHLIST_REMOVE", "WATCHLIST"]:

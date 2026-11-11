@@ -1589,6 +1589,7 @@ html[data-theme="light"] .copilot-input {
     <article class="kpi-card kpi-card-interactive">
       <div class="kpi-label">PDFs Exported</div>
       <div class="kpi-value">{{ summary.pdf_downloads }}</div>
+      <div class="kpi-label" style="margin-top: 4px; text-transform: none;" title="Exports started by a real click on a PDF button. Raw downloads also include crawlers hitting PDF links directly.">{{ summary.pdf_export_clicks or 0 }} by verified human click</div>
       <button type="button" class="btn kpi-card-trigger" onclick="navigateToAdminSection('users', 'headingTopActiveUsers')">
         <span>Research Reports</span>
         <span aria-hidden="true">→ User Export Ledger</span>

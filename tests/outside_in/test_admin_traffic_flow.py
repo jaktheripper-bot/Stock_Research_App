@@ -663,6 +663,8 @@ class TestAdminTrafficUiAndDomContracts(unittest.TestCase):
         s_hum_pdf = "sess_l3_hum_pdf_997"
         bot_pdf_ticker = "UDYAM-BOT-998"
         hum_pdf_ticker = "INFYPDF997"
+        s_bot_pdf_sess = "sess_l3_bot_pdf_sess_999"
+        bot_sess_pdf_ticker = "INE000BOT999"
 
         conn = get_db_connection()
         c = conn.cursor()
@@ -698,7 +700,18 @@ class TestAdminTrafficUiAndDomContracts(unittest.TestCase):
                     None, "pdf_download", bot_pdf_ticker, now_ts, f"/msme/{bot_pdf_ticker}", "US", "Desktop", "Chrome", "Linux",
                     json.dumps({"action": "export_msme_pdf"}),
                 ),
-                # L3 positive: Valid session-backed lowercase pdf_download -> Human (counted in pdf_downloads KPI)
+                # L3 negative: Session-backed direct /api/pdf/* hit with no browser activity (crawler following a
+                # same-origin link) -> Crawler; a server-side pdf_download alone never proves a human
+                (
+                    s_bot_pdf_sess, "pdf_download", bot_sess_pdf_ticker, now_ts, f"/debt/{bot_sess_pdf_ticker}", "CA", "Desktop", "Chrome", "Windows",
+                    json.dumps({"action": "export_debt_pdf"}),
+                ),
+                # L3 positive: Trusted client-side PDF button click joins the visitor's session -> Human
+                (
+                    s_hum_pdf, "pdf_export_click", hum_pdf_ticker, now_ts, "/dossier/INFY", "IN", "Desktop", "Chrome", "macOS",
+                    json.dumps({"has_interacted": True, "pdf_kind": "dossier", "is_automated": False}),
+                ),
+                # ... and the accompanying server-side download in that human session (counted in pdf_downloads KPI)
                 (
                     s_hum_pdf, "pdf_download", hum_pdf_ticker, now_ts, "/dossier/INFY", "IN", "Desktop", "Chrome", "macOS",
                     json.dumps({"action": "export_pdf", "branded": False}),
@@ -735,15 +748,23 @@ class TestAdminTrafficUiAndDomContracts(unittest.TestCase):
             self.assertIn(s_hum_touch, journeys_human)
             self.assertIn(s_hum_legal, journeys_human)
             self.assertIn(s_hum_pdf, journeys_human)
+            self.assertNotIn(s_bot_pdf_sess, journeys_human)
+            self.assertIn(s_bot_pdf_sess, journeys_crawler)
 
-            # Lowercase pdf_download from s_hum_pdf increments Human pdf_downloads by 1, while sessionless bot PDF does not
+            # The download in the click-verified human session increments Human pdf_downloads by 1; sessionless and
+            # session-backed bot PDF hits do not
             self.assertEqual(sum_human["pdf_downloads"], base_pdf_human + 1)
+            self.assertGreaterEqual(sum_human["pdf_export_clicks"], 1)
             crawler_tickers = {e["ticker"] for e in sum_crawler["recent_events"]}
             self.assertIn(bot_pdf_ticker, crawler_tickers)
         finally:
             c.execute(
                 f"DELETE FROM site_usage_events WHERE session_id IN ({p}, {p}, {p}, {p}, {p}) OR ticker IN ({p}, {p})",
                 (s_bot_11pct, s_bot_cmp, s_hum_touch, s_hum_legal, s_hum_pdf, bot_pdf_ticker, hum_pdf_ticker),
+            )
+            c.execute(
+                f"DELETE FROM site_usage_events WHERE session_id = {p} OR ticker = {p}",
+                (s_bot_pdf_sess, bot_sess_pdf_ticker),
             )
             conn.commit()
             c.close()

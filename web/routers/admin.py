@@ -265,7 +265,7 @@ async def admin_dashboard(
             "unique_sessions": 0, "human_sessions": 0, "crawler_sessions": 0,
             "human_events": 0, "crawler_events": 0,
             "total_actions": 0, "cache_efficiency_pct": 0.0,
-            "total_cost_saved_usd": 0.0, "total_cost_saved_inr": 0.0, "pdf_downloads": 0, "action_breakdown": {},
+            "total_cost_saved_usd": 0.0, "total_cost_saved_inr": 0.0, "pdf_downloads": 0, "pdf_export_clicks": 0, "action_breakdown": {},
             "top_searched_tickers": [], "traffic_sources": [], "top_referrers": [],
             "top_landing_pages": [], "top_visited_pages": [],
             "page_dwell_times": [], "site_visit_tree": [],

@@ -141,6 +141,7 @@ def tool_get_admin_dashboard_kpis(window: str = "30d", exclude_tests: bool = Tru
         "total_cost_saved_usd": usage.get("total_cost_saved_usd", 0.0),
         "total_cost_saved_inr": usage.get("total_cost_saved_inr", round(float(usage.get("total_cost_saved_usd", 0.0)) * 84.0, 2)),
         "pdf_downloads": usage.get("pdf_downloads", 0),
+        "pdf_export_clicks": usage.get("pdf_export_clicks", 0),
         "bounce_rate_pct": usage.get("bounce_rate_pct", 0.0),
         "gross_revenue_inr": revenue.get("gross_revenue_inr", 0.0),
         "refund_sum_inr": revenue.get("refund_sum_inr", 0.0),
