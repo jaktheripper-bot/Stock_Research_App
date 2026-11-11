@@ -36,6 +36,7 @@ if ROOT_DIR not in sys.path:
 
 from core.db.agent_sessions import record_autonomous_event
 from core.db.connection import init_db
+from core.mailer_monitor import report_mailer_outcome
 from core.db.distributed_lock import job_lease, mark_job_done, missing_done_markers, prune_zombie_leases
 from core.logging_config import flush_betterstack_logs, setup_logging
 
@@ -996,8 +997,10 @@ def main():
             )
         elif effective_mode == "send-close-wrap":
             summary[effective_mode] = run_send_edition(EDITION_MARKET_CLOSE, date_str, force=args.force)
+            report_mailer_outcome(EDITION_MARKET_CLOSE, date_str, summary[effective_mode])
         elif effective_mode == "send-fund-update":
             summary[effective_mode] = run_send_edition(EDITION_FUND_NAV, date_str, force=args.force)
+            report_mailer_outcome(EDITION_FUND_NAV, date_str, summary[effective_mode])
         elif effective_mode == "mf-portfolios":
             summary["mf_portfolios"] = run_monthly_mf_portfolio_pipeline(
                 date_str, force=args.force or True

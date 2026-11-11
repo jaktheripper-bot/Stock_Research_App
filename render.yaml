@@ -200,6 +200,10 @@ services:
         value: https://moatnomics.com
       - key: RESEND_API_KEY
         sync: false
+      - key: ADMIN_ALERT_EMAIL
+        sync: false
+      - key: BETTER_STACK_HEARTBEAT_URL_MARKET_CLOSE
+        sync: false
       - key: ENABLE_LIVE_EMAIL_DISPATCH
         value: "1"
       - key: SMTP_FROM
@@ -293,6 +297,10 @@ services:
       - key: CANONICAL_DOMAIN
         value: https://moatnomics.com
       - key: RESEND_API_KEY
+        sync: false
+      - key: ADMIN_ALERT_EMAIL
+        sync: false
+      - key: BETTER_STACK_HEARTBEAT_URL_FUND_NAV
         sync: false
       - key: ENABLE_LIVE_EMAIL_DISPATCH
         value: "1"
