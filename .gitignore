@@ -43,3 +43,6 @@ web/static/img/Moatnomics-*/
 
 # Local AI-assistant scratch outputs (debug spreadsheets, notes); never part of the app
 Claude outputs/
+
+# Local dev-server launch config for the Claude desktop browser preview
+.claude/launch.json
