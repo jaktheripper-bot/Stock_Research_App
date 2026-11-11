@@ -3082,6 +3082,17 @@ def init_db(force: bool = False):
                 )
                 conn.commit()
 
+            # Migration v053: digest_dispatches.edition_kind (MARKET_CLOSE 19:30 IST / FUND_NAV 07:30 IST emails)
+            if "v053_digest_dispatch_edition_kind" not in applied:
+                logger.info("Applying schema migration: v053_digest_dispatch_edition_kind...")
+                from core.db.digest import ensure_digest_edition_kind_column
+
+                ensure_digest_edition_kind_column(cursor, is_pg=bool(supabase_url))
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version) VALUES ('v053_digest_dispatch_edition_kind') ON CONFLICT DO NOTHING;"
+                )
+                conn.commit()
+
             _DB_INITIALIZED = True
             _INITIALIZED_DBS.add(target_key)
         except Exception as e:

@@ -2,12 +2,12 @@ name: Autonomous Multi-Asset Scheduled Pipeline
 
 on:
   schedule:
-    # Step A: 19:30 IST (14:00 UTC) — Post-Close 7-Asset Harvest + ~19:45 IST Day-End Market Wrap (Weekend Warehouse Mode on Sat/Sun)
-    - cron: "0 14 * * *"
-    # Step B: 23:15 IST (17:45 UTC) — Silent AMFI NAVAll.txt Sync + 7-Pillar Mutual Fund Rotation Audit
+    # Close run: 16:30 IST (11:00 UTC) — post-close asset refresh, stock reports, monthly SEBI MF sync.
+    # No email here: Render sends the Market Close Wrap at 19:30 IST (and re-runs gaps at 18:30 IST).
+    - cron: "0 11 * * *"
+    # Fund run: 23:15 IST (17:45 UTC) — AMFI NAVs, post-NAV ETF matrix, fund rotation audit.
+    # No email here: Render sends the Fund NAV Update at 07:30 IST (and re-runs gaps at 01:00 IST).
     - cron: "45 17 * * *"
-    # Silent Catch-Up: 08:00 AM IST (02:30 UTC) — Verifies prior-day (T-1) leases only; never pre-locks today's evening harvest
-    - cron: "30 2 * * *"
   workflow_dispatch:
     inputs:
       mode:
@@ -18,8 +18,11 @@ on:
         options:
           - auto
           - evening
+          - close-backup
+          - send-close-wrap
           - nightly
-          - morning
+          - fund-backup
+          - send-fund-update
           - all
       date:
         description: "Optional IST edition date (YYYY-MM-DD)"
@@ -38,7 +41,7 @@ concurrency:
 jobs:
   execute-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     permissions:
       contents: read
 
@@ -81,12 +84,10 @@ jobs:
           BETTER_STACK_HEARTBEAT_URL: ${{ secrets.BETTER_STACK_HEARTBEAT_URL }}
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            if [ "${{ github.event.schedule }}" = "0 14 * * *" ]; then
+            if [ "${{ github.event.schedule }}" = "0 11 * * *" ]; then
               MODE="evening"
             elif [ "${{ github.event.schedule }}" = "45 17 * * *" ]; then
               MODE="nightly"
-            elif [ "${{ github.event.schedule }}" = "30 2 * * *" ] || [ "${{ github.event.schedule }}" = "45 2 * * *" ]; then
-              MODE="morning"
             else
               MODE="auto"
             fi

@@ -4,19 +4,25 @@ Scheduled Multi-Asset Report & Update Pipeline Runner.
 Executes autonomously across Cloud (GitHub Actions Cron / Render Failover) and Local macOS Failover
 against Supabase PostgreSQL with distributed job leases.
 
-Cadence Architecture (IST):
-  --mode evening   (19:30 IST Step A: Post-Close Sovereign, ETFs, Debt Scan, 15-Stock Discovery Reel,
-                    15-Firm MSME Cohort, 15-Stock MF Constituents + ~19:45 IST 7-Asset Day-End Market Wrap;
-                    on Sat/Sun: Weekend Warehouse Mode runs MSME + Stock Constituents only)
-  --mode nightly   (23:15 IST Step B: Silent AMFI NAVAll.txt Sync + 7-Pillar Mutual Fund Rotation Audit;
-                    on Sat/Sun: Weekend Warehouse Mode runs Mutual Fund Rotation Audit only)
-  --mode morning   (08:00 IST Catch-Up: Silent T-1 lease verification; never locks today's evening leases)
-  --mode auto      (Resolves evening / nightly / morning + edition date automatically from IST wall clock)
-  --mode all       (Executes evening harvest + nightly AMFI/MF rotation sequentially)
+Cadence Architecture (IST) — option B: two runs, two timed emails, off-GitHub backups:
+  --mode evening           (GitHub 16:30 IST close run: Sovereign, Savings, ETF prices, Debt Scan,
+                            Discovery Reel, MSME, MF constituent stock reports, monthly SEBI MF sync;
+                            Sat/Sun: Weekend Warehouse Mode runs MSME + Stock Constituents only)
+  --mode close-backup      (Render 18:30 IST: same phases; skips finished/in-progress ones)
+  --mode send-close-wrap   (Render 19:30 IST: Market Close Wrap email, Mon-Fri)
+  --mode nightly           (GitHub 23:15 IST fund run: AMFI NAVs, post-NAV ETF matrix, Sovereign/Scan
+                            failover, Mutual Fund Rotation Audit)
+  --mode fund-backup       (Render 01:00 IST: same phases for the prior evening's date)
+  --mode send-fund-update  (Render 07:30 IST: Fund NAV Update email for the prior trading day, Tue-Sat)
+  --mode auto              (Resolves evening / nightly + edition date from the IST wall clock)
+  --mode all               (Executes evening + nightly sequentially; manual use)
+Runs that start before 12:00 IST bind to the previous date, so delayed runners never take over
+the next day's leases or emails.
 """
 import argparse
 import logging
 import os
+import signal
 import sys
 import time
 from datetime import datetime, timedelta
@@ -30,18 +36,65 @@ if ROOT_DIR not in sys.path:
 
 from core.db.agent_sessions import record_autonomous_event
 from core.db.connection import init_db
-from core.db.distributed_lock import job_lease, prune_zombie_leases
+from core.db.distributed_lock import job_lease, mark_job_done, missing_done_markers, prune_zombie_leases
 from core.logging_config import flush_betterstack_logs, setup_logging
 
 IST = ZoneInfo("Asia/Kolkata")
 DAILY_LEASE_TTL_SECONDS = 28800  # 8 hours: coordinates cloud + failover workers without locking same-day post-close runs
 
-# Morning SEBI MF portfolio sync budget. The GitHub Actions job is capped at 45 minutes and the
-# morning catch-up still runs stock, discovery and MSME phases afterwards, so the sync stops at
-# 25 minutes and leaves slow or unpublished AMCs for the next morning (nothing written for them).
+# Monthly SEBI MF portfolio sync budget (runs at the end of the 16:30 IST close run; the GitHub
+# Actions job is capped at 90 minutes). The sync stops at 25 minutes and leaves slow or
+# unpublished AMCs for the next evening (nothing written for them).
 MF_SYNC_FETCH_WORKERS = 4
 MF_SYNC_PER_AMC_TIMEOUT_SECONDS = 600
 MF_SYNC_BUDGET_SECONDS = 25 * 60
+
+# Phase 6 (daily MF constituent stock reports): parallel workers and the AI time budget. After
+# the budget no new AI generation starts; unstarted equities stay PENDING (unarchived).
+STOCK_INGEST_WORKERS = 4
+STOCK_INGEST_AI_BUDGET_SECONDS = 40 * 60
+
+# Email editions (option B): the Market Close Wrap is sent at 19:30 IST for the same trading day
+# and the Fund NAV Update at 07:30 IST for the prior trading day. Senders wait for the phases
+# that feed their sections, then fail closed if those sections are still empty.
+EDITION_MARKET_CLOSE = "MARKET_CLOSE"
+EDITION_FUND_NAV = "FUND_NAV"
+SEND_WAIT_CAP_SECONDS = {EDITION_MARKET_CLOSE: 60 * 60, EDITION_FUND_NAV: 45 * 60}
+SEND_POLL_SECONDS = 60
+
+
+def close_run_required_leases(date_str: str) -> list:
+    """Close-run phases that feed the Market Close Wrap sections (weekday editions)."""
+    return [
+        f"sovereign_sync_{date_str}",
+        f"savings_rate_sync_{date_str}",
+        f"asset_scan_{date_str}",
+        f"discovery_reel_{date_str}",
+        f"msme_daily_ingest_{date_str}",
+    ]
+
+
+def fund_run_required_leases(date_str: str) -> list:
+    """Fund-run phases that feed the Fund NAV Update sections (MF look-through + ETF matrix)."""
+    return [
+        f"amfi_nav_sync_{date_str}",
+        f"etf_nav_sync_{date_str}",
+        f"fund_audit_{date_str}",
+    ]
+
+
+def _install_termination_handler() -> None:
+    """Turns SIGTERM (CI cancellation / timeout, Render shutdown) into SystemExit so held phase
+    leases are released by `job_lease` and a backup runner can retry those phases."""
+
+    def _on_sigterm(signum, _frame):
+        logger.error("Received signal %s; aborting pipeline so held leases are released.", signum)
+        raise SystemExit(128 + int(signum))
+
+    try:
+        signal.signal(signal.SIGTERM, _on_sigterm)
+    except (ValueError, OSError) as sig_err:
+        logger.warning("Could not install SIGTERM handler: %s", sig_err)
 
 
 class SynthesisUnavailableError(RuntimeError):
@@ -98,6 +151,13 @@ def _last_trading_date_str(ref_dt: datetime) -> str:
     return cursor.isoformat()
 
 
+DATED_MODES = (
+    "evening", "close-backup", "send-close-wrap",
+    "nightly", "fund-backup", "send-fund-update",
+    "all",
+)
+
+
 def _resolve_mode_and_date(
     requested_mode: str,
     now_ist: datetime,
@@ -105,28 +165,21 @@ def _resolve_mode_and_date(
 ) -> Tuple[str, str]:
     """Resolves effective pipeline mode and target IST edition date.
 
-    - Morning runs without an explicit `--date` bind strictly to `T-1` (`yesterday_str`) so
-      08:00 AM catch-up checks never pre-lock today's 19:30 IST evening leases.
-    - Post-midnight / pre-noon runs (`00:00–11:59 IST`) bind `evening`, `nightly`, and `all`
-      modes to `T-1` (`yesterday_str`) so delayed cloud runners never hijack today's post-close
-      leases or mailer.
+    Runs that start before 12:00 IST bind to `T-1` (`yesterday_str`): delayed close/fund runs,
+    the 01:00 IST `fund-backup` and the 07:30 IST `send-fund-update` all belong to the previous
+    date, and never take over today's 16:30 IST close-run leases or emails.
     """
     today_str = now_ist.strftime("%Y-%m-%d")
     yesterday_str = (now_ist - timedelta(days=1)).strftime("%Y-%m-%d")
 
     if requested_mode == "auto":
-        if 16 <= now_ist.hour <= 21:
+        if 12 <= now_ist.hour <= 21:
             return "evening", (explicit_date or today_str)
         if now_ist.hour >= 22:
             return "nightly", (explicit_date or today_str)
-        if now_ist.hour < 5:
-            return "nightly", (explicit_date or yesterday_str)
-        return "morning", (explicit_date or yesterday_str)
+        return "nightly", (explicit_date or yesterday_str)
 
-    if requested_mode == "morning":
-        return "morning", (explicit_date or yesterday_str)
-
-    if requested_mode in ("evening", "nightly", "all"):
+    if requested_mode in DATED_MODES:
         # Delayed GitHub Actions cron runs arriving post-midnight (00:00–11:59 IST)
         # belong to prior trading day T-1; never hijack today's post-close leases or mailer.
         default_date = yesterday_str if now_ist.hour < 12 else today_str
@@ -172,6 +225,7 @@ def _run_leased_phase(
                     return
                 logger.info(f"Executing {phase_label} (attempt {attempt + 1}/2)...")
                 results[result_key] = phase_fn()
+                mark_job_done(lease_name)
                 logger.info(f"{phase_label} complete.")
                 return
         except Exception as exc:
@@ -201,22 +255,24 @@ def _dispatch_bouquet_phase(
     date_str: str,
     force: bool = False,
     respect_market_calendar: bool = False,
+    edition_kind: str = EDITION_MARKET_CLOSE,
 ) -> None:
-    """Executes the Day-End 7-Asset Market Wrap email dispatch with weekend & local-host guards."""
+    """Sends one email edition (`MARKET_CLOSE` or `FUND_NAV`) once per date, with weekend & local-host guards."""
     force_email_redispatch = bool(force and os.environ.get("FORCE_EMAIL_REDISPATCH") == "1")
     if respect_market_calendar and not force_email_redispatch and _is_weekend_date(date_str):
-        logger.info(f"Markets closed on weekend ({date_str}). Skipping Day-End Market Wrap dispatch.")
-        results["morning_bouquet"] = "SKIPPED_MARKET_CLOSED"
+        logger.info(f"Markets closed on weekend ({date_str}). Skipping {edition_kind} email dispatch.")
+        results["digest_dispatch"] = "SKIPPED_MARKET_CLOSED"
         return
 
     from core.notify import _is_live_email_dispatch_allowed, _is_test_runtime
 
+    lease_name = f"digest_{edition_kind.lower()}_{date_str}"
     if not _is_live_email_dispatch_allowed() and not _is_test_runtime():
         logger.info(
-            f"[Local Email Guard] Live email dispatch disabled on this host; skipping morning_bouquet_{date_str} "
+            f"[Local Email Guard] Live email dispatch disabled on this host; skipping {lease_name} "
             f"lease acquisition so cloud failover remains unblocked."
         )
-        results["morning_bouquet"] = "SKIPPED_LOCAL_GUARD"
+        results["digest_dispatch"] = "SKIPPED_LOCAL_GUARD"
         return
 
     already_dispatched = False
@@ -225,35 +281,92 @@ def _dispatch_bouquet_phase(
         try:
             from core.db.digest import has_edition_been_dispatched
 
-            already_dispatched = has_edition_been_dispatched(date_str)
+            already_dispatched = has_edition_been_dispatched(date_str, edition_kind=edition_kind)
         except Exception as exc:
             logger.exception(f"Dispatch-ledger check failed; skipping email dispatch (fail-closed): {exc}")
-            results["morning_bouquet"] = f"FAILED: {type(exc).__name__}: {exc}"
+            results["digest_dispatch"] = f"FAILED: {type(exc).__name__}: {exc}"
             dispatch_check_failed = True
 
     if already_dispatched:
-        logger.info(f"Day-End Research Bouquet for {date_str} already dispatched. Skipping duplicate send.")
-        results["morning_bouquet"] = "ALREADY_DISPATCHED"
+        logger.info(f"{edition_kind} email for {date_str} already dispatched. Skipping duplicate send.")
+        results["digest_dispatch"] = "ALREADY_DISPATCHED"
     elif not dispatch_check_failed:
         def _send_bouquet():
             from core.notify import dispatch_research_bouquet
 
-            bouquet_res = dispatch_research_bouquet(edition_date=date_str, force=force_email_redispatch)
+            bouquet_res = dispatch_research_bouquet(
+                edition_date=date_str,
+                edition_kind=edition_kind,
+                force=force_email_redispatch,
+            )
             status = bouquet_res.get("status", "COMPLETED")
             logger.info(
-                f"Day-End Market Wrap dispatch status={status} (delivered={bouquet_res.get('delivered', 0)})."
+                f"{edition_kind} email dispatch status={status} (delivered={bouquet_res.get('delivered', 0)})."
             )
             return status
 
         _run_leased_phase(
             results,
-            "morning_bouquet",
-            f"morning_bouquet_{date_str}",
-            "Day-End 7-Asset Market Wrap Email Dispatch",
+            "digest_dispatch",
+            lease_name,
+            f"{edition_kind} Email Dispatch",
             _send_bouquet,
             force=force,
             ttl_seconds=86400,
         )
+
+
+def _wait_for_required_phases(required: list, cap_seconds: int, poll_seconds: int = SEND_POLL_SECONDS) -> list:
+    """Polls completion markers until every required phase is done or `cap_seconds` passes.
+
+    Returns the phases still missing (empty list when all are done)."""
+    deadline = time.monotonic() + max(0, int(cap_seconds))
+    missing = missing_done_markers(required)
+    while missing and time.monotonic() < deadline:
+        logger.info("Waiting for %d phase(s) before sending: %s", len(missing), ", ".join(missing))
+        time.sleep(max(1, min(poll_seconds, max(1.0, deadline - time.monotonic()))))
+        missing = missing_done_markers(required)
+    return missing
+
+
+def run_send_edition(
+    edition_kind: str,
+    date_str: str,
+    force: bool = False,
+    wait_cap_seconds: Optional[int] = None,
+) -> dict:
+    """Render sender job: waits for the phases that feed `edition_kind`, then sends that email once.
+
+    MARKET_CLOSE goes out for weekday `date_str` only; FUND_NAV covers the prior trading day's NAVs
+    (weekday `date_str`). If required phases are still unfinished at the wait cap, the email is still
+    attempted and the builder fails closed when any of its sections is empty."""
+    results: dict = {"edition_kind": edition_kind}
+    if _is_weekend_date(date_str) and not force:
+        logger.info(f"{edition_kind} edition for weekend date {date_str} is not sent.")
+        results["digest_dispatch"] = "SKIPPED_MARKET_CLOSED"
+        return results
+
+    required = (
+        close_run_required_leases(date_str)
+        if edition_kind == EDITION_MARKET_CLOSE
+        else fund_run_required_leases(date_str)
+    )
+    cap = SEND_WAIT_CAP_SECONDS.get(edition_kind, 0) if wait_cap_seconds is None else wait_cap_seconds
+    missing = _wait_for_required_phases(required, cap)
+    results["phases_missing_at_send"] = missing
+    if missing:
+        logger.warning(
+            "%s for %s: %d phase(s) still unfinished after %ss wait (%s); attempting send, builder fails closed on empty sections.",
+            edition_kind, date_str, len(missing), cap, ", ".join(missing),
+        )
+    _dispatch_bouquet_phase(
+        results,
+        date_str=date_str,
+        force=force,
+        respect_market_calendar=True,
+        edition_kind=edition_kind,
+    )
+    return results
 
 
 def run_evening_harvest_pipeline(
@@ -261,12 +374,14 @@ def run_evening_harvest_pipeline(
     force: bool = False,
     respect_market_calendar: bool = True,
 ) -> dict:
-    """Executes Step A (19:30 IST): Post-close 7-asset harvest + ~19:45 IST Day-End Market Wrap.
+    """Executes the close run (GitHub 16:30 IST; Render `close-backup` 18:30 IST re-runs unfinished phases).
 
+    Sends no email: the Market Close Wrap is sent by the Render `send-close-wrap` job at 19:30 IST.
     On Saturdays & Sundays (`respect_market_calendar=True` and `not force`), market-session syncs
-    (`sovereign_sync`, `etf_sync`, `asset_scan`, `discovery_reel`) and the Day-End Newsletter
-    are skipped (`SKIPPED_MARKET_CLOSED`), while **Weekend Warehouse Mode** continues building
-    `msme_ingest` (15 firms) and `stock_ingestion` (15 MF constituent dossiers).
+    (`sovereign_sync`, `etf_sync`, `asset_scan`, `discovery_reel`) are skipped
+    (`SKIPPED_MARKET_CLOSED`), while **Weekend Warehouse Mode** continues building `msme_ingest`
+    (15 firms) and `stock_ingestion` (MF constituent dossiers). The monthly SEBI MF portfolio
+    sync runs last, from day 4 of the month, until that month's portfolios are fresh.
     """
     is_weekend_skip = bool(respect_market_calendar and not force and _is_weekend_date(date_str))
     mode_banner = "Weekend Warehouse Mode" if is_weekend_skip else "Post-Close Evening Harvest"
@@ -403,7 +518,14 @@ def run_evening_harvest_pipeline(
     def _stock_ingestion():
         from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
 
-        res = ingest_daily_stock_cohort(edition_date=date_str, count=None, skip_gemini=False)
+        ai_deadline = time.monotonic() + STOCK_INGEST_AI_BUDGET_SECONDS
+        res = ingest_daily_stock_cohort(
+            edition_date=date_str,
+            count=None,
+            skip_gemini=False,
+            workers=STOCK_INGEST_WORKERS,
+            deadline_monotonic=ai_deadline,
+        )
         ingested_n = res.get("ingested_count", len(res.get("ingested_tickers") or res.get("ingested_stocks") or []))
         logger.info(f"Evening Phase 6: {res.get('status')} ({ingested_n} equities).")
 
@@ -418,6 +540,7 @@ def run_evening_harvest_pipeline(
                 synth_count = synthesize_pending_cohort(
                     limit=max(15, len(pending_list)),
                     tickers=pending_list or None,
+                    deadline_monotonic=ai_deadline,
                 )
                 logger.info("Compiled %d pending equities for edition %s.", synth_count, date_str)
                 if isinstance(res, dict) and synth_count > 0:
@@ -440,13 +563,16 @@ def run_evening_harvest_pipeline(
         force=force,
     )
 
-    # 7. ~19:45 IST Day-End 7-Asset Market Wrap Dispatch (Mon-Fri post-harvest)
-    _dispatch_bouquet_phase(
-        results,
-        date_str=date_str,
-        force=force,
-        respect_market_calendar=respect_market_calendar,
-    )
+    # 7. Monthly SEBI MF portfolio sync (moved here from the retired 08:00 IST morning run; budgeted)
+    try:
+        day_of_month = int(str(date_str)[8:10])
+    except ValueError:
+        day_of_month = 0
+    if day_of_month >= 4 and os.environ.get("TESTING") != "1":
+        mf_res = run_monthly_mf_portfolio_pipeline(date_str, force=force)
+        results["mf_portfolio_sync"] = mf_res.get("mf_portfolio_sync")
+        if "mf_portfolio_coverage" in mf_res:
+            results["mf_portfolio_coverage"] = mf_res["mf_portfolio_coverage"]
 
     record_autonomous_event(
         event_type="EVENING_HARVEST_COMPLETE",
@@ -460,7 +586,7 @@ def run_evening_harvest_pipeline(
             f"Discovery: {_phase_status(results.get('discovery_reel'))}, "
             f"MSME: {_phase_status(results.get('msme_ingest'))}, "
             f"Stock Ingest: {_phase_status(results.get('stock_ingestion'))}, "
-            f"Day-End Wrap: {_phase_status(results.get('morning_bouquet'))}"
+            f"SEBI MF Sync: {_phase_status(results.get('mf_portfolio_sync'))}"
         ),
         metadata=results,
     )
@@ -586,139 +712,15 @@ def run_monthly_mf_portfolio_pipeline(
     return results
 
 
-def run_morning_pipeline(
-    date_str: str,
-    force: bool = False,
-    respect_market_calendar: bool = False,
-) -> dict:
-    """Executes the morning catch-up / ingestion verification pipeline for `date_str`."""
-    is_weekend_skip = bool(respect_market_calendar and not force and _is_weekend_date(date_str))
-    logger.info(f"Starting Morning Multi-Asset Catch-Up Pipeline for {date_str}...")
-    results = {}
-    prune_zombie_leases()
-
-    # 0. Monthly MF disclosure refresh and daily catch-up for outstanding schemes.
-    try:
-        day_of_month = int(str(date_str)[8:10])
-    except ValueError:
-        day_of_month = 0
-    if day_of_month >= 4 and os.environ.get("TESTING") != "1":
-        mf_res = run_monthly_mf_portfolio_pipeline(date_str, force=force)
-        results["mf_portfolio_sync"] = mf_res.get("mf_portfolio_sync")
-        if "mf_portfolio_coverage" in mf_res:
-            results["mf_portfolio_coverage"] = mf_res["mf_portfolio_coverage"]
-
-    # 1. Daily Catch-Up (25/15-Stock) Ingestion & Mutual Fund Look-Through Saturation
-    def _stock_ingestion():
-        from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
-
-        res = ingest_daily_stock_cohort(edition_date=date_str, count=None, skip_gemini=False)
-        ingested_n = res.get("ingested_count", len(res.get("ingested_tickers") or res.get("ingested_stocks") or []))
-        logger.info(f"Phase 1 result: {res.get('status')} ({ingested_n} equities).")
-
-        # If any candidate equities were deferred to the pending queue under fail-closed integrity,
-        # automatically trigger the batch synthesis worker to compile them immediately.
-        if res.get("pending_count", 0) > 0 or ingested_n == 0:
-            try:
-                from scripts.synthesize_pending_equities import synthesize_pending_cohort
-                pending_list = res.get("pending_tickers") or []
-                logger.info("Compiling pending equities queue for edition %s...", date_str)
-                synth_count = synthesize_pending_cohort(
-                    limit=max(15, len(pending_list)),
-                    tickers=pending_list or None,
-                )
-                logger.info("Compiled %d pending equities for edition %s.", synth_count, date_str)
-                if isinstance(res, dict) and synth_count > 0:
-                    res["compiled_from_pending"] = synth_count
-                    res["ingested_count"] = ingested_n + synth_count
-                    if res.get("status") == "pending_synthesis":
-                        res["status"] = "success"
-            except Exception as synth_err:
-                logger.warning("Pending synthesis pass notice: %s", synth_err)
-
-        return res
-
-    _run_leased_phase(
-        results,
-        "stock_ingestion",
-        f"mf_stock_ingest_{date_str}",
-        "Phase 1: Daily MF Constituent Ingestion",
-        _stock_ingestion,
-        force=force,
-    )
-
-    # 2. Discovery Reel Screening (Mon-Fri editions only when respect_market_calendar=True)
-    if is_weekend_skip:
-        results["discovery_reel"] = "SKIPPED_MARKET_CLOSED"
-    else:
-        def _discovery_reel():
-            from scripts.run_discovery_worker import run_discovery_pipeline
-
-            success = run_discovery_pipeline(
-                target_count=15,
-                edition_date=date_str,
-                dry_run=False,
-                force_synthesis=False,
-            )
-            if not success:
-                raise RuntimeError("Discovery pipeline reported an unsuccessful run.")
-            return "SUCCESS"
-
-        _run_leased_phase(
-            results,
-            "discovery_reel",
-            f"discovery_reel_{date_str}",
-            "Phase 2: Discovery Reel Screening & Dossier Verification",
-            _discovery_reel,
-            force=force,
-        )
-
-    # 3. Daily Unlisted MSME Cohort Ingestion
-    def _msme_ingest():
-        from core.msme.daily_ingest import ingest_daily_msme_cohort
-
-        msme_count = ingest_daily_msme_cohort(date_str, 15)
-        return f"INGESTED_{msme_count}"
-
-    _run_leased_phase(
-        results,
-        "msme_ingest",
-        f"msme_daily_ingest_{date_str}",
-        "Phase 3: Daily MSME 15-Firm Cohort Ingestion",
-        _msme_ingest,
-        force=force,
-    )
-
-    # 4. Research Bouquet Catch-Up Verification
-    _dispatch_bouquet_phase(
-        results,
-        date_str=date_str,
-        force=force,
-        respect_market_calendar=respect_market_calendar,
-    )
-
-    record_autonomous_event(
-        event_type="MORNING_PIPELINE_COMPLETE",
-        ticker="MULTI_ASSET",
-        trigger_source="SCHEDULED_RUNNER",
-        action_taken=f"Executed morning pipeline for {date_str}",
-        summary=(
-            f"Stock Ingest: {_phase_status(results.get('stock_ingestion'))}, "
-            f"Discovery: {_phase_status(results.get('discovery_reel'))}, "
-            f"MSME: {_phase_status(results.get('msme_ingest'))}, "
-            f"Bouquet: {_phase_status(results.get('morning_bouquet'))}"
-        ),
-        metadata=results,
-    )
-    return results
-
-
 def run_nightly_pipeline(
     date_str: str,
     force: bool = False,
     respect_market_calendar: bool = False,
 ) -> dict:
-    """Executes Step B (23:15 IST): Silent AMFI NAVAll.txt sync + Mutual Fund Rotation Audit.
+    """Executes the fund run (GitHub 23:15 IST; Render `fund-backup` 01:00 IST re-runs unfinished phases).
+
+    AMFI NAVAll.txt sync + post-NAV ETF matrix + Mutual Fund Rotation Audit. Sends no email: the Fund
+    NAV Update is sent by the Render `send-fund-update` job at 07:30 IST for this date.
 
     On Saturdays & Sundays (`respect_market_calendar=True` and `not force`), market/NAV syncs
     (`amfi_sync`, `etf_sync`, `sovereign_sync`, `asset_scan`) return `SKIPPED_MARKET_CLOSED`,
@@ -780,7 +782,8 @@ def run_nightly_pipeline(
             force=force,
         )
 
-    # 2. National ETF Matrix Ingestion (Failover if not already leased in Step A)
+    # 2. National ETF Matrix re-sync after the night's AMFI NAVs (own lease: the 16:30 close-run ETF
+    #    price sync must not suppress this post-NAV refresh that feeds the 07:30 Fund NAV Update)
     if is_weekend_skip:
         results["etf_sync"] = "SKIPPED_MARKET_CLOSED"
     else:
@@ -794,8 +797,8 @@ def run_nightly_pipeline(
         _run_leased_phase(
             results,
             "etf_sync",
-            f"etf_matrix_sync_{date_str}",
-            "Nightly Phase 2: National ETF Matrix Synchronization",
+            f"etf_nav_sync_{date_str}",
+            "Nightly Phase 2: National ETF NAV Matrix Synchronization",
             _etf_sync,
             force=force,
         )
@@ -950,7 +953,10 @@ def main():
     parser = argparse.ArgumentParser(description="Multi-Asset Scheduled Pipeline Runner")
     parser.add_argument(
         "--mode",
-        choices=["auto", "evening", "morning", "nightly", "mf-portfolios", "all"],
+        choices=[
+            "auto", "evening", "close-backup", "send-close-wrap",
+            "nightly", "fund-backup", "send-fund-update", "mf-portfolios", "all",
+        ],
         default="auto",
         help="Pipeline mode to execute (default: auto from IST clock)",
     )
@@ -968,6 +974,7 @@ def main():
     args = parser.parse_args()
 
     setup_logging()
+    _install_termination_handler()
     init_db()
 
     now_ist = datetime.now(IST)
@@ -979,18 +986,18 @@ def main():
     )
     try:
         summary = {}
-        if effective_mode == "evening":
-            summary["evening"] = run_evening_harvest_pipeline(
+        if effective_mode in ("evening", "close-backup"):
+            summary[effective_mode] = run_evening_harvest_pipeline(
                 date_str, force=args.force, respect_market_calendar=True
             )
-        elif effective_mode == "morning":
-            summary["morning"] = run_morning_pipeline(
+        elif effective_mode in ("nightly", "fund-backup"):
+            summary[effective_mode] = run_nightly_pipeline(
                 date_str, force=args.force, respect_market_calendar=True
             )
-        elif effective_mode == "nightly":
-            summary["nightly"] = run_nightly_pipeline(
-                date_str, force=args.force, respect_market_calendar=True
-            )
+        elif effective_mode == "send-close-wrap":
+            summary[effective_mode] = run_send_edition(EDITION_MARKET_CLOSE, date_str, force=args.force)
+        elif effective_mode == "send-fund-update":
+            summary[effective_mode] = run_send_edition(EDITION_FUND_NAV, date_str, force=args.force)
         elif effective_mode == "mf-portfolios":
             summary["mf_portfolios"] = run_monthly_mf_portfolio_pipeline(
                 date_str, force=args.force or True

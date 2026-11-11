@@ -111,4 +111,190 @@ services:
       - key: GOOGLE_GENAI_USE_VERTEXAI
         value: "true"
 
+  # 18:30 IST: re-runs any unfinished 16:30 IST GitHub close-run phase (finished/in-progress phases are skipped)
+  - type: cron
+    name: close-run-backup
+    env: python
+    schedule: "0 13 * * *"
+    buildCommand: "pip install -r requirements.txt && TESTING=1 python3 scripts/verify_reality_audit.py && TESTING=1 pytest -q"
+    startCommand: "python3 scripts/run_scheduled_pipeline.py --mode close-backup"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.0
+      - key: TZ
+        value: Asia/Kolkata
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false
+      - key: SMARTAPI_PROXY_URL
+        sync: false
+      - key: ANGEL_API_KEY
+        sync: false
+      - key: ANGEL_CLIENT_CODE
+        sync: false
+      - key: ANGEL_PIN
+        sync: false
+      - key: ANGEL_TOTP_KEY
+        sync: false
+      - key: BETTER_STACK_SOURCE_TOKEN
+        sync: false
+      - key: BETTER_STACK_HEARTBEAT_URL
+        sync: false
+      - key: GOOGLE_GENAI_USE_VERTEXAI
+        value: "true"
+      - key: ENABLE_BACKGROUND_SCHEDULERS
+        value: "0"
+      - key: BETTER_STACK_INGESTING_HOST
+        value: "s2808842.us-west-2a.betterstackdata.com"
+      - key: CANONICAL_DOMAIN
+        value: https://moatnomics.com
+      - key: ENABLE_LIVE_EMAIL_DISPATCH
+        value: "0"
 
+  # 19:30 IST Mon-Fri: sends the Market Close Wrap once its phases are done (waits up to 60 min; fails closed on empty sections)
+  - type: cron
+    name: market-close-wrap-sender
+    env: python
+    schedule: "0 14 * * 1-5"
+    buildCommand: "pip install -r requirements.txt && TESTING=1 python3 scripts/verify_reality_audit.py && TESTING=1 pytest -q"
+    startCommand: "python3 scripts/run_scheduled_pipeline.py --mode send-close-wrap"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.0
+      - key: TZ
+        value: Asia/Kolkata
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false
+      - key: SMARTAPI_PROXY_URL
+        sync: false
+      - key: ANGEL_API_KEY
+        sync: false
+      - key: ANGEL_CLIENT_CODE
+        sync: false
+      - key: ANGEL_PIN
+        sync: false
+      - key: ANGEL_TOTP_KEY
+        sync: false
+      - key: BETTER_STACK_SOURCE_TOKEN
+        sync: false
+      - key: BETTER_STACK_HEARTBEAT_URL
+        sync: false
+      - key: GOOGLE_GENAI_USE_VERTEXAI
+        value: "true"
+      - key: ENABLE_BACKGROUND_SCHEDULERS
+        value: "0"
+      - key: BETTER_STACK_INGESTING_HOST
+        value: "s2808842.us-west-2a.betterstackdata.com"
+      - key: CANONICAL_DOMAIN
+        value: https://moatnomics.com
+      - key: RESEND_API_KEY
+        sync: false
+      - key: ENABLE_LIVE_EMAIL_DISPATCH
+        value: "1"
+      - key: SMTP_FROM
+        value: "Moatnomics Service Desk <desk@moatnomics.com>"
+
+  # 01:00 IST: re-runs any unfinished 23:15 IST GitHub fund-run phase for the previous date
+  - type: cron
+    name: fund-run-backup
+    env: python
+    schedule: "30 19 * * *"
+    buildCommand: "pip install -r requirements.txt && TESTING=1 python3 scripts/verify_reality_audit.py && TESTING=1 pytest -q"
+    startCommand: "python3 scripts/run_scheduled_pipeline.py --mode fund-backup"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.0
+      - key: TZ
+        value: Asia/Kolkata
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false
+      - key: SMARTAPI_PROXY_URL
+        sync: false
+      - key: ANGEL_API_KEY
+        sync: false
+      - key: ANGEL_CLIENT_CODE
+        sync: false
+      - key: ANGEL_PIN
+        sync: false
+      - key: ANGEL_TOTP_KEY
+        sync: false
+      - key: BETTER_STACK_SOURCE_TOKEN
+        sync: false
+      - key: BETTER_STACK_HEARTBEAT_URL
+        sync: false
+      - key: GOOGLE_GENAI_USE_VERTEXAI
+        value: "true"
+      - key: ENABLE_BACKGROUND_SCHEDULERS
+        value: "0"
+      - key: BETTER_STACK_INGESTING_HOST
+        value: "s2808842.us-west-2a.betterstackdata.com"
+      - key: CANONICAL_DOMAIN
+        value: https://moatnomics.com
+      - key: ENABLE_LIVE_EMAIL_DISPATCH
+        value: "0"
+
+  # 07:30 IST Tue-Sat: sends the Fund NAV Update for the prior trading day (waits up to 45 min; fails closed on empty sections)
+  - type: cron
+    name: fund-nav-update-sender
+    env: python
+    schedule: "0 2 * * 2-6"
+    buildCommand: "pip install -r requirements.txt && TESTING=1 python3 scripts/verify_reality_audit.py && TESTING=1 pytest -q"
+    startCommand: "python3 scripts/run_scheduled_pipeline.py --mode send-fund-update"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.0
+      - key: TZ
+        value: Asia/Kolkata
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false
+      - key: SMARTAPI_PROXY_URL
+        sync: false
+      - key: ANGEL_API_KEY
+        sync: false
+      - key: ANGEL_CLIENT_CODE
+        sync: false
+      - key: ANGEL_PIN
+        sync: false
+      - key: ANGEL_TOTP_KEY
+        sync: false
+      - key: BETTER_STACK_SOURCE_TOKEN
+        sync: false
+      - key: BETTER_STACK_HEARTBEAT_URL
+        sync: false
+      - key: GOOGLE_GENAI_USE_VERTEXAI
+        value: "true"
+      - key: ENABLE_BACKGROUND_SCHEDULERS
+        value: "0"
+      - key: BETTER_STACK_INGESTING_HOST
+        value: "s2808842.us-west-2a.betterstackdata.com"
+      - key: CANONICAL_DOMAIN
+        value: https://moatnomics.com
+      - key: RESEND_API_KEY
+        sync: false
+      - key: ENABLE_LIVE_EMAIL_DISPATCH
+        value: "1"
+      - key: SMTP_FROM
+        value: "Moatnomics Service Desk <desk@moatnomics.com>"

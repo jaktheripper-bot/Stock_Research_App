@@ -96,44 +96,27 @@ sequenceDiagram
     Router-->>Browser: Rendered Institutional Dossier (HTML + Glassmorphism UI)
 ```
 
-### 2.2 Two-Step Evening Harvest (`19:30 IST` + `23:15 IST`), 7-Asset Day-End Market Wrap & Weekend Warehouse Mode
+### 2.2 Option B Schedule: Close Run + Fund Run, Render Backups & Two Timed Emails
 
-The autonomous multi-asset pipeline aligns with real Indian post-market statutory settlement clocks across two evening windows plus a silent morning `T-1` catch-up check and Saturday/Sunday Warehouse Mode:
+> Status: implemented on `dev`; it takes effect once `dev` is merged to `main` and Render syncs the Blueprint (`render.yaml`). Until then `main` keeps the earlier 19:30 / 23:15 / 08:00 IST schedule.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Sched as Scheduled Pipeline (19:30 IST, 23:15 IST & 08:00 AM IST)
-    participant Mkt as Sovereign, ETF & Asset Surveillance Engines
-    participant Disc as scripts/run_discovery_worker.py
-    participant Ingest as core/analysis/daily_stock_ingestion.py
-    participant Wrap as core/analysis/research_bouquet.py & core/notify.py
-    participant FundEng as core/ingestion/amfi.py & fund_overlap_auditor.py
-    participant DB as Supabase PostgreSQL & reports.db
+Heavy work runs on GitHub Actions (free, but its cron starts drift 4–7.5 hours late). Render cron jobs start on time, so they run the backups and send both emails. The website process runs no pipeline work and sends no research email.
 
-    Note over Sched, Wrap: Step A: 19:30 IST (--mode evening) - Post-Close 7-Asset Harvest & ~19:45 IST Market Wrap
-    alt Trading Day (Mon-Fri) or --force
-        Sched->>Mkt: Refresh Sovereign Curve (16 tenors + SDLs), ETF Matrix (442 ETFs) & Surveillance Scan
-        Sched->>Disc: Screen & archive 15-stock Discovery Reel on settled NSE/BSE closing prices
-    else Weekend (Sat-Sun) Warehouse Mode
-        Sched-->>Sched: Skip Sovereign, ETF, Scan & Discovery Reel (SKIPPED_MARKET_CLOSED)
-    end
-    Sched->>Ingest: Ingest 15 MSME firms + 15 uncovered MF constituent equities (Vertex AI SSE / Batch-Flex)
-    Ingest->>DB: Archive compiled 7-Pillar dossiers & recalculate affected MF look-through scores
-    alt Trading Day (Mon-Fri)
-        Sched->>Wrap: Compile & dispatch 7-Asset Day-End Market Wrap (morning_bouquet_{date_str} lease)
-        Wrap->>DB: Record immutable digest_dispatches audit row
-    else Weekend (Sat-Sun)
-        Sched-->>Sched: Skip Day-End Market Wrap email (SKIPPED_MARKET_CLOSED)
-    end
+| IST | Runner (`--mode`) | Work | Email |
+|---|---|---|---|
+| 16:30 | GitHub `evening` (close run, 90-min job limit) | Sovereign curve, savings rates, ETF prices, debt/asset scan, discovery reel, MSME, MF-constituent stock reports (4 workers, 40-min AI budget), monthly SEBI MF portfolio sync (from day 4, 25-min budget) | — |
+| 18:30 | Render `close-backup` | Same phases; any phase already done or still running is skipped | — |
+| 19:30 Mon–Fri | Render `send-close-wrap` | Waits ≤60 min for `sovereign_sync`, `savings_rate_sync`, `asset_scan`, `discovery_reel`, `msme_daily_ingest` completion markers | **Market Close Wrap**: Equities, Sovereign, Corporate debt, REITs/InvITs/SGBs, MSME, Fixed savings |
+| 23:15 | GitHub `nightly` (fund run) | AMFI NAVs, post-NAV ETF matrix (`etf_nav_sync_<date>`), sovereign/scan failover, one fund look-through audit | — |
+| 01:00 | Render `fund-backup` | Same phases for the previous date | — |
+| 07:30 Tue–Sat | Render `send-fund-update` | Waits ≤45 min for `amfi_nav_sync`, `etf_nav_sync`, `fund_audit` markers (prior trading day) | **Fund NAV Update**: ETF matrix, Mutual fund look-through |
 
-    Note over Sched, FundEng: Step B: 23:15 IST (--mode nightly) - AMFI NAV Sync & 7-Pillar Fund Rotation
-    Sched->>FundEng: Sync AMFI NAVAll.txt (Mon-Fri) + Run 1-scheme 7-Pillar Fund Audit SSE (7/7 days)
-    FundEng->>DB: Persist audited fund dossier powering next trading day's Prior-Session AMFI Audit spotlight
-
-    Note over Sched, DB: 08:00 AM IST (--mode morning) - Silent T-1 Catch-Up Check (Never Pre-Locks T)
-    Sched->>DB: Verify prior day (yesterday_str) leases; retry only missed T-1 phases without re-emailing
-```
+* **Completion markers vs leases:** a lease (`distributed_job_locks`) means "running or finished"; a separate `done::<lease>` marker (36 h TTL) is written only after a phase succeeds. Backups skip leased phases; senders wait on markers.
+* **Cancellation safety:** `job_lease` releases on `BaseException` and the runner turns SIGTERM into `SystemExit`, so a cancelled or timed-out GitHub job frees its phases for the Render backup.
+* **Date binding:** any run starting before 12:00 IST binds to the previous date (`_resolve_mode_and_date`), so the 01:00 backup and 07:30 email cover the prior evening, and late GitHub runs never take over the next day.
+* **Fail-closed emails:** each edition requires its own sections (`EDITION_REQUIRED_SECTIONS` in `core/analysis/research_bouquet.py`); if any is empty after the wait, `BouquetDataUnavailableError` is raised, nothing is sent and the run exits 1. One send per (date, kind) via `digest_dispatches.edition_kind` (migration `v053`).
+* **AI budget:** after 40 minutes no new stock report generation starts; unstarted equities are reused from a verified archive or stay PENDING (never a template report) and are retried the next evening.
+* **Weekends:** no Market Close Wrap on Saturday/Sunday; the Saturday 07:30 email covers Friday's NAVs. Market holidays are not yet detected (only weekends).
 
 #### Fail-Closed Domain Integrity, Public Directory Completeness & Substance Invariants (Pre-Commit Gates 4.5 & 4.6)
 * **Pending Over Potemkin & Public Surface Exclusion:** When live or batch LLM synthesis is throttled or fails in production, the pipeline adheres to Rule 4 ("Pending Over Potemkin"), setting `report_text = NULL` and transitioning candidate stocks into the `PENDING COMPILATION` queue state (served via `dossier_pending.html`). Public directory and reel surfaces enforce strict completeness guards: `get_archived_reports` and `get_all_equities_directory_sync` require `r.report_text IS NOT NULL AND TRIM(r.report_text) != ''`, `get_active_discovery_reel` enforces a `NOT EXISTS` subquery excluding any ticker whose `reports` row has `NULL`/empty `report_text`, and `get_active_mutual_funds(..., audited_only=True, dedupe_twins=True, limit=None)` restricts public browse views (`/funds`, `/funds/compare/overlap`, `/api/funds/schemes`, `/api/opportunities/universe`) to the `944` twin-deduplicated schemes with verified `mutual_fund_holdings` rows (`1,050` total portfolio-backed schemes) while keeping `/funds?q=...` searchable across all `2,074` indexed AMFI schemes.
@@ -356,9 +339,9 @@ The Discovery report and institutional equity ingestion pipeline run daily prior
 
 * **Operational Cadence & Ingestion Timing:**
   * **Dynamic Catch-Up Constituent Ingestion (`25/day` -> `15/day`):** Ingests `25` uncovered mutual fund equity constituents per day while the uncovered backlog exceeds `100`, automatically stepping down to `15` stocks/day once the backlog is `<= 100` (`core/analysis/daily_stock_ingestion.py:resolve_daily_stock_cohort_target`).
-  * **Days `4–12` Monthly SEBI Portfolio Sync (`07:45 AM IST`):** Automatically refreshes monthly statutory AMC portfolio disclosures and official AMFI scheme-wise AAUM across 16 public AMCs (`core/ingestion/mf_portfolio_ingest.py`, `job_monthly_mf_portfolio_sync`).
-  * **Bounded MF Sync Time Budget:** the morning SEBI portfolio sync calls `ingest_top_funds(fetch_workers=4, per_amc_timeout_s=600, deadline_monotonic=now+25min)` (`MF_SYNC_FETCH_WORKERS`, `MF_SYNC_PER_AMC_TIMEOUT_SECONDS`, `MF_SYNC_BUDGET_SECONDS` in `scripts/run_scheduled_pipeline.py`). `_prefetch_amc_workbooks` fetches AMC workbooks on bounded daemon threads; an AMC that overruns its deadline is abandoned (slot handed to the next AMC) and its schemes are skipped as `workbook fetch timed out` with nothing written; once the budget passes, remaining schemes are skipped as `time budget exhausted`, slug-twin sync is deferred, and the phase finishes as `PARTIAL` inside the 45-minute GitHub Actions job instead of being killed. Return payload adds `timed_out_amcs` and `budget_exhausted`. Default `fetch_workers=1` keeps serial behaviour for all other callers.
-  * **19:30 IST (Post-Close Discovery Reel Refresh):** Refreshes top momentum, growth, and value candidate reels from settled exchange closing prices.
+  * **Monthly SEBI Portfolio Sync (end of the 16:30 IST close run, from day 4 until the month's portfolios are fresh):** Automatically refreshes monthly statutory AMC portfolio disclosures and official AMFI scheme-wise AAUM across 16 public AMCs (`core/ingestion/mf_portfolio_ingest.py`, `job_monthly_mf_portfolio_sync`).
+  * **Bounded MF Sync Time Budget:** the close-run SEBI portfolio sync calls `ingest_top_funds(fetch_workers=4, per_amc_timeout_s=600, deadline_monotonic=now+25min)` (`MF_SYNC_FETCH_WORKERS`, `MF_SYNC_PER_AMC_TIMEOUT_SECONDS`, `MF_SYNC_BUDGET_SECONDS` in `scripts/run_scheduled_pipeline.py`). `_prefetch_amc_workbooks` fetches AMC workbooks on bounded daemon threads; an AMC that overruns its deadline is abandoned (slot handed to the next AMC) and its schemes are skipped as `workbook fetch timed out` with nothing written; once the budget passes, remaining schemes are skipped as `time budget exhausted`, slug-twin sync is deferred, and the phase finishes as `PARTIAL` inside the 45-minute GitHub Actions job instead of being killed. Return payload adds `timed_out_amcs` and `budget_exhausted`. Default `fetch_workers=1` keeps serial behaviour for all other callers.
+  * **16:30 IST close run (Post-Close Discovery Reel Refresh; Render backup 18:30 IST):** Refreshes top momentum, growth, and value candidate reels from settled exchange closing prices.
 * **Constituent Queue Ranking Algorithm (Twin-Deduplicated Composite Priority):**
   Across twin-deduplicated mutual fund schemes (`0` synthetic AUM fallbacks, raw `IN...` ISINs resolved via NSE/BSE master maps or filtered out so `0` raw ISINs leak into `reports`), uncovered listed equity constituents (`732` uncovered of `1,119` total) are ranked deterministically by:
   $$\text{Priority Score} = \sum_{s} \frac{w_{s,i} \cdot \text{AUM}_s}{100} + \sum_{s \in [45\%, 70\%)} \frac{w_{s,i}}{\max(1, 70 - C_s)} \cdot \max(\text{AUM}_s, 500) \cdot 0.25 + \sum_{s} 250 \cdot N_{\text{inq}, s} \cdot w_{s,i}$$

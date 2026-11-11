@@ -196,10 +196,98 @@ def job_lease(
     failed = False
     try:
         yield acquired
-    except Exception:
+    except BaseException:
+        # BaseException (not Exception): a cancelled CI job raises KeyboardInterrupt (SIGINT) or
+        # SystemExit (SIGTERM handler). Those must also free the lease so a backup runner can
+        # retry the phase instead of skipping it for the lease's full TTL.
         failed = True
         raise
     finally:
         if acquired and (release_on_exit or (failed and release_on_failure)):
             release_job_lease(job_name)
 
+
+
+# --- Phase completion markers ------------------------------------------------------------
+# A held lease means "running OR finished", so backups and email senders cannot tell an
+# in-progress phase from a completed one. A completion marker is a separate row
+# (`done::<job_name>`) written only after a phase succeeds. Markers never imply data
+# freshness by themselves; email builders still fail closed on empty sections.
+
+DONE_MARKER_PREFIX = "done::"
+DONE_MARKER_TTL_SECONDS = 129600  # 36 hours: covers the 07:30 IST send for the prior trading day
+
+
+def _done_marker_name(job_name: str) -> str:
+    return f"{DONE_MARKER_PREFIX}{job_name}"
+
+
+def mark_job_done(job_name: str, ttl_seconds: int = DONE_MARKER_TTL_SECONDS) -> bool:
+    """Records that `job_name` completed successfully. Idempotent; returns True when recorded."""
+    ensure_lock_table_exists()
+    clamped_ttl = max(MIN_LEASE_TTL_SECONDS, int(ttl_seconds))
+    now_ist = datetime.now(IST)
+    exp_iso = (now_ist + timedelta(seconds=clamped_ttl)).isoformat()
+    conn = get_connection()
+    cur = conn.cursor()
+    p = get_placeholder()
+    try:
+        cur.execute(
+            f"""
+            INSERT INTO distributed_job_locks (job_name, locked_by, locked_at, expires_at)
+            VALUES ({p}, {p}, {p}, {p})
+            ON CONFLICT (job_name) DO UPDATE
+            SET locked_by = EXCLUDED.locked_by,
+                locked_at = EXCLUDED.locked_at,
+                expires_at = EXCLUDED.expires_at
+            """,
+            (_done_marker_name(job_name), f"DONE:{WORKER_ID}", now_ist.isoformat(), exp_iso),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        logger.warning("Failed to record completion marker for %s: %s", job_name, e)
+        return False
+    finally:
+        cur.close()
+        try:
+            conn.close()
+        except Exception as close_err:
+            logger.debug("Failed closing connection in mark_job_done: %s", close_err)
+
+
+def is_job_done(job_name: str) -> bool:
+    """True when an unexpired completion marker exists for `job_name`."""
+    return not missing_done_markers([job_name])
+
+
+def missing_done_markers(job_names) -> list:
+    """Returns the subset of `job_names` without an unexpired completion marker (all of them on DB error)."""
+    names = [str(n) for n in (job_names or []) if n]
+    if not names:
+        return []
+    ensure_lock_table_exists()
+    conn = get_connection()
+    is_pg = is_postgres_connection(conn)
+    cur = conn.cursor()
+    p = get_placeholder()
+    now_iso = datetime.now(IST).isoformat()
+    exp_cmp = f"expires_at >= {p}" if is_pg else f"datetime(expires_at) >= datetime({p})"
+    try:
+        placeholders = ", ".join([p] * len(names))
+        cur.execute(
+            f"SELECT job_name FROM distributed_job_locks WHERE job_name IN ({placeholders}) AND {exp_cmp}",
+            tuple(_done_marker_name(n) for n in names) + (now_iso,),
+        )
+        found = {str(r[0])[len(DONE_MARKER_PREFIX):] for r in cur.fetchall()}
+        return [n for n in names if n not in found]
+    except Exception as e:
+        logger.error("Completion-marker lookup failed; treating %d phases as not done: %s", len(names), e)
+        return names
+    finally:
+        cur.close()
+        try:
+            conn.close()
+        except Exception as close_err:
+            logger.debug("Failed closing connection in missing_done_markers: %s", close_err)

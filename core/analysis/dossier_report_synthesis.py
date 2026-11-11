@@ -6,6 +6,7 @@ import json
 import time
 import random
 import logging
+from typing import Optional
 import requests
 from google import genai
 
@@ -572,6 +573,8 @@ def synthesize_batch_stock_reports(
     poll_timeout_seconds: int = 120,
     poll_interval_seconds: int = 5,
     edition_label: str = "daily-ingestion",
+    workers: int = 1,
+    deadline_monotonic: Optional[float] = None,
 ) -> dict:
     """
     Submits a cohort of stock synthesis requests via the Gemini Batch API (client.batches.create)
@@ -701,10 +704,12 @@ def synthesize_batch_stock_reports(
         except Exception as batch_err:
             logger.warning("Gemini Batch API submission/polling notice: %s. Falling back to Flex 50%% tier.", batch_err)
 
-    # 2. Complete remaining stocks via Vertex AI SSE Streaming (avoids 60s unary 504 timeouts) or AI Studio Flex
-    for t_sym, s_data, u_prompt, s_inst in valid_items:
-        if t_sym in results:
-            continue
+    # 2. Complete remaining stocks via Vertex AI SSE Streaming (avoids 60s unary 504 timeouts) or AI Studio Flex.
+    #    Up to `workers` generations run concurrently; none starts after `deadline_monotonic`.
+    def _generate_one(item):
+        t_sym, s_data, u_prompt, s_inst = item
+        if deadline_monotonic is not None and time.monotonic() >= deadline_monotonic:
+            return None
         try:
             cites = []
             txt = ""
@@ -760,7 +765,7 @@ def synthesize_batch_stock_reports(
                     clean_flex_txt = enforce_indian_english(clean_flex_txt)
                 except Exception as lang_err:
                     logger.debug("Language filter normalization notice in batch flex: %s", lang_err)
-                results[t_sym] = {
+                return t_sym, {
                     "report_text": clean_flex_txt,
                     "citations": cites,
                     "tier": "VERTEX_AI_POSTPAY_GROUNDED_SSE" if is_vertex else "GEMINI_FLEX_50PCT_DISCOUNT",
@@ -768,6 +773,26 @@ def synthesize_batch_stock_reports(
                 }
         except Exception as flex_err:
             logger.debug("Gemini Flex tier notice for %s: %s", t_sym, flex_err)
+        return None
+
+    remaining = [item for item in valid_items if item[0] not in results]
+    worker_count = max(1, int(workers or 1))
+    if worker_count == 1 or len(remaining) <= 1:
+        generated = [_generate_one(item) for item in remaining]
+    else:
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=min(worker_count, len(remaining)), thread_name_prefix="stock-synth") as pool:
+            generated = list(pool.map(_generate_one, remaining))
+    for outcome in generated:
+        if outcome:
+            results[outcome[0]] = outcome[1]
+    skipped_for_budget = sum(1 for o in generated if o is None) if deadline_monotonic is not None else 0
+    if deadline_monotonic is not None and time.monotonic() >= deadline_monotonic and skipped_for_budget:
+        logger.warning(
+            "AI time budget reached: %d of %d stock reports were not started or did not complete; they stay PENDING.",
+            skipped_for_budget, len(remaining),
+        )
 
     return results
 

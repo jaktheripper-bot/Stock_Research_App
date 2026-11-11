@@ -2618,7 +2618,11 @@ async def api_admin_digest_dispatch_test(request: Request):
     target_email = (body.get("recipient_email") or get_admin_notification_email()).strip()
     edition_date = body.get("edition_date")
 
-    result = dispatch_research_bouquet(edition_date=edition_date, test_recipient=target_email)
+    edition_kind = str(body.get("edition_kind") or "MARKET_CLOSE").strip().upper()
+    if edition_kind not in ("MARKET_CLOSE", "FUND_NAV"):
+        raise HTTPException(status_code=422, detail="edition_kind must be MARKET_CLOSE or FUND_NAV.")
+
+    result = dispatch_research_bouquet(edition_date=edition_date, test_recipient=target_email, edition_kind=edition_kind)
     return JSONResponse(status_code=200, content=result)
 
 
@@ -2642,7 +2646,13 @@ async def api_admin_digest_broadcast(request: Request):
     force = bool(body.get("force", False))
     edition_date = body.get("edition_date")
 
-    result = dispatch_research_bouquet(edition_date=edition_date, only_active_pro=only_active_pro, force=force)
+    edition_kind = str(body.get("edition_kind") or "MARKET_CLOSE").strip().upper()
+    if edition_kind not in ("MARKET_CLOSE", "FUND_NAV"):
+        raise HTTPException(status_code=422, detail="edition_kind must be MARKET_CLOSE or FUND_NAV.")
+
+    result = dispatch_research_bouquet(
+        edition_date=edition_date, only_active_pro=only_active_pro, force=force, edition_kind=edition_kind
+    )
     return JSONResponse(status_code=200, content=result)
 
 

@@ -1,13 +1,14 @@
 """
 Unit tests for scripts/run_scheduled_pipeline.py.
-Verifies invocation contracts, signatures, and lease coordination across morning and nightly workflows.
+Verifies invocation contracts, signatures, and lease coordination across the close run (evening),
+the fund run (nightly), their Render backups and the two timed email senders.
 """
 import contextlib
 import sys
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import ANY, patch, MagicMock
 
-from scripts.run_scheduled_pipeline import run_morning_pipeline, run_nightly_pipeline
+from scripts.run_scheduled_pipeline import run_evening_harvest_pipeline, run_nightly_pipeline
 
 
 class TestScheduledPipeline(unittest.TestCase):
@@ -15,44 +16,52 @@ class TestScheduledPipeline(unittest.TestCase):
     @patch("scripts.run_scheduled_pipeline.job_lease")
     @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
     @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
+    @patch("core.db.savings.verify_and_sync_automated_savings_rates", return_value={"total_active": 34})
+    @patch("core.db.sovereign.refresh_daily_sovereign_benchmarks", return_value={"benchmarks_updated": 16})
+    @patch("core.ingestion.etf_ingest.ingest_all_amfi_etfs", return_value={"persisted_to_db": 442})
+    @patch("core.analysis.asset_scanner.run_comprehensive_asset_scan", return_value={"status": "OK"})
     @patch("core.analysis.daily_stock_ingestion.ingest_daily_stock_cohort")
     @patch("scripts.run_discovery_worker.run_discovery_pipeline")
     @patch("core.msme.daily_ingest.ingest_daily_msme_cohort")
-    @patch("core.db.digest.has_edition_been_dispatched", return_value=False)
     @patch("core.notify.dispatch_research_bouquet")
-    def test_run_morning_pipeline_signatures(
+    def test_close_run_signatures_and_sends_no_email(
         self,
         mock_bouquet,
-        mock_has_dispatched,
         mock_msme,
         mock_discovery,
         mock_stock_ingest,
+        mock_scan,
+        mock_etf,
+        mock_sov,
+        mock_savings,
         mock_record_event,
         mock_prune,
         mock_lease,
     ):
+        """Option B: the close run refreshes data and stock reports; Render sends the 19:30 email."""
         mock_lease.return_value.__enter__.return_value = True
-        mock_stock_ingest.return_value = {"status": "SUCCESS", "ingested_stocks": ["TCS", "INFY"]}
+        mock_stock_ingest.return_value = {"status": "SUCCESS", "ingested_count": 2}
         mock_discovery.return_value = True
         mock_msme.return_value = 15
-        mock_bouquet.return_value = {"status": "COMPLETED", "delivered": 3}
 
-        res = run_morning_pipeline("2026-10-25", force=False)
+        res = run_evening_harvest_pipeline("2026-10-30", force=False, respect_market_calendar=True)
 
         self.assertEqual(res.get("discovery_reel"), "SUCCESS")
         self.assertEqual(res.get("msme_ingest"), "INGESTED_15")
-        self.assertEqual(res.get("morning_bouquet"), "COMPLETED")
+        self.assertNotIn("digest_dispatch", res)
+        mock_bouquet.assert_not_called()
         mock_discovery.assert_called_once_with(
             target_count=15,
-            edition_date="2026-10-25",
+            edition_date="2026-10-30",
             dry_run=False,
             force_synthesis=False,
         )
-        mock_bouquet.assert_called_once_with(edition_date="2026-10-25", force=False)
-        mock_record_event.assert_called_once()
+        # Phase 6 runs with 4 workers and a monotonic AI deadline.
+        _, stock_kwargs = mock_stock_ingest.call_args
+        self.assertEqual(stock_kwargs["workers"], 4)
+        self.assertIsInstance(stock_kwargs["deadline_monotonic"], float)
         call_kwargs = mock_record_event.call_args[1]
-        self.assertEqual(call_kwargs.get("event_type"), "MORNING_PIPELINE_COMPLETE")
-        self.assertIsInstance(call_kwargs.get("metadata"), dict)
+        self.assertEqual(call_kwargs.get("event_type"), "EVENING_HARVEST_COMPLETE")
         self.assertEqual(call_kwargs.get("metadata"), res)
 
     @patch("scripts.run_scheduled_pipeline.job_lease")
@@ -112,6 +121,19 @@ class TestScheduledPipeline(unittest.TestCase):
         from scripts.run_discovery_worker import run_discovery_worker, run_discovery_pipeline
         self.assertIs(run_discovery_worker, run_discovery_pipeline)
 
+    def test_web_process_no_longer_runs_pipeline_loops(self):
+        """Option B: the website never runs the daily pipeline or sends research emails in-process."""
+        import web.main as web_main
+
+        for retired in ("run_daily_discovery_scheduler", "run_daily_amfi_scheduler", "run_daily_fund_audit_scheduler"):
+            self.assertFalse(hasattr(web_main, retired), retired)
+        registered = MagicMock()
+        from core.msme.scheduler import register_jobs
+
+        register_jobs(registered)
+        job_ids = [c.kwargs.get("id") for c in registered.add_job.call_args_list]
+        self.assertEqual(job_ids, ["msme_monthly_ingest"])
+
     def test_scheduler_boot_guard_requires_explicit_enable_flag(self):
         """Verifies that background schedulers do not boot without ENABLE_BACKGROUND_SCHEDULERS=1."""
         from web.main import lifespan, app
@@ -128,8 +150,7 @@ class TestScheduledPipeline(unittest.TestCase):
             sys.modules.pop("pytest", None)
             with patch("web.main.AsyncIOScheduler") as mock_sched, \
                  patch("web.main.warmup_task", side_effect=_noop), \
-                 patch("web.main.run_daily_discovery_scheduler", side_effect=_noop) as mock_disc, \
-                 patch("web.main.run_daily_amfi_scheduler", side_effect=_noop) as mock_amfi:
+                 patch("web.main.run_daily_project_audit_scheduler", side_effect=_noop) as mock_audit:
 
                 async def _run():
                     async with lifespan(app):
@@ -137,8 +158,7 @@ class TestScheduledPipeline(unittest.TestCase):
 
                 asyncio.run(_run())
                 mock_sched.assert_not_called()
-                mock_disc.assert_not_called()
-                mock_amfi.assert_not_called()
+                mock_audit.assert_not_called()
 
         # When ENABLE_BACKGROUND_SCHEDULERS=1
         with patch.dict(os.environ, {"TESTING": "0", "ENABLE_BACKGROUND_SCHEDULERS": "1"}, clear=False), \
@@ -146,9 +166,6 @@ class TestScheduledPipeline(unittest.TestCase):
             sys.modules.pop("pytest", None)
             with patch("web.main.AsyncIOScheduler") as mock_sched, \
                  patch("web.main.warmup_task", side_effect=_noop), \
-                 patch("web.main.run_daily_discovery_scheduler", side_effect=_noop), \
-                 patch("web.main.run_daily_amfi_scheduler", side_effect=_noop), \
-                 patch("web.main.run_daily_fund_audit_scheduler", side_effect=_noop), \
                  patch("web.main.run_daily_project_audit_scheduler", side_effect=_noop), \
                  patch("core.agents.watchers.bse_watcher.run_bse_watcher_loop", side_effect=_noop):
 
@@ -240,7 +257,7 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
         # Failed phases free their lease for a same-day retry; successful phases keep theirs.
         self.assertIn("amfi_nav_sync_2026-10-30", self.released)
         self.assertIn("fund_audit_2026-10-30", self.released)
-        self.assertNotIn("etf_matrix_sync_2026-10-30", self.released)
+        self.assertNotIn("etf_nav_sync_2026-10-30", self.released)
         # No DAILY_FUND_AUDIT event for a failed audit; only the pipeline summary event.
         self.assertEqual(mock_record_event.call_count, 1)
         summary_kwargs = mock_record_event.call_args.kwargs
@@ -256,16 +273,17 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
     @patch("core.msme.daily_ingest.ingest_daily_msme_cohort", return_value=15)
     @patch("core.db.digest.has_edition_been_dispatched", side_effect=RuntimeError("ledger unavailable"))
     @patch("core.notify.dispatch_research_bouquet")
-    def test_morning_bouquet_fails_closed_when_dispatch_ledger_unreadable(
+    def test_email_send_fails_closed_when_dispatch_ledger_unreadable(
         self, mock_bouquet, mock_has_dispatched, mock_msme, mock_discovery, mock_ingest, mock_record_event, mock_prune
     ):
+        from scripts.run_scheduled_pipeline import _dispatch_bouquet_phase
+
+        res = {}
         with patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease):
-            res = run_morning_pipeline("2026-10-30", force=False)
+            _dispatch_bouquet_phase(res, "2026-10-30", force=False, respect_market_calendar=True)
 
         mock_bouquet.assert_not_called()
-        self.assertTrue(res["morning_bouquet"].startswith("FAILED: RuntimeError"))
-        self.assertEqual(res["discovery_reel"], "SUCCESS")
-        self.assertEqual(res["msme_ingest"], "INGESTED_15")
+        self.assertTrue(res["digest_dispatch"].startswith("FAILED: RuntimeError"))
 
     @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
     @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
@@ -276,13 +294,16 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
     def test_unsuccessful_discovery_run_is_failed_and_releases_lease(
         self, mock_has_dispatched, mock_msme, mock_discovery, mock_ingest, mock_record_event, mock_prune
     ):
-        with patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease):
-            res = run_morning_pipeline("2026-10-30", force=False)
+        with patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease), \
+             patch("core.db.savings.verify_and_sync_automated_savings_rates", return_value={}), \
+             patch("core.db.sovereign.refresh_daily_sovereign_benchmarks", return_value={}), \
+             patch("core.ingestion.etf_ingest.ingest_all_amfi_etfs", return_value={}), \
+             patch("core.analysis.asset_scanner.run_comprehensive_asset_scan", return_value={}):
+            res = run_evening_harvest_pipeline("2026-10-30", force=False, respect_market_calendar=True)
 
         self.assertTrue(res["discovery_reel"].startswith("FAILED: RuntimeError"))
         self.assertIn("discovery_reel_2026-10-30", self.released)
         self.assertEqual(res["msme_ingest"], "INGESTED_15")
-        self.assertEqual(res["morning_bouquet"], "ALREADY_DISPATCHED")
 
     def test_main_exits_nonzero_and_withholds_heartbeat_when_a_phase_failed(self):
         import scripts.run_scheduled_pipeline as runner
@@ -306,15 +327,39 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
             self.assertEqual(runner.main(), 0)
         mock_heartbeat.assert_called_once_with("nightly")
 
-    def test_resolve_mode_and_date_prevents_morning_lease_poisoning_and_midnight_rollover(self):
-        """08:00 AM catch-up binds to T-1; 00:00-04:59 nightly binds to T-1; 19:30 evening binds to T."""
+    def test_resolve_mode_and_date_binds_backups_and_senders_to_the_right_date(self):
+        """Pre-noon runs bind to T-1 (fund backup 01:00, fund email 07:30, delayed runs); afternoon/evening to T."""
         from datetime import datetime
         from scripts.run_scheduled_pipeline import IST, _resolve_mode_and_date
 
-        # 08:00 AM IST Monday -> morning mode on T-1 (2026-11-01), never pre-locking 2026-11-02 evening leases
-        mon_8am = datetime(2026, 11, 2, 8, 0, tzinfo=IST)
-        self.assertEqual(_resolve_mode_and_date("auto", mon_8am), ("morning", "2026-11-01"))
-        self.assertEqual(_resolve_mode_and_date("morning", mon_8am), ("morning", "2026-11-01"))
+        # Close run 16:30, close backup 18:30 and close wrap 19:30 IST bind to today
+        mon_1630 = datetime(2026, 11, 2, 16, 30, tzinfo=IST)
+        self.assertEqual(_resolve_mode_and_date("evening", mon_1630), ("evening", "2026-11-02"))
+        self.assertEqual(_resolve_mode_and_date("auto", mon_1630), ("evening", "2026-11-02"))
+        self.assertEqual(
+            _resolve_mode_and_date("close-backup", datetime(2026, 11, 2, 18, 30, tzinfo=IST)),
+            ("close-backup", "2026-11-02"),
+        )
+        self.assertEqual(
+            _resolve_mode_and_date("send-close-wrap", datetime(2026, 11, 2, 19, 30, tzinfo=IST)),
+            ("send-close-wrap", "2026-11-02"),
+        )
+        # Fund backup 01:00 IST Tue and Fund NAV email 07:30 IST Tue cover Monday's NAVs
+        self.assertEqual(
+            _resolve_mode_and_date("fund-backup", datetime(2026, 11, 3, 1, 0, tzinfo=IST)),
+            ("fund-backup", "2026-11-02"),
+        )
+        self.assertEqual(
+            _resolve_mode_and_date("send-fund-update", datetime(2026, 11, 3, 7, 30, tzinfo=IST)),
+            ("send-fund-update", "2026-11-02"),
+        )
+        # Saturday 07:30 IST Fund NAV email covers Friday
+        self.assertEqual(
+            _resolve_mode_and_date("send-fund-update", datetime(2026, 11, 7, 7, 30, tzinfo=IST)),
+            ("send-fund-update", "2026-11-06"),
+        )
+        # Auto before noon falls back to the prior night's fund run (no morning mode any more)
+        self.assertEqual(_resolve_mode_and_date("auto", datetime(2026, 11, 2, 8, 0, tzinfo=IST)), ("nightly", "2026-11-01"))
 
         # 19:30 IST Monday -> evening harvest on T (2026-11-02)
         mon_1930 = datetime(2026, 11, 2, 19, 30, tzinfo=IST)
@@ -343,7 +388,7 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
     @patch("core.analysis.daily_stock_ingestion.ingest_daily_stock_cohort", return_value={"status": "OK", "ingested_count": 15})
     @patch("core.db.digest.has_edition_been_dispatched", return_value=False)
     @patch("core.notify.dispatch_research_bouquet", return_value={"status": "COMPLETED", "delivered": 4})
-    def test_evening_harvest_runs_all_7_phases_on_weekday_and_warehouse_only_on_weekend(
+    def test_close_run_runs_data_phases_on_weekday_and_warehouse_only_on_weekend(
         self,
         mock_bouquet,
         mock_has_dispatched,
@@ -359,13 +404,13 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
         from scripts.run_scheduled_pipeline import _failed_phases, run_evening_harvest_pipeline
 
         with patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease):
-            # 1. Friday (2026-10-30): all 7 phases execute including Day-End Wrap
+            # 1. Friday (2026-10-30): all data phases execute; the close run sends no email (Render does at 19:30)
             fri_res = run_evening_harvest_pipeline("2026-10-30", force=False, respect_market_calendar=True)
             self.assertEqual(_failed_phases(fri_res), [])
             self.assertEqual(fri_res["discovery_reel"], "SUCCESS")
             self.assertEqual(fri_res["msme_ingest"], "INGESTED_15")
-            self.assertEqual(fri_res["morning_bouquet"], "COMPLETED")
-            mock_bouquet.assert_called_once_with(edition_date="2026-10-30", force=False)
+            self.assertNotIn("digest_dispatch", fri_res)
+            mock_bouquet.assert_not_called()
 
             mock_bouquet.reset_mock()
             mock_disc.reset_mock()
@@ -380,7 +425,7 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
             self.assertEqual(sun_res["etf_sync"], "SKIPPED_MARKET_CLOSED")
             self.assertEqual(sun_res["asset_scan"], "SKIPPED_MARKET_CLOSED")
             self.assertEqual(sun_res["discovery_reel"], "SKIPPED_MARKET_CLOSED")
-            self.assertEqual(sun_res["morning_bouquet"], "SKIPPED_MARKET_CLOSED")
+            self.assertNotIn("digest_dispatch", sun_res)
             self.assertEqual(sun_res["msme_ingest"], "INGESTED_15")
             self.assertEqual(sun_res["stock_ingestion"]["status"], "OK")
             mock_bouquet.assert_not_called()
@@ -428,7 +473,7 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
         mock_fund_audit.assert_called_once()
 
     def test_local_email_guard_skips_bouquet_lease_when_live_dispatch_disabled(self):
-        """Local non-cloud hosts must return SKIPPED_LOCAL_GUARD without locking morning_bouquet_{date}."""
+        """Local non-cloud hosts must return SKIPPED_LOCAL_GUARD without locking digest_<kind>_{date}."""
         from scripts.run_scheduled_pipeline import _dispatch_bouquet_phase
 
         results = {}
@@ -444,7 +489,7 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
              patch("core.notify._is_test_runtime", return_value=False):
             _dispatch_bouquet_phase(results, "2026-11-02", force=False, respect_market_calendar=True)
 
-        self.assertEqual(results["morning_bouquet"], "SKIPPED_LOCAL_GUARD")
+        self.assertEqual(results["digest_dispatch"], "SKIPPED_LOCAL_GUARD")
         self.assertEqual(leased_names, [])
 
     @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
@@ -453,7 +498,7 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
     @patch("core.msme.daily_ingest.ingest_daily_msme_cohort", return_value=15)
     @patch("core.db.digest.has_edition_been_dispatched", return_value=True)
     @patch("scripts.synthesize_pending_equities.synthesize_pending_cohort", return_value=2)
-    def test_morning_and_evening_trigger_synthesize_pending_cohort_when_deferred(
+    def test_close_run_triggers_synthesize_pending_cohort_when_deferred(
         self,
         mock_synth_cohort,
         mock_has_dispatched,
@@ -462,8 +507,7 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
         mock_record_event,
         mock_prune,
     ):
-        """Deferred Rule-4 candidates in morning or evening stock ingestion must invoke synthesize_pending_cohort."""
-        from scripts.run_scheduled_pipeline import run_evening_harvest_pipeline
+        """Deferred Rule-4 candidates in close-run stock ingestion must invoke synthesize_pending_cohort under the AI budget."""
 
         deferred_payload = {
             "status": "pending_synthesis",
@@ -473,16 +517,15 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
             "pending_tickers": ["UNARCHIVED_ONE", "UNARCHIVED_TWO"],
         }
         with patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease), \
-             patch("core.analysis.daily_stock_ingestion.ingest_daily_stock_cohort", side_effect=[dict(deferred_payload), dict(deferred_payload)]):
-            m_res = run_morning_pipeline("2026-11-02", force=False)
+             patch("core.analysis.daily_stock_ingestion.ingest_daily_stock_cohort", return_value=dict(deferred_payload)):
             e_res = run_evening_harvest_pipeline("2026-11-01", force=False, respect_market_calendar=True)
 
-        self.assertEqual(mock_synth_cohort.call_count, 2)
-        mock_synth_cohort.assert_called_with(limit=15, tickers=["UNARCHIVED_ONE", "UNARCHIVED_TWO"])
-        self.assertEqual(m_res["stock_ingestion"]["compiled_from_pending"], 2)
-        self.assertEqual(m_res["stock_ingestion"]["ingested_count"], 2)
-        self.assertEqual(m_res["stock_ingestion"]["status"], "success")
+        self.assertEqual(mock_synth_cohort.call_count, 1)
+        mock_synth_cohort.assert_called_with(
+            limit=15, tickers=["UNARCHIVED_ONE", "UNARCHIVED_TWO"], deadline_monotonic=ANY
+        )
         self.assertEqual(e_res["stock_ingestion"]["compiled_from_pending"], 2)
+        self.assertEqual(e_res["stock_ingestion"]["ingested_count"], 2)
         self.assertEqual(e_res["stock_ingestion"]["status"], "success")
 
     @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
@@ -626,9 +669,9 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
              patch("core.db.digest.has_edition_been_dispatched", return_value=True) as mock_has_disp, \
              patch("core.notify.dispatch_research_bouquet") as mock_bouquet:
             _dispatch_bouquet_phase(results_suppressed, "2026-11-03", force=True, respect_market_calendar=True)
-            mock_has_disp.assert_called_once_with("2026-11-03")
+            mock_has_disp.assert_called_once_with("2026-11-03", edition_kind="MARKET_CLOSE")
             mock_bouquet.assert_not_called()
-            self.assertEqual(results_suppressed["morning_bouquet"], "ALREADY_DISPATCHED")
+            self.assertEqual(results_suppressed["digest_dispatch"], "ALREADY_DISPATCHED")
 
         # 2. Weekday --force WITH FORCE_EMAIL_REDISPATCH=1 -> explicitly re-sends with force=True
         results_forced = {}
@@ -638,8 +681,8 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
              patch("core.notify.dispatch_research_bouquet", return_value={"status": "COMPLETED", "delivered": 2}) as mock_bouquet2:
             _dispatch_bouquet_phase(results_forced, "2026-11-03", force=True, respect_market_calendar=True)
             mock_has_disp2.assert_not_called()
-            mock_bouquet2.assert_called_once_with(edition_date="2026-11-03", force=True)
-            self.assertEqual(results_forced["morning_bouquet"], "COMPLETED")
+            mock_bouquet2.assert_called_once_with(edition_date="2026-11-03", edition_kind="MARKET_CLOSE", force=True)
+            self.assertEqual(results_forced["digest_dispatch"], "COMPLETED")
 
     @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
     @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
@@ -676,7 +719,7 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
         mock_etf.assert_called_once_with(force_refresh=True)
         mock_disc.assert_called_once()
         mock_bouquet.assert_not_called()
-        self.assertEqual(sun_res["morning_bouquet"], "SKIPPED_MARKET_CLOSED")
+        self.assertNotIn("digest_dispatch", sun_res)
 
     def test_sync_amfi_diff_mode_honors_force_refresh_flag(self):
         """scripts/sync_amfi.py --diff-mode --force-refresh must refresh NAVAll.txt before scan_mutual_funds."""

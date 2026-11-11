@@ -15,6 +15,7 @@ import re
 import json
 import math
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Set, Tuple
 
@@ -910,7 +911,9 @@ def recalculate_affected_mutual_funds(
 def ingest_daily_stock_cohort(
     edition_date: Optional[str] = None,
     count: Optional[int] = None,
-    skip_gemini: bool = False
+    skip_gemini: bool = False,
+    workers: int = 1,
+    deadline_monotonic: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Main Daily 08:30 AM Orchestrator:
@@ -919,6 +922,10 @@ def ingest_daily_stock_cohort(
     3. Archives to reports.db and generates today's /discovery Morning Discovery Reel.
     4. Automatically recalculates all affected mutual fund look-through metrics.
     5. Records autonomous audit event.
+
+    `workers` > 1 fetches exchange data and generates AI reports concurrently (archiving stays
+    serial). Once `deadline_monotonic` passes, no new AI generation starts: remaining equities are
+    reused from an existing verified archive or left PENDING (never a fallback report).
     """
     if not edition_date:
         edition_date = datetime.now(IST).strftime("%Y-%m-%d")
@@ -952,9 +959,18 @@ def ingest_daily_stock_cohort(
     resolved_data_map: Dict[str, Dict[str, Any]] = {}
     batch_reports_map: Dict[str, Dict[str, Any]] = {}
 
-    for item in queue:
-        t_clean = clean_ticker(item.get("ticker", ""))
-        resolved_data_map[t_clean] = _resolve_candidate_stock_data(item)
+    worker_count = max(1, int(workers or 1))
+    if worker_count > 1 and len(queue) > 1:
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=min(worker_count, len(queue)), thread_name_prefix="cohort-data") as pool:
+            resolved_list = list(pool.map(_resolve_candidate_stock_data, queue))
+        for item, s_data in zip(queue, resolved_list):
+            resolved_data_map[clean_ticker(item.get("ticker", ""))] = s_data
+    else:
+        for item in queue:
+            t_clean = clean_ticker(item.get("ticker", ""))
+            resolved_data_map[t_clean] = _resolve_candidate_stock_data(item)
 
     api_key = get_secret("GEMINI_API_KEY")
     if not skip_gemini and api_key and len(api_key.strip()) > 10:
@@ -978,6 +994,8 @@ def ingest_daily_stock_cohort(
                 batch_reports_map = synthesize_batch_stock_reports(
                     batch_inputs,
                     edition_label=f"daily-ingestion-{edition_date}",
+                    workers=worker_count,
+                    deadline_monotonic=deadline_monotonic,
                 )
             except Exception as batch_err:
                 logger.warning(f"Gemini Batch API cohort notice: {batch_err}")
@@ -989,12 +1007,18 @@ def ingest_daily_stock_cohort(
     pending_tickers: List[str] = []
     discovery_reel_items = []
 
+    budget_exhausted = False
     for item in queue:
         try:
             t_clean = clean_ticker(item.get("ticker", ""))
+            item_skip_gemini = skip_gemini
+            if deadline_monotonic is not None and time.monotonic() >= deadline_monotonic:
+                # Budget spent: no new AI calls; reuse a verified archive or stay PENDING.
+                budget_exhausted = True
+                item_skip_gemini = True
             res = synthesize_and_archive_stock_dossier(
                 item,
-                skip_gemini=skip_gemini,
+                skip_gemini=item_skip_gemini,
                 pre_synthesized_report=batch_reports_map.get(t_clean),
                 resolved_stock_data=resolved_data_map.get(t_clean),
             )
@@ -1135,5 +1159,6 @@ def ingest_daily_stock_cohort(
         "pending_tickers": pending_tickers,
         "affected_funds_count": len(recalculated_funds),
         "recalculated_funds": recalculated_funds,
+        "budget_exhausted": budget_exhausted,
         "progress_stats": get_ingestion_progress_stats()
     }

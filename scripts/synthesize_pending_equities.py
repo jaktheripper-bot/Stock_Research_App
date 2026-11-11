@@ -415,8 +415,11 @@ def synthesize_pending_batch(
     tickers: Optional[List[str]] = None,
     delay: float = 3.0,
     max_retries: int = 2,
+    deadline_monotonic: Optional[float] = None,
 ) -> Dict[str, Any]:
-    """Compiles pending equity reports via `generate_stock_report` with strict fail-closed validation."""
+    """Compiles pending equity reports via `generate_stock_report` with strict fail-closed validation.
+
+    No new equity is started once `deadline_monotonic` passes; the rest stay PENDING for the next run."""
     from core.analysis.dossier_report_synthesis import generate_stock_report
     from core.db.fundamentals import extract_fundamentals_from_report_text, save_cached_fundamentals
 
@@ -438,6 +441,12 @@ def synthesize_pending_batch(
     logger.info("Starting fail-closed 7-pillar synthesis for %d pending equities...", total)
 
     for idx, (sym, sname, bucket) in enumerate(queue, start=1):
+        if deadline_monotonic is not None and time.monotonic() >= deadline_monotonic:
+            logger.warning(
+                "AI time budget reached: stopping pending synthesis after %d of %d; the rest stay PENDING.",
+                idx - 1, total,
+            )
+            break
         canon = _resolve_target_symbol(sym)
         logger.info("[%d/%d] [%s] Synthesizing %s (%s)...", idx, total, bucket, sym, sname)
         ok = False
@@ -499,6 +508,7 @@ def synthesize_pending_cohort(
     tickers: Optional[List[str]] = None,
     delay: float = 2.0,
     max_retries: int = 2,
+    deadline_monotonic: Optional[float] = None,
 ) -> int:
     """Compiles deferred/pending equity candidates, re-audits affected MFs, and returns compiled count."""
     if os.environ.get("TESTING") == "1" and os.environ.get("ALLOW_PENDING_SYNTH_IN_TEST") != "1":
@@ -510,6 +520,7 @@ def synthesize_pending_cohort(
         tickers=tickers,
         delay=delay,
         max_retries=max_retries,
+        deadline_monotonic=deadline_monotonic,
     )
     compiled_n = int(batch_res.get("compiled", 0) or 0)
     compiled_syms = batch_res.get("compiled_tickers") or []

@@ -17,6 +17,7 @@ Enforces:
 - Statutory 1-click unsubscribe per IT Rules 2021 & anti-spam regulations
 """
 
+import re
 import hashlib
 import logging
 import os
@@ -112,6 +113,22 @@ def _truncate_clean(text: Any, max_chars: int = 190) -> str:
         return raw
     clipped = raw[: max_chars - 3].rsplit(" ", 1)[0]
     return f"{clipped}..."
+
+
+_HTML_SECTION_NUM_RE = re.compile(r'(<div class="section-title">)\d+\. ')
+_TEXT_SECTION_NUM_RE = re.compile(r"^\d+\. (?=[A-Z])", re.M)
+
+
+def _renumber_html_sections(html: str) -> str:
+    """Numbers the rendered section titles 1..n so split editions never skip numbers."""
+    counter = iter(range(1, 100))
+    return _HTML_SECTION_NUM_RE.sub(lambda m: f"{m.group(1)}{next(counter)}. ", html)
+
+
+def _renumber_text_sections(text: str) -> str:
+    """Plain-text counterpart of `_renumber_html_sections` for headings like "6. MUTUAL FUND ..."."""
+    counter = iter(range(1, 100))
+    return _TEXT_SECTION_NUM_RE.sub(lambda m: f"{next(counter)}. ", text)
 
 
 def _date_index(seed_prefix: str, date_str: str, pool_len: int) -> int:
@@ -745,48 +762,124 @@ def _load_live_savings_posture(date_str: str) -> Dict[str, Any]:
         return {}
 
 
+# Email editions (option B). MARKET_CLOSE is sent at 19:30 IST for the trading day; FUND_NAV at
+# 07:30 IST with the prior night's official AMFI NAVs. `edition_kind=None` keeps the full 8-section
+# compilation used by the mobile brief and the admin preview.
+EDITION_SECTIONS: Dict[str, tuple] = {
+    "MARKET_CLOSE": ("equities", "sovereign", "corporate_debt", "reits_sgb", "msme", "fixed_savings"),
+    "FUND_NAV": ("etfs", "mutual_funds"),
+}
+# Sections that must hold live data before an edition is sent (fail closed otherwise).
+EDITION_REQUIRED_SECTIONS: Dict[str, tuple] = {
+    "MARKET_CLOSE": ("equities", "sovereign", "corporate_debt", "reits_sgb", "msme"),
+    "FUND_NAV": ("etfs", "mutual_funds"),
+}
+_ALL_SECTIONS = ("equities", "sovereign", "corporate_debt", "etfs", "reits_sgb", "mutual_funds", "msme", "fixed_savings")
+_LEGACY_REQUIRED = ("equities", "sovereign", "corporate_debt", "etfs", "reits_sgb", "mutual_funds", "msme")
+
+
+def _edition_copy(edition_kind: Optional[str], date_label: str, formatted_date: str) -> Dict[str, str]:
+    if edition_kind == "MARKET_CLOSE":
+        return {
+            "subject": f"Moatnomics Market Close Wrap: Equities, Bonds, Real Assets & Savings ({date_label})",
+            "kicker": "Market Close Wrap &bull; Post-Close Intelligence",
+            "kicker_text": "MOATNOMICS MARKET CLOSE WRAP — POST-CLOSE DIGEST",
+            "intro": (
+                "Good evening. Here is today's post-close breakdown across listed equities, sovereign yields, "
+                "corporate credit, real assets &amp; gold parity, unlisted MSME enterprises and fixed savings."
+            ),
+            "intro_text": (
+                "Good evening. Here is today's post-close breakdown across listed equities, sovereign yields, "
+                "corporate credit, real assets & gold parity, unlisted MSME enterprises and fixed savings."
+            ),
+        }
+    if edition_kind == "FUND_NAV":
+        return {
+            "subject": f"Moatnomics Fund NAV Update: Mutual Funds & ETFs ({date_label})",
+            "kicker": "Fund NAV Update &bull; Official AMFI NAVs",
+            "kicker_text": "MOATNOMICS FUND NAV UPDATE — MUTUAL FUNDS & ETFS",
+            "intro": (
+                f"Good morning. Here is the mutual fund and ETF update built on the official AMFI NAVs "
+                f"published for {formatted_date}."
+            ),
+            "intro_text": (
+                f"Good morning. Here is the mutual fund and ETF update built on the official AMFI NAVs "
+                f"published for {formatted_date}."
+            ),
+        }
+    return {
+        "subject": f"Moatnomics Day-End Market Wrap: Multi-Asset Close & Forensic Signals ({date_label})",
+        "kicker": "Day-End 7-Asset Market Wrap &bull; Post-Close Intelligence",
+        "kicker_text": "MOATNOMICS DAY-END MARKET WRAP — 7-ASSET POST-CLOSE DIGEST",
+        "intro": (
+            "Good evening. Here is today's post-settlement breakdown across listed equities, sovereign yields, "
+            "corporate credit, ETFs, real assets &amp; gold parity, mutual fund look-through audits, and unlisted MSME enterprises."
+        ),
+        "intro_text": "Good evening. Here is today's post-settlement breakdown across all seven asset classes.",
+    }
+
+
 def compile_research_bouquet(
     edition_date: Optional[str] = None,
     require_live_data: bool = False,
+    edition_kind: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Compiles the multi-asset Day-End Market Wrap from live database tables.
-    When `require_live_data=True`, raises `BouquetDataUnavailableError` if any required live pillar is empty.
+    Compiles a research email edition from live database tables.
+
+    `edition_kind` selects the sections: "MARKET_CLOSE" (19:30 IST), "FUND_NAV" (07:30 IST) or None
+    (all 8 sections). When `require_live_data=True`, raises `BouquetDataUnavailableError` if any
+    section required by that edition is empty.
     """
     from core.db.connection import IST
+
+    kind = str(edition_kind).strip().upper() if edition_kind else None
+    if kind is not None and kind not in EDITION_SECTIONS:
+        raise ValueError(f"Unknown research email edition kind: {edition_kind!r}")
+    sections = EDITION_SECTIONS[kind] if kind else _ALL_SECTIONS
 
     date_str = edition_date or datetime.now(IST).strftime("%Y-%m-%d")
     formatted_date = datetime.strptime(date_str[:10], "%Y-%m-%d").strftime("%A, %B %d, %Y")
 
-    equity_picks = _load_live_equities(date_str, limit=3)
-    sovereign_posture = _load_live_sovereign_posture(date_str)
-    corporate_debt = _load_live_corporate_debt(date_str)
-    etf_highlight = _load_live_etf_highlight(date_str)
-    reits_sgb = _load_live_reits_and_sgb(date_str)
-    mf_highlight = _load_live_mf_highlight(date_str)
-    msme_highlight = _load_live_msme_highlight(date_str)
-    savings_highlight = _load_live_savings_posture(date_str)
+    loaders = {
+        "equities": lambda: _load_live_equities(date_str, limit=3),
+        "sovereign": lambda: _load_live_sovereign_posture(date_str),
+        "corporate_debt": lambda: _load_live_corporate_debt(date_str),
+        "etfs": lambda: _load_live_etf_highlight(date_str),
+        "reits_sgb": lambda: _load_live_reits_and_sgb(date_str),
+        "mutual_funds": lambda: _load_live_mf_highlight(date_str),
+        "msme": lambda: _load_live_msme_highlight(date_str),
+        "fixed_savings": lambda: _load_live_savings_posture(date_str),
+    }
+    loaded = {name: (loaders[name]() if name in sections else ([] if name == "equities" else {})) for name in _ALL_SECTIONS}
+    equity_picks = loaded["equities"]
+    sovereign_posture = loaded["sovereign"]
+    corporate_debt = loaded["corporate_debt"]
+    etf_highlight = loaded["etfs"]
+    reits_sgb = loaded["reits_sgb"]
+    mf_highlight = loaded["mutual_funds"]
+    msme_highlight = loaded["msme"]
+    savings_highlight = loaded["fixed_savings"]
 
+    copy = _edition_copy(kind, date_str[:10], formatted_date)
     if require_live_data:
-        required_map = {
-            "equities": equity_picks,
-            "sovereign": sovereign_posture,
-            "corporate_debt": corporate_debt,
-            "etfs": etf_highlight,
-            "reits_sgb": reits_sgb,
-            "mutual_funds": mf_highlight,
-            "msme": msme_highlight,
-        }
-        missing = [name for name, val in required_map.items() if not val]
+        required = EDITION_REQUIRED_SECTIONS[kind] if kind else _LEGACY_REQUIRED
+        missing = [name for name in required if not loaded[name]]
         if missing:
             raise BouquetDataUnavailableError(
-                f"Cannot compile live Day-End Market Wrap for {date_str}; missing live pillars: {', '.join(missing)}"
+                f"Cannot compile live {kind or 'Day-End Market Wrap'} edition for {date_str}; "
+                f"missing live sections: {', '.join(missing)}"
             )
 
     return {
         "edition_date": date_str[:10],
+        "edition_kind": kind,
         "formatted_date": formatted_date,
-        "subject": f"Moatnomics Day-End Market Wrap: Multi-Asset Close & Forensic Signals ({date_str[:10]})",
+        "subject": copy["subject"],
+        "header_kicker": copy["kicker"],
+        "header_kicker_text": copy["kicker_text"],
+        "intro_html": copy["intro"],
+        "intro_text": copy["intro_text"],
         "equities": equity_picks,
         "sovereign": sovereign_posture,
         "corporate_debt": corporate_debt,
@@ -1039,7 +1132,13 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
         utm_content="terminal_cta",
     )
 
-    return f"""<!DOCTYPE html>
+    equities_block = (
+        f'<div class="section-title">1. Listed Equities &mdash; Post-Close Discovery Cohort</div>\n      {equities_html}'
+        if equities_html.strip()
+        else ""
+    )
+
+    return _renumber_html_sections(f"""<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -1063,7 +1162,7 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
   <div class="wrapper">
     <div class="header">
       <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #C7E268; font-weight: 700; margin-bottom: 4px;">
-        Day-End 7-Asset Market Wrap &bull; Post-Close Intelligence
+        {bouquet.get('header_kicker') or 'Day-End 7-Asset Market Wrap &bull; Post-Close Intelligence'}
       </div>
       <h1>MOATNOMICS RESEARCH</h1>
       <p>{bouquet.get('formatted_date')} &bull; Prepared for {user_name}</p>
@@ -1071,11 +1170,10 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
 
     <div class="content">
       <p style="font-size: 14px; margin-top: 0; color: #334155;">
-        Good evening. Here is today's post-settlement breakdown across listed equities, sovereign yields, corporate credit, ETFs, real assets &amp; gold parity, mutual fund look-through audits, and unlisted MSME enterprises.
+        {bouquet.get('intro_html') or _edition_copy(None, edition_date, str(bouquet.get('formatted_date') or ''))['intro']}
       </p>
 
-      <div class="section-title">1. Listed Equities &mdash; Post-Close Discovery Cohort</div>
-      {equities_html}
+      {equities_block}
       {sov_html}
       {debt_html}
       {etf_html}
@@ -1106,7 +1204,7 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
   </div>
 </body>
 </html>
-"""
+""")
 
 
 def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, Any]] = None) -> str:
@@ -1121,17 +1219,20 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
 
     lines = [
         "===============================================================",
-        "MOATNOMICS DAY-END MARKET WRAP — 7-ASSET POST-CLOSE DIGEST",
+        bouquet.get("header_kicker_text") or "MOATNOMICS DAY-END MARKET WRAP — 7-ASSET POST-CLOSE DIGEST",
         "===============================================================",
         f"Edition Date: {bouquet.get('formatted_date')}",
         f"Recipient:    {user_name}",
         "",
-        "Good evening. Here is today's post-settlement breakdown across all seven asset classes.",
+        bouquet.get("intro_text") or "Good evening. Here is today's post-settlement breakdown across all seven asset classes.",
         "",
-        "---------------------------------------------------------------",
-        "1. LISTED EQUITIES — POST-CLOSE DISCOVERY COHORT",
-        "---------------------------------------------------------------",
     ]
+    if bouquet.get("equities"):
+        lines.extend([
+            "---------------------------------------------------------------",
+            "1. LISTED EQUITIES — POST-CLOSE DISCOVERY COHORT",
+            "---------------------------------------------------------------",
+        ])
     for eq in bouquet.get("equities") or []:
         eq_ticker = str(eq.get("ticker") or "").strip()
         link = build_tracked_link(
@@ -1266,4 +1367,4 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
             "",
         ]
     )
-    return "\n".join(lines)
+    return _renumber_text_sections("\n".join(lines))

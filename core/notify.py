@@ -434,12 +434,16 @@ def dispatch_research_bouquet(
     test_recipient: Optional[str] = None,
     only_active_pro: bool = False,
     force: bool = False,
+    edition_kind: str = "MARKET_CLOSE",
 ) -> dict:
     """
-    Dispatches the Day-End 7-Asset Market Wrap & Research Bouquet to subscribers or a test recipient.
-    Supports Resend API and SMTP with graceful mock/logging fallback.
-    Fails closed (`BouquetDataUnavailableError`) if any of the 7 asset classes lack live database rows.
-    Records delivery in digest_dispatches.
+    Dispatches one research email edition to subscribers or a test recipient.
+
+    `edition_kind`: "MARKET_CLOSE" (19:30 IST: equities, sovereign, debt, REITs/SGBs, MSME, savings)
+    or "FUND_NAV" (07:30 IST: mutual fund look-through + ETF matrix on the night's AMFI NAVs).
+    Supports Resend API and SMTP with graceful mock/logging fallback. Fails closed
+    (`BouquetDataUnavailableError`) if a section that edition requires lacks live rows.
+    Records delivery in digest_dispatches with its edition kind (one send per date and kind).
     """
     from datetime import datetime, timezone, timedelta
     from core.analysis.research_bouquet import (
@@ -458,9 +462,9 @@ def dispatch_research_bouquet(
     target_date = edition_date or datetime.now(IST).strftime("%Y-%m-%d")
 
     # Fast-path idempotency guard: short-circuit before expensive multi-asset compilation
-    if not test_recipient and not force and has_edition_been_dispatched(target_date):
+    if not test_recipient and not force and has_edition_been_dispatched(target_date, edition_kind=edition_kind):
         logger.info(
-            f"[DISPATCH] Day-End Research Bouquet for {target_date} already dispatched. Skipping duplicate send."
+            f"[DISPATCH] {edition_kind} edition for {target_date} already dispatched. Skipping duplicate send."
         )
         return {
             "success": True,
@@ -474,7 +478,7 @@ def dispatch_research_bouquet(
             "recipients": 0,
         }
 
-    bouquet = compile_research_bouquet(edition_date=target_date, require_live_data=True)
+    bouquet = compile_research_bouquet(edition_date=target_date, require_live_data=True, edition_kind=edition_kind)
     sender_email = _get_cfg("SMTP_FROM") or _get_cfg("RESEND_FROM") or _get_cfg("SMTP_USER") or "noreply@moatnomics.com"
 
     if test_recipient:
@@ -505,7 +509,8 @@ def dispatch_research_bouquet(
             failed_count=0 if delivered else 1,
             status="TEST_SENT",
             html_content=html,
-            plain_text_content=text
+            plain_text_content=text,
+            edition_kind=edition_kind,
         )
 
         return {
@@ -573,7 +578,8 @@ def dispatch_research_bouquet(
         failed_count=failed_count,
         status="COMPLETED" if failed_count == 0 else "PARTIAL",
         html_content=sample_html,
-        plain_text_content=sample_text
+        plain_text_content=sample_text,
+        edition_kind=edition_kind,
     )
 
     return {

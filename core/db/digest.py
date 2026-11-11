@@ -192,6 +192,37 @@ def set_user_digest_subscription(token_or_email: str, subscribe: bool) -> bool:
         conn.close()
 
 
+DIGEST_EDITION_KINDS = ("MARKET_CLOSE", "FUND_NAV")
+
+
+def _normalize_edition_kind(edition_kind: Optional[str]) -> str:
+    kind = str(edition_kind or "MARKET_CLOSE").strip().upper()
+    if kind not in DIGEST_EDITION_KINDS:
+        raise ValueError(f"Unknown digest edition kind: {edition_kind!r}")
+    return kind
+
+
+def ensure_digest_edition_kind_column(cursor, is_pg: bool) -> None:
+    """Migration v053: adds `edition_kind` to digest_dispatches; legacy rows become MARKET_CLOSE."""
+    if is_pg:
+        cursor.execute(
+            "ALTER TABLE digest_dispatches ADD COLUMN IF NOT EXISTS edition_kind VARCHAR(32) NOT NULL DEFAULT 'MARKET_CLOSE';"
+        )
+    else:
+        cursor.execute("PRAGMA table_info(digest_dispatches);")
+        cols = {str(r[1]) for r in cursor.fetchall()}
+        if "edition_kind" not in cols:
+            cursor.execute(
+                "ALTER TABLE digest_dispatches ADD COLUMN edition_kind VARCHAR(32) NOT NULL DEFAULT 'MARKET_CLOSE';"
+            )
+    cursor.execute(
+        "UPDATE digest_dispatches SET edition_kind = 'MARKET_CLOSE' WHERE edition_kind IS NULL OR edition_kind = '';"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_digest_dispatches_date_kind ON digest_dispatches (edition_date, edition_kind, status);"
+    )
+
+
 def record_digest_dispatch(
     edition_date: str,
     subject: str,
@@ -201,9 +232,11 @@ def record_digest_dispatch(
     status: str = "COMPLETED",
     html_content: str = "",
     plain_text_content: str = "",
-    dispatch_id: Optional[str] = None
+    dispatch_id: Optional[str] = None,
+    edition_kind: str = "MARKET_CLOSE",
 ) -> str:
     """Records an executed or test research bouquet dispatch in the database."""
+    kind = _normalize_edition_kind(edition_kind)  # raises on an unknown kind before touching the DB
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -214,15 +247,15 @@ def record_digest_dispatch(
         cursor.execute(
             f"""
             INSERT INTO digest_dispatches (
-                id, edition_date, subject, recipients_count, delivered_count, 
-                failed_count, status, html_content, plain_text_content
+                id, edition_date, subject, recipients_count, delivered_count,
+                failed_count, status, html_content, plain_text_content, edition_kind
             )
-            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p});
+            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p});
             """,
             (
                 did, str(edition_date), str(subject), int(recipients_count),
                 int(delivered_count), int(failed_count), str(status),
-                str(html_content), str(plain_text_content)
+                str(html_content), str(plain_text_content), kind
             )
         )
         conn.commit()
@@ -490,10 +523,10 @@ def get_digest_dispatch_history(limit: int = 15) -> List[Dict[str, Any]]:
     return history
 
 
-def has_edition_been_dispatched(edition_date: str) -> bool:
+def has_edition_been_dispatched(edition_date: str, edition_kind: str = "MARKET_CLOSE") -> bool:
     """
-    Idempotency guard: returns True if a broadcast for `edition_date` has already
-    been recorded with status COMPLETED or PARTIAL in `digest_dispatches`.
+    Idempotency guard: returns True if a broadcast of `edition_kind` for `edition_date` has
+    already been recorded with status COMPLETED or PARTIAL in `digest_dispatches`.
     """
     if not edition_date or not str(edition_date).strip():
         return False
@@ -508,10 +541,11 @@ def has_edition_been_dispatched(edition_date: str) -> bool:
             f"""
             SELECT 1 FROM digest_dispatches
             WHERE edition_date = {p}
+              AND edition_kind = {p}
               AND status IN ('COMPLETED', 'PARTIAL')
             LIMIT 1;
             """,
-            (clean_date,),
+            (clean_date, _normalize_edition_kind(edition_kind)),
         )
         return cursor.fetchone() is not None
     except Exception as e:
