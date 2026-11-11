@@ -876,6 +876,22 @@ def run_nightly_pipeline(
         force=force,
     )
 
+    # 6. Mailer privacy retention: per-recipient email events older than 90 days are rolled into
+    #    per-edition totals and deleted (7/7 days).
+    def _mailer_event_retention():
+        from core.db.digest import purge_expired_recipient_events
+
+        return purge_expired_recipient_events()
+
+    _run_leased_phase(
+        results,
+        "mailer_event_retention",
+        f"digest_event_retention_{date_str}",
+        "Nightly Phase 6: Mailer Event 90-Day Retention",
+        _mailer_event_retention,
+        force=force,
+    )
+
     record_autonomous_event(
         event_type="NIGHTLY_PIPELINE_COMPLETE",
         ticker="MULTI_ASSET",

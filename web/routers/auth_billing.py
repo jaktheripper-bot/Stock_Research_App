@@ -859,6 +859,34 @@ async def api_get_currencies(request: Request):
     })
 
 
+@router.post("/api/webhooks/resend")
+async def api_resend_webhook(request: Request):
+    """
+    Resend delivery/open webhook for the two research mailers (Market Close Wrap, Fund NAV Update).
+    Verifies the Svix signature over the raw body with RESEND_WEBHOOK_SECRET (fail closed: an unset
+    secret, bad signature or stale timestamp returns 401 and writes nothing), then records the event
+    per recipient and applies bounce/complaint pause rules. Idempotent on `svix-id`.
+    """
+    from core.config import get_secret
+    from core.db.digest import apply_resend_event, verify_resend_webhook
+
+    raw_body = await request.body()
+    secret = (get_secret("RESEND_WEBHOOK_SECRET") or os.environ.get("RESEND_WEBHOOK_SECRET") or "").strip()
+    if not verify_resend_webhook(raw_body, dict(request.headers), secret):
+        logger.warning("Rejected Resend webhook: missing secret or invalid/stale signature.")
+        raise HTTPException(status_code=401, detail="Invalid webhook signature.")
+    try:
+        event = json.loads(raw_body.decode("utf-8"))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Malformed webhook JSON.") from exc
+
+    outcome = apply_resend_event(event, request.headers.get("svix-id", ""))
+    if outcome == "ERROR":
+        # 5xx makes Resend retry the delivery later.
+        raise HTTPException(status_code=500, detail="Event could not be stored.")
+    return JSONResponse(status_code=200, content={"status": outcome})
+
+
 @router.get("/api/notifications/unsubscribe")
 async def api_unsubscribe_notifications(request: Request, token: Optional[str] = None, email: Optional[str] = None):
     """

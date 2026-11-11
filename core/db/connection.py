@@ -3093,6 +3093,17 @@ def init_db(force: bool = False):
                 )
                 conn.commit()
 
+            # Migration v054: per-recipient mailer events (delivery/bounce/complaint/open), 90-day retention totals, pause fields
+            if "v054_digest_recipient_events" not in applied:
+                logger.info("Applying schema migration: v054_digest_recipient_events...")
+                from core.db.digest import ensure_digest_tracking_tables
+
+                ensure_digest_tracking_tables(cursor, is_pg=bool(supabase_url))
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version) VALUES ('v054_digest_recipient_events') ON CONFLICT DO NOTHING;"
+                )
+                conn.commit()
+
             _DB_INITIALIZED = True
             _INITIALIZED_DBS.add(target_key)
         except Exception as e:

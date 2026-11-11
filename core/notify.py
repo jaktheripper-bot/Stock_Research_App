@@ -12,7 +12,7 @@ import smtplib
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Optional
+from typing import Optional, Dict
 
 from core.db import record_alert_event
 from core.config import get_secret
@@ -127,10 +127,23 @@ def get_email_service_status() -> dict:
 
 
 def _dispatch_via_resend(from_email: str, to_email: str, subject: str, text: str, html: Optional[str] = None) -> bool:
-    """Dispatches outgoing email via Resend HTTP REST API."""
+    """Dispatches outgoing email via Resend HTTP REST API. Returns True when accepted."""
+    return _send_via_resend(from_email, to_email, subject, text, html=html) is not None
+
+
+def _send_via_resend(
+    from_email: str,
+    to_email: str,
+    subject: str,
+    text: str,
+    html: Optional[str] = None,
+    tags: Optional[Dict[str, str]] = None,
+) -> Optional[str]:
+    """Sends via Resend. Returns Resend's message id ("" when the local/test guard blocked a live call),
+    or None when the send failed. `tags` are echoed back in Resend webhook events."""
     resend_api_key = _get_cfg("RESEND_API_KEY")
     if not resend_api_key:
-        return False
+        return None
     try:
         import json
         import urllib.request
@@ -144,7 +157,7 @@ def _dispatch_via_resend(from_email: str, to_email: str, subject: str, text: str
                 to_email,
                 subject,
             )
-            return True
+            return ""
 
         try:
             import certifi
@@ -162,6 +175,13 @@ def _dispatch_via_resend(from_email: str, to_email: str, subject: str, text: str
         }
         if html:
             payload["html"] = html
+        if tags:
+            # Resend tag names/values allow ASCII letters, digits, underscores and dashes only.
+            payload["tags"] = [
+                {"name": str(k), "value": "".join(ch if (ch.isalnum() or ch in "_-") else "_" for ch in str(v))}
+                for k, v in tags.items()
+                if v is not None
+            ]
 
         req = urllib.request.Request(
             "https://api.resend.com/emails",
@@ -175,13 +195,20 @@ def _dispatch_via_resend(from_email: str, to_email: str, subject: str, text: str
         )
         with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
             if resp.status in (200, 201):
+                message_id = ""
+                try:
+                    body = resp.read()
+                    if isinstance(body, (bytes, bytearray)) and body:
+                        message_id = str((json.loads(body.decode("utf-8")) or {}).get("id") or "")
+                except Exception as parse_err:
+                    logger.warning("Resend accepted email to %s but the response id was unreadable: %s", to_email, parse_err)
                 logger.info("Dispatched email via Resend API to %s (Subject: %s)", to_email, subject)
-                return True
+                return message_id
             logger.error("Resend API responded with unexpected status %s for %s", resp.status, to_email)
-            return False
+            return None
     except Exception as e:
         logger.error("Error dispatching email via Resend API to %s: %s", to_email, e)
-        return False
+        return None
 
 
 def _dispatch_via_smtp(from_email: str, to_email: str, subject: str, text: str, html: Optional[str] = None) -> bool:
@@ -539,6 +566,15 @@ def dispatch_research_bouquet(
 
     delivered_count = 0
     failed_count = 0
+    import uuid as _uuid
+
+    dispatch_id = f"dsp_{_uuid.uuid4().hex[:12]}"
+    edition_tags = {
+        "edition_kind": edition_kind,
+        "edition_date": str(bouquet["edition_date"]),
+        "dispatch_id": dispatch_id,
+    }
+    sent_rows = []  # (user_id, email, resend_message_id) for per-recipient delivery tracking
 
     # Render a baseline copy for archive
     sample_html = render_bouquet_html(bouquet, subscriber=subscribers[0])
@@ -555,7 +591,10 @@ def dispatch_research_bouquet(
 
             ok = False
             if _get_cfg("RESEND_API_KEY"):
-                ok = _dispatch_via_resend(sender_email, sub_email, subj, text, html=html)
+                message_id = _send_via_resend(sender_email, sub_email, subj, text, html=html, tags=edition_tags)
+                ok = message_id is not None
+                if ok:
+                    sent_rows.append((sub.get("id"), sub_email, message_id))
             elif _get_cfg("SMTP_HOST") and _get_cfg("SMTP_USER") and _get_cfg("SMTP_PASSWORD"):
                 ok = _dispatch_via_smtp(sender_email, sub_email, subj, text, html=html)
             else:
@@ -571,6 +610,7 @@ def dispatch_research_bouquet(
             failed_count += 1
 
     did = record_digest_dispatch(
+        dispatch_id=dispatch_id,
         edition_date=bouquet["edition_date"],
         subject=bouquet["subject"],
         recipients_count=len(subscribers),
@@ -581,6 +621,10 @@ def dispatch_research_bouquet(
         plain_text_content=sample_text,
         edition_kind=edition_kind,
     )
+    if sent_rows:
+        from core.db.digest import record_recipient_sends
+
+        record_recipient_sends(did, edition_kind, str(bouquet["edition_date"]), sent_rows)
 
     return {
         "success": True,

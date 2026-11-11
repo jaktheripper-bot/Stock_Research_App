@@ -4015,7 +4015,7 @@ html[data-theme="light"] .copilot-input {
           Research Bouquet &amp; Day-End Market Wrap Desk
         </h3>
         <p style="margin: 0; font-size: 13px; color: #94a3b8; line-height: 1.5;">
-          Automated multi-asset intelligence dispatches with branded open/click tracking (<code style="color: #38bdf8;" id="kpiDigestTrackingDomainHeader">{{ digest_summary.tracking_url|default('https://links.moatnomics.com') }}</code>) and statutory 1-click unsubscribe.
+          Market Close Wrap (19:30 IST) and Fund NAV Update (07:30 IST) with per-recipient delivery &amp; open tracking, UTM click attribution (<code style="color: #38bdf8;" id="kpiDigestTrackingDomainHeader">{{ digest_summary.tracking_url|default('https://links.moatnomics.com') }}</code>) and statutory 1-click unsubscribe.
         </p>
       </div>
       <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -4033,6 +4033,61 @@ html[data-theme="light"] .copilot-input {
 
     <!-- Alert / Confirmation Banner -->
     <div id="digestAlertBanner" style="display: none; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; font-weight: 600;"></div>
+
+    <!-- Mailer delivery panel: last 14 days, one row per date and email -->
+    <div class="admin-card" id="mailerDeliveryPanel" style="margin-bottom: 24px;">
+      <h4 style="margin: 0 0 6px 0; font-size: 14px; font-weight: 700;">Mailer Delivery &mdash; Last 14 Days</h4>
+      <p style="margin: 0 0 12px 0; font-size: 12px; color: #94a3b8;">
+        On time = sent within 15 minutes of schedule. &ldquo;&mdash;&rdquo; means no tracking data yet. Opens are inflated by Apple Mail image pre-loading; treat clicks as the reliable engagement signal.
+      </p>
+      <div class="table-sticky-wrap" style="overflow-x: auto; max-width: 100%;" tabindex="0" role="region" aria-label="Mailer delivery table">
+        <table class="admin-table" style="width: 100%; font-size: 12.5px;">
+          <thead>
+            <tr>
+              <th scope="col">Date</th><th scope="col">Email</th><th scope="col">Scheduled</th><th scope="col">Status</th>
+              <th scope="col">Recipients</th><th scope="col">Delivered</th><th scope="col">Bounced</th>
+              <th scope="col">Spam</th><th scope="col">Opens*</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in digest_summary.mailer_panel|default([]) %}
+            <tr>
+              <td class="mono">{{ row.edition_date }}</td>
+              <td>{{ 'Market Close Wrap' if row.edition_kind == 'MARKET_CLOSE' else 'Fund NAV Update' }}</td>
+              <td class="mono">{{ row.scheduled_at }}</td>
+              <td>
+                {% if row.timeliness == 'ON_TIME' %}<span class="badge" style="background:#10b981; color:#fff;">On time</span>
+                {% elif row.timeliness == 'LATE' %}<span class="badge" style="background:#f59e0b; color:#111827;">Late</span>
+                {% elif row.timeliness == 'NOT_SENT' %}<span class="badge" style="background:#ef4444; color:#fff;">Not sent</span>
+                {% elif row.timeliness == 'UPCOMING' %}<span class="badge" style="background:#334155; color:#e2e8f0;">Upcoming</span>
+                {% elif row.timeliness == 'NOT_DUE' %}<span style="color:#64748b;">Not due</span>
+                {% else %}<span class="badge" style="background:#334155; color:#e2e8f0;">Sent</span>{% endif %}
+              </td>
+              <td class="mono">{{ row.recipients if row.recipients is not none else '—' }}</td>
+              <td class="mono">{{ row.delivered if row.delivered is not none else '—' }}</td>
+              <td class="mono">{{ row.bounced if row.bounced is not none else '—' }}</td>
+              <td class="mono">{{ row.complaints if row.complaints is not none else '—' }}</td>
+              <td class="mono">{{ row.opens if row.opens is not none else '—' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9" style="color:#64748b;">No mailer data available.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <h4 style="margin: 18px 0 8px 0; font-size: 14px; font-weight: 700;">Paused Subscribers</h4>
+      <ul id="pausedSubscribersList" style="list-style: none; padding: 0; margin: 0; font-size: 12.5px;">
+        {% for sub in digest_summary.paused_subscribers|default([]) %}
+        <li style="display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+          <span>{{ sub.email }} &middot; <span style="color:#fbbf24;">{{ {'bounced_hard': 'Hard bounce', 'complained': 'Spam complaint', 'bounced_soft_x3': '3 soft bounces'}.get(sub.reason, sub.reason) }}</span> &middot; <span class="mono" style="color:#94a3b8;">{{ sub.paused_at[:16] }}</span></span>
+          <button type="button" class="btn btn-secondary btn-sm" data-user-id="{{ sub.user_id }}" onclick="resumeDigestSubscriber(this)">Resume</button>
+        </li>
+        {% else %}
+        <li style="color:#64748b; padding: 6px 0;">No paused subscribers.</li>
+        {% endfor %}
+      </ul>
+    </div>
 
     <!-- KPI Cards Band -->
     <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
@@ -6681,6 +6736,35 @@ html[data-theme="light"] .copilot-input {
       }
     } catch (e) {
       console.debug('Error refreshing digest history:', e);
+    }
+  }
+
+  async function resumeDigestSubscriber(btn) {
+    const userId = btn ? btn.getAttribute('data-user-id') : '';
+    if (!userId) return;
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = 'Resuming...';
+    try {
+      const resp = await fetch('/api/admin/digest/resume-subscriber', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId })
+      });
+      const data = await resp.json();
+      if (resp.ok && data.success) {
+        showDigestAlert('Subscriber resumed: they will receive both research emails again.', 'success');
+        const row = btn.closest('li');
+        if (row) row.remove();
+      } else {
+        showDigestAlert(`Resume failed: ${data.detail || 'Unknown error'}`, 'error');
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+      }
+    } catch (e) {
+      showDigestAlert(`Network error resuming subscriber: ${e.message}`, 'error');
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
     }
   }
 

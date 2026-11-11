@@ -41,7 +41,7 @@ POLICIES = {
     },
     "privacy": {
         "title": "Privacy Policy",
-        "last_updated": "October 2026",
+        "last_updated": "November 2026",
         "description": "How the Platform collects, handles, and protects user data and privacy.",
         "content_html": """
         <h3>1. Information We Collect</h3>
@@ -78,9 +78,14 @@ POLICIES = {
             <li><strong>Razorpay:</strong> Payment processing gateway (PCI-DSS Level 1 certified).</li>
             <li><strong>Supabase:</strong> Encrypted authentication and PostgreSQL database storage.</li>
             <li><strong>Enterprise Cloud AI Infrastructure:</strong> Secure cloud compute and inference clusters for quantitative data summarization under zero data retention policies.</li>
+                    <li><strong>Transactional Email Delivery Provider:</strong> Sends our research emails and reports delivery, bounce and open events back to us.</li>
         </ul>
 
-        <h3>6. Contact and Grievance Officer</h3>
+        <h3>6. Research Email Delivery and Open Tracking</h3>
+        <p>If you subscribe to our research emails (the evening Market Close Wrap and the morning Fund NAV Update), we record for each email whether it was delivered, bounced, marked as spam, or opened. Opens are detected with a small image in the email, so they are recorded when your email app loads images. Links in the emails carry campaign tags so we can see which sections are useful.</p>
+        <p>We use this only to keep delivery working (for example, we stop sending to addresses that bounce or report spam) and to improve the emails. Per-recipient records are deleted after 90 days; after that we keep only total counts per email. You can unsubscribe at any time with the one-click link in every email.</p>
+
+        <h3>7. Contact and Grievance Officer</h3>
         <p>In accordance with the Information Technology Act, 2000, inquiries or data deletion requests may be submitted directly through our <a href="/contact">Feedback & Grievance Form</a>.</p>
         """
     },

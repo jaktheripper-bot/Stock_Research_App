@@ -453,6 +453,10 @@ async def admin_dashboard(
             "recent_dispatches": recent_dispatches,
             "utm_analytics": utm_analytics,
         }
+        from core.db.digest import get_mailer_panel, get_paused_digest_subscribers
+
+        digest_summary["mailer_panel"] = get_mailer_panel(days=14)
+        digest_summary["paused_subscribers"] = get_paused_digest_subscribers()
     except Exception as dig_err:
         logger.debug(f"Error compiling digest summary for admin view: {dig_err}")
     provider_constraints = {}
@@ -2654,6 +2658,28 @@ async def api_admin_digest_broadcast(request: Request):
         edition_date=edition_date, only_active_pro=only_active_pro, force=force, edition_kind=edition_kind
     )
     return JSONResponse(status_code=200, content=result)
+
+
+@router.post("/api/admin/digest/resume-subscriber")
+async def api_admin_digest_resume_subscriber(request: Request):
+    """Clears a bounce/complaint pause so the subscriber receives both research emails again."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=401, detail="Admin authentication required.")
+    try:
+        body = await request.json()
+    except Exception as e:
+        logger.debug("Failed parsing json in digest resume-subscriber: %s", e)
+        body = {}
+    user_id = str(body.get("user_id") or "").strip()
+    if not user_id:
+        raise HTTPException(status_code=422, detail="user_id is required.")
+    from core.db.digest import resume_digest_subscriber
+
+    if not resume_digest_subscriber(user_id):
+        raise HTTPException(status_code=404, detail="No paused subscriber with that id.")
+    return JSONResponse(status_code=200, content={"success": True, "user_id": user_id})
 
 
 @router.get("/api/admin/digest/history")
