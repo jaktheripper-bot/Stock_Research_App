@@ -414,7 +414,7 @@
           </button>
 
           <!-- Markets & Multi-Asset Sub-Tabs -->
-          <div class="nav-item dropdown {% if active_page in ['home', 'equities', 'opportunities', 'debt', 'funds', 'sovereign', 'savings', 'etfs', 'reits', 'dossier', 'msme'] %}active-parent{% endif %}" id="navMarketsDropdown">
+          <div class="nav-item dropdown {% if active_page in ['home', 'equities', 'debt', 'funds', 'sovereign', 'savings', 'etfs', 'reits', 'dossier', 'msme'] %}active-parent{% endif %}" id="navMarketsDropdown">
             <button class="nav-link dropdown-toggle" aria-haspopup="true" aria-expanded="false" id="marketsDropdownBtn">
               <span>Markets</span>
               <svg class="dropdown-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -473,13 +473,6 @@
                 </div>
               </a>
               <div class="dropdown-divider"></div>
-              <a href="/opportunities" data-asset-class="opportunities" class="dropdown-item {% if active_page == 'opportunities' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-pillar-05"></use></svg></div>
-                <div class="dropdown-content">
-                  <div class="dropdown-title">Opportunity Terminal</div>
-                  <div class="dropdown-desc">Cross-asset discovery, spread heatmap & risk-yield frontier</div>
-                </div>
-              </a>
               <a href="/msme" data-asset-class="msme" class="dropdown-item {% if active_page == 'msme' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#icon-sector-industrials"></use></svg></div>
                 <div class="dropdown-content">
@@ -491,7 +484,7 @@
           </div>
 
           <!-- Research Tools Sub-Tabs -->
-          <div class="nav-item dropdown {% if active_page in ['discovery', 'compare', 'tax_calculator', 'safety_radar'] %}active-parent{% endif %}" id="navToolsDropdown">
+          <div class="nav-item dropdown {% if active_page in ['discovery', 'opportunities', 'compare', 'tax_calculator', 'safety_radar'] %}active-parent{% endif %}" id="navToolsDropdown">
             <button class="nav-link dropdown-toggle" aria-haspopup="true" aria-expanded="false" id="toolsDropdownBtn">
               <span>Research Tools</span>
               <svg class="dropdown-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -504,6 +497,13 @@
                 <div class="dropdown-content">
                   <div class="dropdown-title">Morning Discovery @9AM</div>
                   <div class="dropdown-desc">Daily screening of under-the-radar BSE equities</div>
+                </div>
+              </a>
+              <a href="/opportunities" data-asset-class="opportunities" class="dropdown-item {% if active_page == 'opportunities' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-pillar-05"></use></svg></div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Opportunity Terminal</div>
+                  <div class="dropdown-desc">Cross-asset discovery, spread heatmap & risk-yield frontier</div>
                 </div>
               </a>
               <a href="/compare" data-asset-class="funds" class="dropdown-item {% if active_page == 'compare' %}active{% endif %}" role="menuitem">
