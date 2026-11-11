@@ -40,21 +40,16 @@ _SCRIPS_CACHE = {"data": None, "mtime": 0}
 _SUGGESTION_CANDIDATES = {"list": [], "scrips_mtime": -1, "alias_mtime": -1}
 
 def get_dynamic_aliases() -> dict:
-    """Loads and caches dynamic_aliases.json in-memory with file mtime validation."""
-    path = "dynamic_aliases.json"
-    if not os.path.exists(path):
-        return {}
-    try:
-        mtime = os.path.getmtime(path)
-        if _ALIASES_CACHE["data"] is not None and _ALIASES_CACHE["mtime"] == mtime:
-            return _ALIASES_CACHE["data"]
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            _ALIASES_CACHE["data"] = data
-            _ALIASES_CACHE["mtime"] = mtime
-            return data
-    except Exception:
-        return _ALIASES_CACHE["data"] or {}
+    """Learned ticker/name -> BSE scrip code aliases, stored in the `learned_scrip_aliases` table (v052).
+
+    Replaces the retired dynamic_aliases.json file; see core/db/scrip_aliases.py.
+    """
+    from core.db.scrip_aliases import cache_version, get_learned_aliases
+
+    data = get_learned_aliases()
+    _ALIASES_CACHE["data"] = data
+    _ALIASES_CACHE["mtime"] = cache_version()
+    return data
 
 def get_bse_scrips_cache() -> dict:
     """Loads and caches bse_scrips_cache.json in-memory with file mtime validation."""
@@ -144,18 +139,10 @@ def resolve_scrip_via_gemini_jit(query: str) -> str:
         match = re.search(r"\b(5\d{5})\b", text)
         if match:
             code = match.group(1)
-            # Persist to dynamic_aliases.json for fast Tier-2 resolution on subsequent queries
-            try:
-                aliases = {}
-                if os.path.exists("dynamic_aliases.json"):
-                    with open("dynamic_aliases.json", "r", encoding="utf-8") as f:
-                        aliases = json.load(f)
-                aliases[clean_ticker(query)] = code
-                with open("dynamic_aliases.json", "w", encoding="utf-8") as f:
-                    json.dump(aliases, f, indent=2)
-                _ALIASES_CACHE["mtime"] = 0
-            except Exception:
-                pass
+            # Persist to learned_scrip_aliases for fast Tier-2 resolution on subsequent queries (all machines)
+            from core.db.scrip_aliases import SOURCE_GEMINI, save_learned_alias
+
+            save_learned_alias(clean_ticker(query), code, SOURCE_GEMINI)
             return code
     except Exception:
         pass
@@ -180,7 +167,7 @@ def resolve_bse_scrip_code(query: str) -> str:
     """
     5-Tier BSE Resolution Hierarchy:
     1. Direct 6-digit numeric check.
-    2. Dynamic aliases (dynamic_aliases.json).
+    2. Learned aliases (learned_scrip_aliases table, v052).
     3. Static PRIMARY_BSE_MAP and Supabase master universe (resolve_scrip RPC).
     4. Active Master Universe local cache (bse_scrips_cache.json).
     5. Just-In-Time Gemini Grounded Search.
@@ -255,7 +242,10 @@ def resolve_canonical_symbol(query: str) -> str:
 
 def _get_cached_candidates() -> list:
     scrips_mtime = _SCRIPS_CACHE.get("mtime", 0)
-    alias_mtime = _ALIASES_CACHE.get("mtime", 0)
+    from core.db.scrip_aliases import cache_version, get_learned_aliases
+
+    get_learned_aliases()  # refresh (TTL-cached) so a newly learned alias bumps the version
+    alias_mtime = cache_version()
     if (
         _SUGGESTION_CANDIDATES["list"]
         and _SUGGESTION_CANDIDATES["scrips_mtime"] == scrips_mtime
@@ -278,7 +268,7 @@ def _get_cached_candidates() -> list:
     cand_list = list(candidates)
     _SUGGESTION_CANDIDATES["list"] = cand_list
     _SUGGESTION_CANDIDATES["scrips_mtime"] = _SCRIPS_CACHE.get("mtime", 0)
-    _SUGGESTION_CANDIDATES["alias_mtime"] = _ALIASES_CACHE.get("mtime", 0)
+    _SUGGESTION_CANDIDATES["alias_mtime"] = alias_mtime
     return cand_list
 
 def get_ticker_suggestions(query: str, n: int = 3, limit: Optional[int] = None) -> list:

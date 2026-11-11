@@ -3069,6 +3069,19 @@ def init_db(force: bool = False):
                 )
                 conn.commit()
 
+            # Migration v052: Learned BSE scrip aliases move from git-tracked dynamic_aliases.json into the database
+            if "v052_learned_scrip_aliases" not in applied:
+                logger.info("Applying schema migration: v052_learned_scrip_aliases...")
+                from core.db.scrip_aliases import create_learned_aliases_table, import_legacy_aliases
+
+                create_learned_aliases_table(cursor, is_pg=bool(supabase_url))
+                imported = import_legacy_aliases(cursor, is_pg=bool(supabase_url))
+                logger.info("v052: imported %d legacy scrip aliases", imported)
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version) VALUES ('v052_learned_scrip_aliases') ON CONFLICT DO NOTHING;"
+                )
+                conn.commit()
+
             _DB_INITIALIZED = True
             _INITIALIZED_DBS.add(target_key)
         except Exception as e:

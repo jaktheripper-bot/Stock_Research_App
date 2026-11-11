@@ -20,7 +20,8 @@
     "v048_reconcile_v2_column_contracts",
     "v049_fixed_savings_and_deposit_universe",
     "v050_reconcile_savings_observations_and_table_names",
-    "v051_savings_global_observation_ids_and_override_audit"
+    "v051_savings_global_observation_ids_and_override_audit",
+    "v052_learned_scrip_aliases"
   ],
   "notes": "Aligned onto dev HEAD 0aeb9e1 (W0-W6 MF disclosure snapshots, durable paid audit worker & terminal v2 observations) and ships v049 Fixed Savings & Term Deposits universe, monotonic rate sync, honest macro fallback provenance, HNI surcharge & deduction/pension tax models, strict HTTP 422 DICGC ladder validation, dynamic Morning Bouquet savings rates, and 8-Asset Omni-Search.",
   "patches": [],
