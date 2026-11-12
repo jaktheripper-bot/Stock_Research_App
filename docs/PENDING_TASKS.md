@@ -1,7 +1,7 @@
 # Platform Roadmap & Pending Tasks Register
 **Moatnomics — Multi-Asset Investment Research Platform**  
 *Document Target:* [`docs/PENDING_TASKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/PENDING_TASKS.md)  
-*Last Updated:* 2026-11-12 20:45:00 IST
+*Last Updated:* 2026-11-13 00:10:00 IST
 
 ---
 
@@ -30,9 +30,9 @@
 
 ### Task 5: Track 3 Language & Voice, Open Items
 - **Category:** Brand, Copy & Compliance Wording
-- **Status:** `In Progress` (Phases 1–3 shipped 2026-10-20; `/terms` statutory 7-section realignment shipped 2026-10-23; visual hero/portal integration & emoji cleanup shipped 2026-10-24)
+- **Status:** `Parked` (Phases 1–3 shipped 2026-10-20; `/terms` statutory 7-section realignment shipped 2026-10-23; visual hero/portal integration & emoji cleanup shipped 2026-10-24; stored-value migration decided against 2026-11-13. Only the Hindi item remains, parked until an audience request.)
 - **Details:**
-  1. Decide whether to migrate stored values (`SURGICAL_REFRESH`, `FULL_SYNTHESIS`, contact category `synthesis`, existing `BSE Surveillance` alert rows) to the new wording; needs a data migration.
+  1. ~~Decide whether to migrate stored values (`SURGICAL_REFRESH`, `FULL_SYNTHESIS`, contact category `synthesis`, existing `BSE Surveillance` alert rows) to the new wording (`Decided 2026-11-13: keep internal identifiers, no migration`). Production check (read-only): 6 `FULL_SYNTHESIS` credit-ledger rows, 0 `SURGICAL_REFRESH`, 3 `synthesis` support tickets, 0 surveillance alert rows. None are user-facing (display text already uses the new wording), and `FULL_SYNTHESIS` backs the charge-once unlock check in `core/db/users.py`, so renaming adds risk with no visible benefit.~~
   2. **Parked (Pending Audience Request):** Hindi per-language voice rules, string catalogues and the `language` parameter of `get_system_prompt()`.
   3. ~~Reference the hero banners (`img/heroes/*.webp`) and portal plates (`img/brand/portal-*.webp`) from their pages, after a browser review of text contrast (`Completed 2026-10-24`).~~
   4. ~~Replace the remaining raw emojis in `web/main.py` server messages and `web/templates/admin.html` console with clean text and sprite icons (`Completed 2026-10-24`).~~
