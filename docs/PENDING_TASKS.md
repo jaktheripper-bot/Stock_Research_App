@@ -9,7 +9,7 @@
 
 ### Task 8: Mailer Monitoring Setup (Better Stack Heartbeats & Resend Webhook)
 - **Category:** Monitoring & Email Deliverability
-- **Status:** `Pending` (owner action in vendor dashboards; health endpoint shipped 2026-11-12)
+- **Status:** `Configured 2026-11-12, awaiting first live verification` (Better Stack URL monitor "Moatnomics Mailers" on `/api/health/mailers` every 180 s, Up; Resend webhook enabled for `email.delivered`, `email.delivery_delayed`, `email.bounced`, `email.complained`, `email.opened`; `RESEND_WEBHOOK_SECRET` set on the website; unsigned POST returns 401). Close once step 5 holds after the 2026-11-13 07:30 IST Fund NAV Update.
 - **Origin:** Checks run 2026-11-12. Better Stack has only the general "Morning Discovery & Ingestion Pipeline" heartbeat. Resend has no webhook configured, and the website has no `RESEND_WEBHOOK_SECRET`, so `digest_recipient_events` has never recorded a delivery, bounce, complaint or open, and hard-bounce/complaint auto-pause cannot trigger.
 - **Details:**
   1. **Better Stack URL monitor (free, replaces two paid heartbeats):** add an uptime monitor on `https://moatnomics.com/api/health/mailers` (alert when the URL is unavailable / returns non-2xx, check every 3 minutes). The endpoint (`core/mailer_health.py`, shipped 2026-11-12) returns 200 when the latest due Market Close Wrap (by 21:00 IST) and Fund NAV Update (by 08:45 IST next day) went out, counting weekends and NSE holidays as expected skips, and 503 when either is late or the ledger cannot be read.
