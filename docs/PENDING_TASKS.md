@@ -7,6 +7,17 @@
 
 ## 1. Active, In-Progress & Parked Tasks
 
+### Task 8: Mailer Monitoring Setup (Better Stack Heartbeats & Resend Webhook)
+- **Category:** Monitoring & Email Deliverability
+- **Status:** `Pending` (owner action in vendor dashboards; no code change needed)
+- **Origin:** Checks run 2026-11-12. Better Stack has only the general "Morning Discovery & Ingestion Pipeline" heartbeat. Resend has no webhook configured, and the website has no `RESEND_WEBHOOK_SECRET`, so `digest_recipient_events` has never recorded a delivery, bounce, complaint or open, and hard-bounce/complaint auto-pause cannot trigger.
+- **Details:**
+  1. **Better Stack heartbeats:** create two heartbeats, "Market Close Wrap" and "Fund NAV Update", each with a 1-day period and a 1-hour grace period. Both senders run daily and ping on a send or an expected weekend/holiday skip (`core/mailer_monitor.py`).
+  2. Paste each heartbeat URL into its sender job's own Render variable: `BETTER_STACK_HEARTBEAT_URL_MARKET_CLOSE` on `market-close-wrap-sender`, and `BETTER_STACK_HEARTBEAT_URL_FUND_NAV` on `fund-nav-update-sender`. Paste the bare `https://` URL; `get_secret()` also strips wrapping quotes.
+  3. **Resend webhook:** in Resend, go to Webhooks → Add endpoint, enter `https://moatnomics.com/api/webhooks/resend`, and select the delivered, bounced, complained and opened events.
+  4. Copy the webhook's signing secret into a new `RESEND_WEBHOOK_SECRET` variable on the **Moatnomics.com** website service in Render. The endpoint fails closed (401) without it.
+  5. **Verify:** after the next send, `digest_recipient_events` shows `sent` and `delivered` rows and the admin Digest tab shows the delivery funnel; both Better Stack heartbeats show "Up".
+
 ### Task 7: Research Emails Land in Gmail Promotions
 - **Category:** Email Deliverability
 - **Status:** `Pending`
