@@ -4337,6 +4337,58 @@ def _record_unverified_portal_drift(
         conn.close()
 
 
+# Outcome of each live official-page rate check, kept in system_settings so a broken source page
+# (moved, redesigned, TLS failure, timeout) is visible to the owner instead of silently skipped.
+PROBE_VERIFIED = "VERIFIED"
+PROBE_SOURCE_UNAVAILABLE = "SOURCE_UNAVAILABLE"
+PROBE_NO_MATCH = "NO_MATCH"
+PROBE_HEALTH_SETTING_KEY = "savings_rate_probe_health"
+
+
+def record_savings_probe_health(check_date: str, outcomes: Dict[str, Tuple[str, str, str]]) -> Dict[str, Any]:
+    """Merges this run's probe outcomes into the stored health record and returns it.
+
+    Keeps `failing_since` from the previous record while a probe keeps failing, and the last date
+    each probe verified a rate. Storage problems are logged, never raised: the rate sync itself
+    must not fail because the health note could not be written.
+    """
+    previous = get_savings_probe_health().get("probes", {})
+    probes: Dict[str, Any] = {}
+    for probe_id, (status, reason, url) in outcomes.items():
+        prev = previous.get(probe_id) or {}
+        failing = status != PROBE_VERIFIED
+        probes[probe_id] = {
+            "status": status,
+            "reason": reason[:300],
+            "url": url,
+            "checked_on": check_date,
+            "last_verified_on": check_date if not failing else prev.get("last_verified_on"),
+            "failing_since": (prev.get("failing_since") or check_date) if failing else None,
+        }
+    record = {"checked_on": check_date, "probes": probes}
+    try:
+        from core.db.settings import set_system_setting
+
+        if not set_system_setting(PROBE_HEALTH_SETTING_KEY, json.dumps(record)):
+            logger.warning("Could not store savings rate check health.")
+    except Exception as store_err:
+        logger.warning("Could not store savings rate check health: %s", store_err)
+    return record
+
+
+def get_savings_probe_health() -> Dict[str, Any]:
+    """Returns the stored probe health record ({} when none is stored or it cannot be read)."""
+    try:
+        from core.db.settings import get_system_setting
+
+        raw = get_system_setting(PROBE_HEALTH_SETTING_KEY)
+        record = json.loads(raw) if raw else {}
+        return record if isinstance(record, dict) else {}
+    except Exception as read_err:
+        logger.warning("Could not read savings rate check health: %s", read_err)
+        return {}
+
+
 def verify_and_sync_automated_savings_rates(
     edition_date: Optional[str] = None,
     allow_network: bool = True,
@@ -4437,6 +4489,7 @@ def verify_and_sync_automated_savings_rates(
     live_probes_verified = 0
     live_rate_changes = 0
     rate_drift_alerts: List[str] = []
+    probe_outcomes: Dict[str, Tuple[str, str, str]] = {}
 
     if allow_network:
         ssl_ctx = ssl.create_default_context(cafile=certifi.where())
@@ -4445,35 +4498,50 @@ def verify_and_sync_automated_savings_rates(
             "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
         }
         url_cache: Dict[str, str] = {}
+        url_errors: Dict[str, str] = {}
         for probe in _PUBLIC_RATE_PROBES:
             live_probes_attempted += 1
             url = probe["url"]
+            probe_id = probe["instrument_id"]
             try:
-                if url not in url_cache:
+                if url not in url_cache and url not in url_errors:
                     req = urllib.request.Request(url, headers=headers)
                     with urllib.request.urlopen(req, timeout=4, context=ssl_ctx) as resp:
                         if resp.status == 200:
                             url_cache[url] = resp.read(262144).decode("utf-8", errors="ignore")
+                        else:
+                            url_errors[url] = f"HTTP {resp.status}"
                 html_text = url_cache.get(url, "")
                 if not html_text:
+                    reason = url_errors.get(url) or "empty response"
+                    probe_outcomes[probe_id] = (PROBE_SOURCE_UNAVAILABLE, reason, url)
+                    logger.warning("Savings rate source for %s unavailable (%s): %s", probe_id, reason, url)
                     continue
-                current = get_savings_instrument_by_id(
-                    probe["instrument_id"], reference_date=check_date
-                )
+                current = get_savings_instrument_by_id(probe_id, reference_date=check_date)
                 if not current:
                     continue
 
                 scoped = extract_scoped_portal_rate_evidence(html_text, probe)
                 parsed_rate = scoped.get("parsed_rate")
+                if parsed_rate is None:
+                    probe_outcomes[probe_id] = (
+                        PROBE_NO_MATCH, "scheme rate not found on the page (page layout changed?)", url
+                    )
+                    logger.warning("Savings rate for %s not found on %s; page layout may have changed.", probe_id, url)
                 if parsed_rate is not None and not (
                     probe["min_pct"] <= float(parsed_rate) <= probe["max_pct"]
                 ):
                     logger.warning(
                         "Rejected out-of-bounds parsed rate %.2f%% for %s",
                         float(parsed_rate),
-                        probe["instrument_id"],
+                        probe_id,
+                    )
+                    probe_outcomes[probe_id] = (
+                        PROBE_NO_MATCH, f"parsed rate {float(parsed_rate):.2f}% outside expected range", url
                     )
                     continue
+                if parsed_rate is not None:
+                    probe_outcomes[probe_id] = (PROBE_VERIFIED, "", url)
 
                 if scoped["valid"]:
                     assert parsed_rate is not None
@@ -4523,11 +4591,14 @@ def verify_and_sync_automated_savings_rates(
                     else:
                         _stamp_tariff_verification(probe["instrument_id"], check_date)
             except Exception as probe_err:
+                url_errors.setdefault(url, f"{type(probe_err).__name__}: {probe_err}")
+                probe_outcomes[probe_id] = (PROBE_SOURCE_UNAVAILABLE, url_errors[url], url)
                 logger.warning(
                     "Automated savings probe notice (%s): %s. Retaining verified statutory rate.",
-                    probe["instrument_id"],
+                    probe_id,
                     probe_err,
                 )
+        record_savings_probe_health(check_date, probe_outcomes)
 
     all_active = get_active_savings_instruments(reference_date=check_date)
     stale_items = sorted(
@@ -4554,6 +4625,9 @@ def verify_and_sync_automated_savings_rates(
         "live_probes_verified": live_probes_verified,
         "live_rate_changes": live_rate_changes,
         "rate_drift_alerts": rate_drift_alerts,
+        "probe_failures": sorted(
+            pid for pid, (status, _reason, _url) in probe_outcomes.items() if status != PROBE_VERIFIED
+        ),
         "review_due_count": len(stale_items),
         "review_due_ids": stale_items,
     }

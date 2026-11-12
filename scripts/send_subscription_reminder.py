@@ -207,10 +207,78 @@ def _collect_live_runtime_metrics() -> List[Dict[str, str]]:
     return snapshots
 
 
+# Small savings rates (PPF, SCSS, NSC, ...) are reset by the Finance Ministry once a quarter,
+# announced around the quarter's last day. The official pages cannot be read automatically any more
+# (moved / JavaScript-only / TLS failures), so the owner confirms each quarter's rates by hand.
+SAVINGS_REVIEW_LEAD_DAYS = 6
+
+
+def collect_savings_rate_review(target_date: date) -> Dict[str, Any]:
+    """Small-savings rates due for the quarterly check, plus official-page checks that are failing.
+
+    Never invents rates: on a database error the section says it is unavailable.
+    """
+    try:
+        from core.db.savings import PROBE_VERIFIED, get_active_savings_instruments, get_savings_probe_health
+
+        instruments = get_active_savings_instruments(category="SMALL_SAVINGS")
+        health = get_savings_probe_health()
+    except Exception as err:
+        logger.warning("Savings rate review unavailable: %s", err)
+        return {"available": False, "error": str(err)[:200]}
+
+    schemes = []
+    for inst in instruments:
+        review_dt = _parse_iso_date(inst.get("next_review_date"))
+        if review_dt is None:
+            continue
+        days_left = (review_dt - target_date).days
+        if days_left < 0:
+            state = "OVERDUE"
+        elif days_left <= SAVINGS_REVIEW_LEAD_DAYS:
+            state = "DUE"
+        else:
+            state = "OK"
+        schemes.append({
+            "instrument_id": inst.get("instrument_id"),
+            "scheme_name": inst.get("scheme_name") or inst.get("instrument_id"),
+            "base_rate_pct": inst.get("base_rate_pct"),
+            "effective_from": inst.get("effective_from"),
+            "next_review_date": review_dt.isoformat(),
+            "days_left": days_left,
+            "state": state,
+        })
+    schemes.sort(key=lambda x: (x["days_left"], str(x["instrument_id"])))
+    failing = [
+        {"instrument_id": pid, **info}
+        for pid, info in sorted((health.get("probes") or {}).items())
+        if isinstance(info, dict) and info.get("status") != PROBE_VERIFIED
+    ]
+    action = [x for x in schemes if x["state"] != "OK"]
+    return {
+        "available": True,
+        "schemes": schemes,
+        "action_needed": action,
+        "overdue": any(x["state"] == "OVERDUE" for x in action),
+        "failing_probes": failing,
+        "probes_checked_on": health.get("checked_on"),
+    }
+
+
+SAVINGS_UPDATE_HOWTO = (
+    "When the Finance Ministry announces the new quarter's rates, update base_rate_pct, "
+    "effective_from and next_review_date for each scheme in "
+    "data/savings_rates/baseline_savings_universe.json (if rates are unchanged, still move "
+    "effective_from and next_review_date to the new quarter), then run "
+    "`python3 scripts/import_savings_rates.py --check` and `--apply`."
+)
+
+
 def build_reminder_report(
     ref_date: Optional[date] = None,
     registry_path: Path = DEFAULT_REGISTRY_PATH,
     include_live_metrics: bool = True,
+    include_savings_review: bool = True,
 ) -> Dict[str, Any]:
     """Compiles the complete daily subscription, covered-services & optimization report."""
     target_date = ref_date or datetime.now(IST).date()
@@ -237,11 +305,18 @@ def build_reminder_report(
     ]
 
     live_metrics = _collect_live_runtime_metrics() if include_live_metrics else []
+    savings_review = (
+        collect_savings_rate_review(target_date) if include_savings_review else {"available": False}
+    )
 
     if any(s["computed_state"] in ("DUE_TODAY", "RECEIPT_CHECK_OVERDUE") for s in evaluated_subs):
         subj_prefix = "[Action Needed]"
     elif any(s["computed_state"] == "DUE_SOON" for s in evaluated_subs):
         subj_prefix = "[Renewal Due Soon]"
+    elif savings_review.get("overdue"):
+        subj_prefix = "[Savings Rates Overdue]"
+    elif savings_review.get("action_needed"):
+        subj_prefix = "[Confirm Savings Rates]"
     elif not all_patterns_fixed:
         subj_prefix = f"[Pattern Lock {confirmed_count}/{total_tracked}]"
     else:
@@ -265,6 +340,7 @@ def build_reminder_report(
         "open_optimizations": open_optimizations,
         "live_metrics": live_metrics,
         "payment_history": registry.get("payment_history", []),
+        "savings_review": savings_review,
     }
 
 
@@ -335,6 +411,32 @@ def render_reminder_text(report: Dict[str, Any]) -> str:
             lines.append(f"• [{opt['id']}] {opt['service']}: {opt['recommendation']}")
             lines.append(f"    Savings:  {opt['cost_impact']}")
             lines.append(f"    Tradeoff: {opt['tradeoff']}")
+
+    sr = report.get("savings_review") or {}
+    if sr.get("available") and (sr.get("action_needed") or sr.get("failing_probes")):
+        lines.append("")
+        lines.append("6. SMALL SAVINGS RATES (QUARTERLY CHECK)")
+        lines.append("------------------------------------------------------------------------")
+        for x in sr.get("action_needed", []):
+            when = (
+                f"review date {x['next_review_date']} passed {-x['days_left']} day(s) ago"
+                if x["state"] == "OVERDUE"
+                else f"review date {x['next_review_date']} (in {x['days_left']} day(s))"
+            )
+            lines.append(
+                f"• [{x['state']}] {x['scheme_name']} ({x['instrument_id']}): {x['base_rate_pct']}% "
+                f"since {x['effective_from']}; {when}"
+            )
+        if sr.get("action_needed"):
+            lines.append(f"  How to update: {SAVINGS_UPDATE_HOWTO}")
+        for f in sr.get("failing_probes", []):
+            lines.append(
+                f"• Automatic check for {f['instrument_id']} failing since {f.get('failing_since')}: "
+                f"{f.get('status')} ({f.get('reason')}) — {f.get('url')}"
+            )
+    elif sr.get("available") is False and sr.get("error"):
+        lines.append("")
+        lines.append(f"6. SMALL SAVINGS RATES: check unavailable ({sr['error']}).")
 
     lines.append("")
     lines.append("Ledger File: docs/VENDOR_SUBSCRIPTIONS.md | Data: data/vendor_subscriptions.json")
@@ -413,6 +515,39 @@ def render_reminder_html(report: Dict[str, Any]) -> str:
         </div>
         """
 
+    savings_html = ""
+    sr = report.get("savings_review") or {}
+    if sr.get("available") and (sr.get("action_needed") or sr.get("failing_probes")):
+        due_rows = ""
+        for x in sr.get("action_needed", []):
+            colour = "#8B2635" if x["state"] == "OVERDUE" else "#9A6700"
+            when = (
+                f"Review date {x['next_review_date']} passed {-x['days_left']} day(s) ago"
+                if x["state"] == "OVERDUE"
+                else f"Review date {x['next_review_date']} (in {x['days_left']} day(s))"
+            )
+            due_rows += (
+                f"<li style='margin:4px 0;'><strong style='color:{colour};'>{esc(x['state'])}</strong> "
+                f"{esc(str(x['scheme_name']))} ({esc(str(x['instrument_id']))}): "
+                f"<strong>{esc(str(x['base_rate_pct']))}%</strong> since {esc(str(x['effective_from']))} — {esc(when)}</li>"
+            )
+        probe_rows = "".join(
+            f"<li style='margin:4px 0;'>Automatic check for <strong>{esc(str(f['instrument_id']))}</strong> failing since "
+            f"{esc(str(f.get('failing_since')))}: {esc(str(f.get('status')))} ({esc(str(f.get('reason')))})</li>"
+            for f in sr.get("failing_probes", [])
+        )
+        howto = (
+            f"<div style='margin-top:8px;color:#52606D;'>{esc(SAVINGS_UPDATE_HOWTO)}</div>"
+            if sr.get("action_needed") else ""
+        )
+        savings_html = f"""
+        <h3 style="font-size:14px;color:#0B2337;text-transform:uppercase;letter-spacing:0.05em;margin:22px 0 8px;">Small Savings Rates (Quarterly Check)</h3>
+        <div style="background:#FFFFFF;border:1px solid #D9E3E8;border-left:3px solid #9A6700;border-radius:6px;padding:12px 16px;font-size:12px;color:#282F33;">
+          <ul style="margin:0;padding-left:18px;line-height:1.5;">{due_rows}{probe_rows}</ul>
+          {howto}
+        </div>
+        """
+
     graduation_banner = (
         "<div style='background:#E6F4EA;border:1px solid #0E3D32;color:#0E3D32;padding:10px 14px;border-radius:6px;font-size:12px;font-weight:600;margin-bottom:16px;'>"
         "All subscription due-date patterns are CONFIRMED. Ready to switch from Daily to Pre-Renewal (7d &amp; 1d prior) whenever you approve."
@@ -446,6 +581,8 @@ def render_reminder_html(report: Dict[str, Any]) -> str:
     {sub_cards}
 
     {metrics_html}
+
+    {savings_html}
 
     <h3 style="font-size:14px;color:#0B2337;text-transform:uppercase;letter-spacing:0.05em;margin:22px 0 8px;">3. Cost vs. Performance Optimizations (Open)</h3>
     {opt_cards}
