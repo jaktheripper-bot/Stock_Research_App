@@ -3153,6 +3153,31 @@ async def healthz():
     return json_response_with_cache(data, max_age=30)
 
 
+@app.get("/api/health/mailers")
+async def mailer_health():
+    """External uptime-monitor check for the two research emails.
+
+    200 when the latest Market Close Wrap and Fund NAV Update that were due have gone out
+    (weekends and NSE holidays are expected skips); 503 when either is late or the ledger cannot
+    be read. Exposes only sent / not sent per edition, never subscriber details.
+    """
+    from starlette.concurrency import run_in_threadpool
+
+    from core.mailer_health import cached_mailer_health
+
+    try:
+        result = await run_in_threadpool(cached_mailer_health)
+    except Exception as err:
+        logger.error("Mailer health check failed: %s", err)
+        result = {"status": "unavailable", "checked_at": datetime.now(IST).isoformat(timespec="seconds")}
+    status_code = 200 if result.get("status") == "ok" else 503
+    return JSONResponse(
+        content=_jsonable_encoder(result),
+        status_code=status_code,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @app.get("/favicon.ico", response_class=Response)
 async def favicon_ico():
     """Serves the canonical Moatnomics Perspective Portal multi-size ICO favicon at root."""

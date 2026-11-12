@@ -9,14 +9,14 @@
 
 ### Task 8: Mailer Monitoring Setup (Better Stack Heartbeats & Resend Webhook)
 - **Category:** Monitoring & Email Deliverability
-- **Status:** `Pending` (owner action in vendor dashboards; no code change needed)
+- **Status:** `Pending` (owner action in vendor dashboards; health endpoint shipped 2026-11-12)
 - **Origin:** Checks run 2026-11-12. Better Stack has only the general "Morning Discovery & Ingestion Pipeline" heartbeat. Resend has no webhook configured, and the website has no `RESEND_WEBHOOK_SECRET`, so `digest_recipient_events` has never recorded a delivery, bounce, complaint or open, and hard-bounce/complaint auto-pause cannot trigger.
 - **Details:**
-  1. **Better Stack heartbeats:** create two heartbeats, "Market Close Wrap" and "Fund NAV Update", each with a 1-day period and a 1-hour grace period. Both senders run daily and ping on a send or an expected weekend/holiday skip (`core/mailer_monitor.py`).
-  2. Paste each heartbeat URL into its sender job's own Render variable: `BETTER_STACK_HEARTBEAT_URL_MARKET_CLOSE` on `market-close-wrap-sender`, and `BETTER_STACK_HEARTBEAT_URL_FUND_NAV` on `fund-nav-update-sender`. Paste the bare `https://` URL; `get_secret()` also strips wrapping quotes.
+  1. **Better Stack URL monitor (free, replaces two paid heartbeats):** add an uptime monitor on `https://moatnomics.com/api/health/mailers` (alert when the URL is unavailable / returns non-2xx, check every 3 minutes). The endpoint (`core/mailer_health.py`, shipped 2026-11-12) returns 200 when the latest due Market Close Wrap (by 21:00 IST) and Fund NAV Update (by 08:45 IST next day) went out, counting weekends and NSE holidays as expected skips, and 503 when either is late or the ledger cannot be read.
+  2. The per-sender variables `BETTER_STACK_HEARTBEAT_URL_MARKET_CLOSE` / `_FUND_NAV` are no longer required; leaving them empty only logs a notice.
   3. **Resend webhook:** in Resend, go to Webhooks → Add endpoint, enter `https://moatnomics.com/api/webhooks/resend`, and select the delivered, bounced, complained and opened events.
   4. Copy the webhook's signing secret into a new `RESEND_WEBHOOK_SECRET` variable on the **Moatnomics.com** website service in Render. The endpoint fails closed (401) without it.
-  5. **Verify:** after the next send, `digest_recipient_events` shows `sent` and `delivered` rows and the admin Digest tab shows the delivery funnel; both Better Stack heartbeats show "Up".
+  5. **Verify:** after the next send, `digest_recipient_events` shows `sent` and `delivered` rows and the admin Digest tab shows the delivery funnel; the Better Stack mailer URL monitor shows "Up".
 
 ### Task 7: Research Emails Land in Gmail Promotions
 - **Category:** Email Deliverability
