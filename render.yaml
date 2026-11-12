@@ -1,7 +1,8 @@
 # Render Blueprint for Moatnomics scheduled jobs (Option B).
 #
-# What this file manages: ONLY the four cron jobs below. They build from the same Dockerfile and
-# branch as the website and run scripts/run_scheduled_pipeline.py with a mode per job.
+# What this file manages: ONLY the six cron jobs below. They build from the same Dockerfile and
+# branch as the website and run scripts/run_scheduled_pipeline.py with a mode per job. Render is
+# the only scheduler: GitHub Actions keeps the workflow for manual runs but no longer times any run.
 #
 # What it deliberately does NOT manage:
 #   - The website ("Moatnomics.com", Docker web service, Singapore). It was created in the Render
@@ -10,11 +11,39 @@
 #   - The paid fund audit worker (scripts/run_paid_fund_audit_worker.py). It is not deployed on
 #     Render today; add it here deliberately if paid deep-dive audits should run off the website.
 #
-# Secrets use `sync: false`: Render asks for each value when the Blueprint is first created, and
-# keeps existing values on later syncs. Schedules are UTC (IST = UTC + 5:30).
+# Secrets: the four original jobs use `sync: false` (values entered when the Blueprint was created
+# and kept on later syncs). The two main runs read theirs from the dashboard-managed environment
+# group `moatnomics-pipeline-secrets`, which must exist in the workspace before this file syncs.
+# Schedules are UTC (IST = UTC + 5:30).
 
 services:
-  # 18:30 IST: re-runs any unfinished 16:30 IST GitHub close-run phase (finished/in-progress phases are skipped).
+  # 16:30 IST: main close run (asset refresh, discovery reel, MSME, stock reports, monthly SEBI MF sync). No email.
+  - type: cron
+    name: close-run
+    runtime: docker
+    region: singapore
+    branch: main
+    plan: standard
+    dockerfilePath: ./Dockerfile
+    schedule: "0 11 * * *"
+    dockerCommand: "python3 scripts/run_scheduled_pipeline.py --mode evening"
+    envVars:
+      - fromGroup: moatnomics-pipeline-secrets
+      - key: GOOGLE_GENAI_USE_VERTEXAI
+        value: "true"
+      - key: ENABLE_BACKGROUND_SCHEDULERS
+        value: "0"
+      # Stops a hung run after 90 minutes instead of Render's 12-hour cut-off (billing is per second of run time).
+      - key: PIPELINE_MAX_RUNTIME_SECONDS
+        value: "5400"
+      - key: BETTER_STACK_INGESTING_HOST
+        value: "s2808842.us-west-2a.betterstackdata.com"
+      - key: CANONICAL_DOMAIN
+        value: https://moatnomics.com
+      - key: ENABLE_LIVE_EMAIL_DISPATCH
+        value: "0"
+
+  # 18:30 IST: re-runs any unfinished 16:30 IST close-run phase (finished/in-progress phases are skipped).
   - type: cron
     name: close-run-backup
     runtime: docker
@@ -51,6 +80,9 @@ services:
         value: "true"
       - key: ENABLE_BACKGROUND_SCHEDULERS
         value: "0"
+      # Stops a hung run after 90 minutes instead of Render's 12-hour cut-off (billing is per second of run time).
+      - key: PIPELINE_MAX_RUNTIME_SECONDS
+        value: "5400"
       - key: BETTER_STACK_INGESTING_HOST
         value: "s2808842.us-west-2a.betterstackdata.com"
       - key: CANONICAL_DOMAIN
@@ -95,6 +127,9 @@ services:
         value: "true"
       - key: ENABLE_BACKGROUND_SCHEDULERS
         value: "0"
+      # Stops a hung run after 75 minutes instead of Render's 12-hour cut-off (billing is per second of run time).
+      - key: PIPELINE_MAX_RUNTIME_SECONDS
+        value: "4500"
       - key: BETTER_STACK_INGESTING_HOST
         value: "s2808842.us-west-2a.betterstackdata.com"
       - key: CANONICAL_DOMAIN
@@ -110,7 +145,33 @@ services:
       - key: SMTP_FROM
         value: "Moatnomics Service Desk <desk@moatnomics.com>"
 
-  # 01:00 IST: re-runs any unfinished 23:15 IST GitHub fund-run phase for the previous date.
+  # 23:15 IST: main fund run (AMFI NAVs, post-NAV ETF matrix, fund rotation audit). No email.
+  - type: cron
+    name: fund-run
+    runtime: docker
+    region: singapore
+    branch: main
+    plan: standard
+    dockerfilePath: ./Dockerfile
+    schedule: "45 17 * * *"
+    dockerCommand: "python3 scripts/run_scheduled_pipeline.py --mode nightly"
+    envVars:
+      - fromGroup: moatnomics-pipeline-secrets
+      - key: GOOGLE_GENAI_USE_VERTEXAI
+        value: "true"
+      - key: ENABLE_BACKGROUND_SCHEDULERS
+        value: "0"
+      # Stops a hung run after 90 minutes instead of Render's 12-hour cut-off (billing is per second of run time).
+      - key: PIPELINE_MAX_RUNTIME_SECONDS
+        value: "5400"
+      - key: BETTER_STACK_INGESTING_HOST
+        value: "s2808842.us-west-2a.betterstackdata.com"
+      - key: CANONICAL_DOMAIN
+        value: https://moatnomics.com
+      - key: ENABLE_LIVE_EMAIL_DISPATCH
+        value: "0"
+
+  # 01:00 IST: re-runs any unfinished 23:15 IST fund-run phase for the previous date.
   - type: cron
     name: fund-run-backup
     runtime: docker
@@ -147,6 +208,9 @@ services:
         value: "true"
       - key: ENABLE_BACKGROUND_SCHEDULERS
         value: "0"
+      # Stops a hung run after 90 minutes instead of Render's 12-hour cut-off (billing is per second of run time).
+      - key: PIPELINE_MAX_RUNTIME_SECONDS
+        value: "5400"
       - key: BETTER_STACK_INGESTING_HOST
         value: "s2808842.us-west-2a.betterstackdata.com"
       - key: CANONICAL_DOMAIN
@@ -191,6 +255,9 @@ services:
         value: "true"
       - key: ENABLE_BACKGROUND_SCHEDULERS
         value: "0"
+      # Stops a hung run after 60 minutes instead of Render's 12-hour cut-off (billing is per second of run time).
+      - key: PIPELINE_MAX_RUNTIME_SECONDS
+        value: "3600"
       - key: BETTER_STACK_INGESTING_HOST
         value: "s2808842.us-west-2a.betterstackdata.com"
       - key: CANONICAL_DOMAIN

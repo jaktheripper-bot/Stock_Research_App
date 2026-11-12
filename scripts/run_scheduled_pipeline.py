@@ -24,6 +24,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
@@ -63,6 +64,13 @@ EDITION_FUND_NAV = "FUND_NAV"
 SEND_WAIT_CAP_SECONDS = {EDITION_MARKET_CLOSE: 60 * 60, EDITION_FUND_NAV: 45 * 60}
 SEND_POLL_SECONDS = 60
 
+# Wall-clock limit for one pipeline process. The Render cron jobs set this (render.yaml) so a hung
+# run stops well before Render's own 12-hour cut-off and cannot bill for hours. Unset or 0 means no
+# limit: GitHub runs keep their 90-minute job timeout and local runs are unchanged.
+MAX_RUNTIME_ENV = "PIPELINE_MAX_RUNTIME_SECONDS"
+MAX_RUNTIME_HARD_EXIT_GRACE_SECONDS = 120
+MAX_RUNTIME_HARD_EXIT_CODE = 124
+
 
 def close_run_required_leases(date_str: str) -> list:
     """Close-run phases that feed the Market Close Wrap sections (weekday editions)."""
@@ -96,6 +104,65 @@ def _install_termination_handler() -> None:
         signal.signal(signal.SIGTERM, _on_sigterm)
     except (ValueError, OSError) as sig_err:
         logger.warning("Could not install SIGTERM handler: %s", sig_err)
+
+
+def _resolve_max_runtime_seconds() -> int:
+    """Reads the wall-clock limit from the environment. Unset, 0 or an unreadable value means no limit."""
+    raw = os.environ.get(MAX_RUNTIME_ENV, "").strip()
+    if not raw:
+        return 0
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("%s=%r is not a whole number of seconds; running without a time limit.", MAX_RUNTIME_ENV, raw)
+        return 0
+    if value < 0:
+        logger.warning("%s=%r is negative; running without a time limit.", MAX_RUNTIME_ENV, raw)
+        return 0
+    return value
+
+
+def _install_runtime_limit(limit_seconds: int) -> list:
+    """Stops the process once it has run for `limit_seconds`.
+
+    At the limit the process signals itself with SIGTERM, so the existing handler raises
+    SystemExit in the main thread and `job_lease` releases held phase leases (unfinished phases
+    stay unmarked and are retried by the next runner; nothing partial is marked done). If the main
+    thread is stuck inside a blocking call and does not unwind within the grace period, the
+    process is ended outright so the run cannot keep billing.
+    Returns the started timers (empty when no limit is set).
+    """
+    if limit_seconds <= 0:
+        return []
+
+    def _on_limit():
+        logger.error(
+            "Pipeline reached its %ss wall-clock limit (%s); aborting so held leases are released.",
+            limit_seconds, MAX_RUNTIME_ENV,
+        )
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    def _on_hard_limit():
+        logger.error(
+            "Pipeline still running %ss after its wall-clock limit; ending the process.",
+            MAX_RUNTIME_HARD_EXIT_GRACE_SECONDS,
+        )
+        try:
+            flush_betterstack_logs()
+        finally:
+            os._exit(MAX_RUNTIME_HARD_EXIT_CODE)
+
+    timers = []
+    for delay, fn in (
+        (limit_seconds, _on_limit),
+        (limit_seconds + MAX_RUNTIME_HARD_EXIT_GRACE_SECONDS, _on_hard_limit),
+    ):
+        timer = threading.Timer(delay, fn)
+        timer.daemon = True
+        timer.start()
+        timers.append(timer)
+    logger.info("Wall-clock limit armed: %ss (%s).", limit_seconds, MAX_RUNTIME_ENV)
+    return timers
 
 
 class SynthesisUnavailableError(RuntimeError):
@@ -346,6 +413,21 @@ def run_send_edition(
         logger.info(f"{edition_kind} edition for weekend date {date_str} is not sent.")
         results["digest_dispatch"] = "SKIPPED_MARKET_CLOSED"
         return results
+
+    if not force:
+        # No email for an NSE trading holiday. If the official calendar is unavailable we cannot
+        # rule a holiday out, so the email is withheld (fail closed) and the run is marked FAILED.
+        from core.ingestion.market_calendar import MarketCalendarUnavailable, is_nse_trading_holiday
+
+        try:
+            if is_nse_trading_holiday(date_str):
+                logger.info(f"{edition_kind} edition for NSE holiday {date_str} is not sent.")
+                results["digest_dispatch"] = "SKIPPED_MARKET_CLOSED"
+                return results
+        except MarketCalendarUnavailable as cal_err:
+            logger.error(f"{edition_kind} for {date_str} withheld: {cal_err}")
+            results["digest_dispatch"] = f"FAILED: MarketCalendarUnavailable: {cal_err}"
+            return results
 
     required = (
         close_run_required_leases(date_str)
@@ -992,6 +1074,7 @@ def main():
 
     setup_logging()
     _install_termination_handler()
+    _install_runtime_limit(_resolve_max_runtime_seconds())
     init_db()
 
     now_ist = datetime.now(IST)

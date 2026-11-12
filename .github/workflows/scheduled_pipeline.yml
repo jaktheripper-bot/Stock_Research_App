@@ -1,13 +1,9 @@
 name: Autonomous Multi-Asset Scheduled Pipeline
 
+# Manual runs only. Render cron jobs (render.yaml) time every scheduled run: close run 16:30 IST,
+# backup 18:30, Market Close Wrap 19:30, fund run 23:15, backup 01:00, Fund NAV Update 07:30.
+# GitHub's own scheduler was dropped because it started runs hours late or not at all.
 on:
-  schedule:
-    # Close run: 16:30 IST (11:00 UTC) — post-close asset refresh, stock reports, monthly SEBI MF sync.
-    # No email here: Render sends the Market Close Wrap at 19:30 IST (and re-runs gaps at 18:30 IST).
-    - cron: "0 11 * * *"
-    # Fund run: 23:15 IST (17:45 UTC) — AMFI NAVs, post-NAV ETF matrix, fund rotation audit.
-    # No email here: Render sends the Fund NAV Update at 07:30 IST (and re-runs gaps at 01:00 IST).
-    - cron: "45 17 * * *"
   workflow_dispatch:
     inputs:
       mode:
@@ -35,7 +31,7 @@ on:
         type: boolean
 
 concurrency:
-  group: moatnomics-pipeline-${{ github.event.schedule || inputs.mode || 'default' }}
+  group: moatnomics-pipeline-${{ inputs.mode || 'default' }}
   cancel-in-progress: false
 
 jobs:
@@ -83,22 +79,11 @@ jobs:
           BETTER_STACK_INGESTING_HOST: ${{ secrets.BETTER_STACK_INGESTING_HOST }}
           BETTER_STACK_HEARTBEAT_URL: ${{ secrets.BETTER_STACK_HEARTBEAT_URL }}
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            if [ "${{ github.event.schedule }}" = "0 11 * * *" ]; then
-              MODE="evening"
-            elif [ "${{ github.event.schedule }}" = "45 17 * * *" ]; then
-              MODE="nightly"
-            else
-              MODE="auto"
-            fi
-            python scripts/run_scheduled_pipeline.py --mode "$MODE"
-          else
-            ARGS="--mode ${{ inputs.mode }}"
-            if [ -n "${{ inputs.date }}" ]; then
-              ARGS="$ARGS --date ${{ inputs.date }}"
-            fi
-            if [ "${{ inputs.force }}" = "true" ]; then
-              ARGS="$ARGS --force"
-            fi
-            python scripts/run_scheduled_pipeline.py $ARGS
+          ARGS="--mode ${{ inputs.mode }}"
+          if [ -n "${{ inputs.date }}" ]; then
+            ARGS="$ARGS --date ${{ inputs.date }}"
           fi
+          if [ "${{ inputs.force }}" = "true" ]; then
+            ARGS="$ARGS --force"
+          fi
+          python scripts/run_scheduled_pipeline.py $ARGS

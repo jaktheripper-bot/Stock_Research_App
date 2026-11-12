@@ -98,22 +98,22 @@ sequenceDiagram
 
 ### 2.2 Option B Schedule: Close Run + Fund Run, Render Backups & Two Timed Emails
 
-> Status: implemented on `dev`; it takes effect once `dev` is merged to `main` and Render syncs the Blueprint (`render.yaml`). Until then `main` keeps the earlier 19:30 / 23:15 / 08:00 IST schedule.
-
-Heavy work runs on GitHub Actions (free, but its cron starts drift 4–7.5 hours late). Render cron jobs start on time, so they run the backups and send both emails. The website process runs no pipeline work and sends no research email.
+> Status: live on `main`. Render cron jobs (Blueprint `moatnomics-scheduled-jobs`, `render.yaml`) time every run. GitHub Actions keeps `scheduled_pipeline.yml` for manual runs only: its scheduler started runs hours late or skipped them (no 16:30 IST run fired on 2026-11-12). The website process runs no pipeline work and sends no research email.
 
 | IST | Runner (`--mode`) | Work | Email |
 |---|---|---|---|
-| 16:30 | GitHub `evening` (close run, 90-min job limit) | Sovereign curve, savings rates, ETF prices, debt/asset scan, discovery reel, MSME, MF-constituent stock reports (4 workers, 40-min AI budget), monthly SEBI MF portfolio sync (from day 4, 25-min budget) | — |
+| 16:30 | Render `close-run` (`--mode evening`, 90-min `PIPELINE_MAX_RUNTIME_SECONDS`) | Sovereign curve, savings rates, ETF prices, debt/asset scan, discovery reel, MSME, MF-constituent stock reports (4 workers, 40-min AI budget), monthly SEBI MF portfolio sync (from day 4, 25-min budget) | — |
 | 18:30 | Render `close-backup` | Same phases; any phase already done or still running is skipped | — |
 | 19:30 Mon–Fri | Render `send-close-wrap` | Waits ≤60 min for `sovereign_sync`, `savings_rate_sync`, `asset_scan`, `discovery_reel`, `msme_daily_ingest` completion markers | **Market Close Wrap**: Equities, Sovereign, Corporate debt, REITs/InvITs/SGBs, MSME, Fixed savings |
-| 23:15 | GitHub `nightly` (fund run) | AMFI NAVs, post-NAV ETF matrix (`etf_nav_sync_<date>`), sovereign/scan failover, one fund look-through audit | — |
+| 23:15 | Render `fund-run` (`--mode nightly`, 90-min limit) | AMFI NAVs, post-NAV ETF matrix (`etf_nav_sync_<date>`), sovereign/scan failover, one fund look-through audit | — |
 | 01:00 | Render `fund-backup` | Same phases for the previous date | — |
 | 07:30 Tue–Sat | Render `send-fund-update` | Waits ≤45 min for `amfi_nav_sync`, `etf_nav_sync`, `fund_audit` markers (prior trading day) | **Fund NAV Update**: ETF matrix, Mutual fund look-through |
 
 * **Completion markers vs leases:** a lease (`distributed_job_locks`) means "running or finished"; a separate `done::<lease>` marker (36 h TTL) is written only after a phase succeeds. Backups skip leased phases; senders wait on markers.
-* **Cancellation safety:** `job_lease` releases on `BaseException` and the runner turns SIGTERM into `SystemExit`, so a cancelled or timed-out GitHub job frees its phases for the Render backup.
-* **Date binding:** any run starting before 12:00 IST binds to the previous date (`_resolve_mode_and_date`), so the 01:00 backup and 07:30 email cover the prior evening, and late GitHub runs never take over the next day.
+* **Cancellation safety:** `job_lease` releases on `BaseException` and the runner turns SIGTERM into `SystemExit`, so a cancelled or timed-out run frees its phases for the backup. Each Render job sets `PIPELINE_MAX_RUNTIME_SECONDS` (60–90 min); at the limit the process signals itself SIGTERM, and is ended outright 120 s later if it cannot unwind.
+* **Market holidays:** both senders skip NSE trading holidays (`core/ingestion/market_calendar.py`, NSE `holiday-master` API, `CM` segment). Each successful fetch is stored in `system_settings.nse_equity_holidays`; if NSE refuses the request, the stored official copy is used when it covers the year. With neither, the email is withheld and the admin is alerted.
+* **Pasted quotes:** `get_secret()` strips one pair of wrapping quotes from environment values, so a value pasted as `"https://..."` from a `.env` line still works.
+* **Date binding:** any run starting before 12:00 IST binds to the previous date (`_resolve_mode_and_date`), so the 01:00 backup and 07:30 email cover the prior evening, and a late manual run never takes over the next day.
 * **Fail-closed emails:** each edition requires its own sections (`EDITION_REQUIRED_SECTIONS` in `core/analysis/research_bouquet.py`); if any is empty after the wait, `BouquetDataUnavailableError` is raised, nothing is sent and the run exits 1. One send per (date, kind) via `digest_dispatches.edition_kind` (migration `v053`).
 * **AI budget:** after 40 minutes no new stock report generation starts; unstarted equities are reused from a verified archive or stay PENDING (never a template report) and are retried the next evening.
 * **Weekends:** no Market Close Wrap on Saturday/Sunday; the Saturday 07:30 email covers Friday's NAVs. Market holidays are not yet detected (only weekends).

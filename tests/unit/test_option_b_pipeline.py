@@ -119,10 +119,16 @@ class TestLeaseReleaseAndCompletionMarkers(unittest.TestCase):
 class TestTimedEmailSenders(unittest.TestCase):
     """L1/L3/L7: senders wait for their phases, send once per kind, never on weekends."""
 
-    def _run(self, kind, date_str, missing_seq, cap=5):
+    def _run(self, kind, date_str, missing_seq, cap=5, holiday=False):
         from scripts.run_scheduled_pipeline import run_send_edition
 
-        with patch("scripts.run_scheduled_pipeline.missing_done_markers", side_effect=missing_seq) as mock_missing, \
+        holiday_patch = (
+            patch("core.ingestion.market_calendar.is_nse_trading_holiday", side_effect=holiday)
+            if isinstance(holiday, Exception)
+            else patch("core.ingestion.market_calendar.is_nse_trading_holiday", return_value=holiday)
+        )
+        with holiday_patch, \
+             patch("scripts.run_scheduled_pipeline.missing_done_markers", side_effect=missing_seq) as mock_missing, \
              patch("scripts.run_scheduled_pipeline.time.sleep") as mock_sleep, \
              patch("scripts.run_scheduled_pipeline._dispatch_bouquet_phase") as mock_dispatch:
             res = run_send_edition(kind, date_str, wait_cap_seconds=cap)
@@ -159,6 +165,79 @@ class TestTimedEmailSenders(unittest.TestCase):
                 mock_dispatch.assert_not_called()
                 mock_missing.assert_not_called()
                 self.assertEqual(res["digest_dispatch"], "SKIPPED_MARKET_CLOSED")
+
+    def test_no_email_on_nse_holiday(self):
+        for kind in ("MARKET_CLOSE", "FUND_NAV"):
+            with self.subTest(kind=kind):
+                res, mock_missing, _, mock_dispatch = self._run(kind, "2026-01-26", [[]], holiday=True)
+                mock_dispatch.assert_not_called()
+                mock_missing.assert_not_called()
+                self.assertEqual(res["digest_dispatch"], "SKIPPED_MARKET_CLOSED")
+
+    def test_email_withheld_and_failed_when_holiday_calendar_unavailable(self):
+        from core.ingestion.market_calendar import MarketCalendarUnavailable
+        from scripts.run_scheduled_pipeline import _failed_phases
+
+        res, _, _, mock_dispatch = self._run(
+            "MARKET_CLOSE", "2026-11-12", [[]], holiday=MarketCalendarUnavailable("NSE down")
+        )
+        mock_dispatch.assert_not_called()
+        self.assertEqual(_failed_phases(res), ["digest_dispatch"])
+
+    def test_nse_holiday_payload_parsing(self):
+        from core.ingestion.market_calendar import MarketCalendarUnavailable, parse_nse_holidays
+
+        payload = {"CM": [{"tradingDate": "26-Jan-2026"}, {"tradingDate": "03-Mar-2026"}], "CBM": []}
+        self.assertEqual(parse_nse_holidays(payload), {"2026-01-26", "2026-03-03"})
+        for bad in ({}, {"CM": []}, {"CM": [{"tradingDate": "Jan 26"}]}):
+            with self.subTest(bad=bad), self.assertRaises(MarketCalendarUnavailable):
+                parse_nse_holidays(bad)
+
+    def test_holiday_check_fails_closed_for_uncovered_year(self):
+        from core.ingestion import market_calendar as mc
+
+        with patch.object(mc, "fetch_nse_equity_holidays", return_value={"2026-01-26"}):
+            self.assertTrue(mc.is_nse_trading_holiday("2026-01-26"))
+            self.assertFalse(mc.is_nse_trading_holiday("2026-11-12"))
+            with self.assertRaises(mc.MarketCalendarUnavailable):
+                mc.is_nse_trading_holiday("2027-01-26")
+
+    def _fetch_with(self, get_side_effect, stored=None):
+        """Runs fetch_nse_equity_holidays with a mocked NSE response and stored copy."""
+        from core.ingestion import market_calendar as mc
+
+        saved = {}
+        with patch.dict(mc._CACHE, {}, clear=True), \
+             patch.object(mc.requests, "get", side_effect=get_side_effect), \
+             patch("core.db.settings.get_system_setting", return_value=stored), \
+             patch("core.db.settings.set_system_setting",
+                   side_effect=lambda k, v: saved.update({k: v}) or True):
+            return mc.fetch_nse_equity_holidays(), saved
+
+    def test_live_holiday_list_is_stored_for_later_runs(self):
+        import json
+        from unittest.mock import MagicMock
+
+        resp = MagicMock()
+        resp.json.return_value = {"CM": [{"tradingDate": "26-Jan-2026"}]}
+        dates, saved = self._fetch_with([resp])
+        self.assertEqual(dates, {"2026-01-26"})
+        self.assertEqual(json.loads(saved["nse_equity_holidays"])["dates"], ["2026-01-26"])
+
+    def test_stored_holiday_list_used_when_nse_refuses(self):
+        import json
+
+        stored = json.dumps({"fetched_at": "2026-11-01T00:00:00+00:00", "dates": ["2026-11-10"]})
+        dates, saved = self._fetch_with(ConnectionError("403 from NSE"), stored=stored)
+        self.assertEqual(dates, {"2026-11-10"})
+        self.assertEqual(saved, {})
+
+    def test_no_live_and_no_stored_list_fails_closed(self):
+        from core.ingestion.market_calendar import MarketCalendarUnavailable
+
+        for stored in (None, "not json", '{"dates": ["26-Jan-2026"]}'):
+            with self.subTest(stored=stored), self.assertRaises(MarketCalendarUnavailable):
+                self._fetch_with(ConnectionError("403 from NSE"), stored=stored)
 
     def test_fund_update_waits_for_post_nav_phases(self):
         from scripts.run_scheduled_pipeline import fund_run_required_leases
@@ -381,12 +460,14 @@ class TestPhaseSixParallelismAndBudget(unittest.TestCase):
 
 
 class TestScheduleContracts(unittest.TestCase):
-    """GitHub runs the heavy work; Render runs backups and both senders at fixed IST times."""
+    """Render times every run (main runs, backups, both senders); GitHub is manual-only."""
 
-    def test_github_workflow_has_close_and_fund_runs_only(self):
+    def test_github_workflow_is_manual_only(self):
         wf = (ROOT / ".github/workflows/scheduled_pipeline.yml").read_text()
-        crons = re.findall(r'^\s*- cron: "([^"]+)"', wf, re.M)
-        self.assertEqual(crons, ["0 11 * * *", "45 17 * * *"])  # 16:30 and 23:15 IST
+        self.assertEqual(re.findall(r'^\s*- cron: "([^"]+)"', wf, re.M), [])
+        self.assertNotRegex(wf, r"(?m)^\s*schedule:\s*$")
+        self.assertNotIn("github.event.schedule", wf)
+        self.assertRegex(wf, r"(?m)^\s*workflow_dispatch:\s*$")
         self.assertRegex(wf, r"(?m)^\s*timeout-minutes: 90\s*$")
         self.assertNotRegex(wf, r"(?m)^\s*- morning\s*$")
 
@@ -403,7 +484,9 @@ class TestScheduleContracts(unittest.TestCase):
     def test_render_cron_jobs_cover_backups_and_both_emails(self):
         crons = {n: s["text"] for n, s in self._render_services().items() if s["type"] == "cron"}
         expected = {
+            "close-run": ("0 11 * * *", "--mode evening", "0"),
             "close-run-backup": ("0 13 * * *", "--mode close-backup", "0"),
+            "fund-run": ("45 17 * * *", "--mode nightly", "0"),
             "market-close-wrap-sender": ("0 14 * * 1-5", "--mode send-close-wrap", "1"),
             "fund-run-backup": ("30 19 * * *", "--mode fund-backup", "0"),
             "fund-nav-update-sender": ("0 2 * * 2-6", "--mode send-fund-update", "1"),
@@ -418,13 +501,23 @@ class TestScheduleContracts(unittest.TestCase):
                     block, r'key: ENABLE_LIVE_EMAIL_DISPATCH\n\s+value: "%s"' % live_email
                 )
                 self.assertRegex(block, r'key: ENABLE_BACKGROUND_SCHEDULERS\n\s+value: "0"')
-                self.assertIn("key: SUPABASE_DB_URL", block)
+                # Secrets come either per job (sync: false) or from the shared dashboard env group.
+                self.assertTrue(
+                    "key: SUPABASE_DB_URL" in block or "fromGroup: moatnomics-pipeline-secrets" in block,
+                    f"{name} has no database secret",
+                )
                 # Same Docker image as the live website, built from main in the website's region.
                 self.assertIn("runtime: docker", block)
                 self.assertIn("dockerfilePath: ./Dockerfile", block)
                 self.assertIn("branch: main", block)
                 self.assertIn("region: singapore", block)
                 self.assertIn(f'dockerCommand: "python3 scripts/run_scheduled_pipeline.py {mode}"', block)
+
+    def test_main_runs_bind_to_the_same_day(self):
+        """16:30 and 23:15 IST are after 12:00 IST, so both main runs bind to today, not T-1."""
+        for utc_hour, utc_min in ((11, 0), (17, 45)):
+            ist_minutes = (utc_hour * 60 + utc_min + 330) % (24 * 60)
+            self.assertGreaterEqual(ist_minutes, 12 * 60)
 
     def test_render_blueprint_never_defines_a_second_website(self):
         services = self._render_services()

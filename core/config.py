@@ -108,6 +108,19 @@ def _load_local_secrets() -> dict:
     _SECRETS_LOADED = True
     return _SECRETS_CACHE
 
+def _strip_wrapping_quotes(raw: Any) -> str:
+    """Trims whitespace and one pair of matching wrapping quotes.
+
+    Values pasted into a host dashboard straight from a .env line (KEY="https://...") keep their
+    quotes, which turns a URL into `"https://...` and breaks it. No real value starts and ends
+    with the same quote character, so removing one wrapping pair is safe.
+    """
+    text = str(raw).strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in ("'", '"'):
+        text = text[1:-1].strip()
+    return text
+
+
 def get_secret(key: str, default: Any = None) -> Any:
     """
     Retrieves configuration value from:
@@ -134,7 +147,7 @@ def get_secret(key: str, default: Any = None) -> Any:
             return None
 
     val = os.environ.get(key)
-    clean_env = str(val).strip() if val is not None and str(val).strip() else None
+    clean_env = _strip_wrapping_quotes(val) if val is not None and str(val).strip() else None
 
     # Cloud self-heal: if GOOGLE_GENAI_USE_VERTEXAI=true on host (e.g. Render) while env still holds
     # a stale AI Studio AIza* key, promote the synced AQ.* Vertex Express key from system_settings.
