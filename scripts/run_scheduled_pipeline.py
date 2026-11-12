@@ -4,16 +4,16 @@ Scheduled Multi-Asset Report & Update Pipeline Runner.
 Executes autonomously across Cloud (GitHub Actions Cron / Render Failover) and Local macOS Failover
 against Supabase PostgreSQL with distributed job leases.
 
-Cadence Architecture (IST) — option B: two runs, two timed emails, off-GitHub backups:
-  --mode evening           (GitHub 16:30 IST close run: Sovereign, Savings, ETF prices, Debt Scan,
+Cadence Architecture (IST) — option B, all timed by Render cron jobs (render.yaml):
+  --mode evening           (Render 16:30 IST close run: Sovereign, Savings, ETF prices, Debt Scan,
                             Discovery Reel, MSME, MF constituent stock reports, monthly SEBI MF sync;
                             Sat/Sun: Weekend Warehouse Mode runs MSME + Stock Constituents only)
   --mode close-backup      (Render 18:30 IST: same phases; skips finished/in-progress ones)
-  --mode send-close-wrap   (Render 19:30 IST: Market Close Wrap email, Mon-Fri)
-  --mode nightly           (GitHub 23:15 IST fund run: AMFI NAVs, post-NAV ETF matrix, Sovereign/Scan
+  --mode send-close-wrap   (Render 19:30 IST daily: Market Close Wrap email; weekends/NSE holidays skip)
+  --mode nightly           (Render 23:15 IST fund run: AMFI NAVs, post-NAV ETF matrix, Sovereign/Scan
                             failover, Mutual Fund Rotation Audit)
   --mode fund-backup       (Render 01:00 IST: same phases for the prior evening's date)
-  --mode send-fund-update  (Render 07:30 IST: Fund NAV Update email for the prior trading day, Tue-Sat)
+  --mode send-fund-update  (Render 07:30 IST daily: Fund NAV Update for the prior trading day; skips non-trading days)
   --mode auto              (Resolves evening / nightly + edition date from the IST wall clock)
   --mode all               (Executes evening + nightly sequentially; manual use)
 Runs that start before 12:00 IST bind to the previous date, so delayed runners never take over

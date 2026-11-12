@@ -1,11 +1,21 @@
 # Platform Roadmap & Pending Tasks Register
 **Moatnomics — Multi-Asset Investment Research Platform**  
 *Document Target:* [`docs/PENDING_TASKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/PENDING_TASKS.md)  
-*Last Updated:* 2026-11-09 18:15:00 IST
+*Last Updated:* 2026-11-12 20:45:00 IST
 
 ---
 
 ## 1. Active, In-Progress & Parked Tasks
+
+### Task 7: Research Emails Land in Gmail Promotions
+- **Category:** Email Deliverability
+- **Status:** `Pending`
+- **Origin:** Owner report (2026-11-12). The 2026-11-12 Market Close Wrap was delivered by Resend at 19:58 IST, but Gmail filed it under Promotions rather than Primary.
+- **Details:**
+  1. Review what makes Gmail treat the Market Close Wrap and Fund NAV Update as marketing: image and link density, promotional wording in subjects and headers, missing plain-text part, sender-name consistency, and `List-Unsubscribe` / `List-Unsubscribe-Post` headers.
+  2. Check `desk@moatnomics.com` domain authentication in Resend (SPF, DKIM, DMARC alignment).
+  3. Once the Resend webhook records opens (`digest_recipient_events`), compare open rates before and after any change.
+  4. Optional: a one-line "move this to Primary" hint for subscribers in the email footer.
 
 ### Task 5: Track 3 Language & Voice, Open Items
 - **Category:** Brand, Copy & Compliance Wording

@@ -57,10 +57,11 @@ class TestMailerMonitor(unittest.TestCase):
                 if results.get("phases_missing_at_send"):
                     self.assertIn("msme_daily_ingest_2026-11-12", body)
 
-    def test_weekend_or_holiday_skip_is_silent(self):
+    def test_weekend_or_holiday_skip_pings_without_alerting(self):
+        """Senders run daily; a market-closed skip is a healthy run, so it keeps the 24 h heartbeat alive."""
         outcome, ping, resend = self._report({"digest_dispatch": "SKIPPED_MARKET_CLOSED"})
         self.assertEqual(outcome, "SKIPPED")
-        ping.assert_not_called()
+        ping.assert_called_once()
         resend.assert_not_called()
 
     def test_missing_alert_address_logs_instead_of_guessing_a_recipient(self):

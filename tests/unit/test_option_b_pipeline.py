@@ -482,14 +482,17 @@ class TestScheduleContracts(unittest.TestCase):
         return services
 
     def test_render_cron_jobs_cover_backups_and_both_emails(self):
-        crons = {n: s["text"] for n, s in self._render_services().items() if s["type"] == "cron"}
+        crons = {
+            n: s["text"] for n, s in self._render_services().items()
+            if s["type"] == "cron" and "run_scheduled_pipeline.py" in s["text"]
+        }
         expected = {
             "close-run": ("0 11 * * *", "--mode evening", "0"),
             "close-run-backup": ("0 13 * * *", "--mode close-backup", "0"),
             "fund-run": ("45 17 * * *", "--mode nightly", "0"),
-            "market-close-wrap-sender": ("0 14 * * 1-5", "--mode send-close-wrap", "1"),
+            "market-close-wrap-sender": ("0 14 * * *", "--mode send-close-wrap", "1"),
             "fund-run-backup": ("30 19 * * *", "--mode fund-backup", "0"),
-            "fund-nav-update-sender": ("0 2 * * 2-6", "--mode send-fund-update", "1"),
+            "fund-nav-update-sender": ("0 2 * * *", "--mode send-fund-update", "1"),
         }
         self.assertEqual(set(crons), set(expected))
         for name, (schedule, mode, live_email) in expected.items():
@@ -521,7 +524,35 @@ class TestScheduleContracts(unittest.TestCase):
 
     def test_render_blueprint_never_defines_a_second_website(self):
         services = self._render_services()
-        self.assertEqual({s["type"] for s in services.values()}, {"cron"})
+        self.assertEqual({s["type"] for s in services.values()}, {"cron", "worker"})
+
+    def test_reminder_and_paid_audit_worker_run_on_render(self):
+        services = self._render_services()
+        reminder = services["subscription-renewal-reminder"]
+        self.assertEqual(reminder["type"], "cron")
+        self.assertIn('schedule: "30 15 * * *"', reminder["text"])  # 21:00 IST
+        self.assertIn('dockerCommand: "python3 scripts/send_subscription_reminder.py --send-email"', reminder["text"])
+        worker = services["paid-fund-audit-worker"]
+        self.assertEqual(worker["type"], "worker")
+        self.assertIn('dockerCommand: "python3 scripts/run_paid_fund_audit_worker.py"', worker["text"])
+        self.assertNotIn("schedule:", worker["text"])
+
+    def test_every_service_reads_secrets_from_the_shared_group(self):
+        """One place to change a key: only the senders' own heartbeat URLs are per-job secrets."""
+        for name, svc in self._render_services().items():
+            with self.subTest(name=name):
+                self.assertIn("- fromGroup: moatnomics-pipeline-secrets", svc["text"])
+                per_job = re.findall(r"key: (\S+)\n\s+sync: false", svc["text"])
+                self.assertTrue(all(k.startswith("BETTER_STACK_HEARTBEAT_URL_") for k in per_job), per_job)
+
+    def test_no_github_workflow_times_a_run(self):
+        # The two workflows that used to carry cron triggers (the others run on push/PR only).
+        for name in ("scheduled_pipeline.yml", "subscription_renewal_reminder.yml"):
+            wf = ROOT / ".github/workflows" / name
+            with self.subTest(workflow=name):
+                text = wf.read_text()
+                self.assertNotRegex(text, r"(?m)^\s*schedule:\s*$")
+                self.assertRegex(text, r"(?m)^\s*workflow_dispatch:")
 
 
 if __name__ == "__main__":

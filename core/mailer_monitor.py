@@ -2,8 +2,9 @@
 Mailer monitoring for the two research emails (Market Close Wrap 19:30 IST, Fund NAV Update 07:30 IST).
 
 After each Render sender job:
-- a successful send pings that mailer's own Better Stack heartbeat, so a missed ping (job never ran,
-  key expired, data empty, GitHub/Render outage) raises an alert from Better Stack;
+- a successful send, or an expected market-closed skip (weekend / NSE holiday), pings that mailer's
+  own Better Stack heartbeat. The senders run every day, so each heartbeat expects one ping per
+  24 hours and a missed ping (job never ran, key expired, data empty, Render outage) raises an alert;
 - any outcome other than a send or an expected market-closed skip emails ADMIN_ALERT_EMAIL with the
   edition, date, status and the phases that were still unfinished.
 """
@@ -101,10 +102,14 @@ def send_mailer_alert(edition_kind: str, date_str: str, outcome: str, results: D
 
 
 def report_mailer_outcome(edition_kind: str, date_str: str, results: Optional[Dict[str, Any]]) -> str:
-    """Heartbeat on a send, alert on anything that is not a send or an expected skip. Returns the outcome."""
+    """Heartbeat on a send or expected skip, alert on anything else. Returns the outcome.
+
+    The skip pings too: the senders run daily and exit early on weekends and NSE holidays, so a
+    24-hour Better Stack heartbeat only goes quiet when a run did not happen or did not finish.
+    """
     results = results or {}
     outcome = classify_outcome(results)
-    if outcome in ("SENT", "PARTIAL"):
+    if outcome in ("SENT", "PARTIAL", "SKIPPED"):
         ping_mailer_heartbeat(edition_kind)
     if outcome in ("PARTIAL", "NOT_SENT"):
         send_mailer_alert(edition_kind, date_str, outcome, results)

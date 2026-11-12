@@ -1,9 +1,8 @@
 name: Subscription Renewal & Optimization Reminder
 
+# Manual runs only. The daily 21:00 IST reminder is timed by the Render cron job
+# `subscription-renewal-reminder` (render.yaml); GitHub's scheduler started runs late or not at all.
 on:
-  schedule:
-    # Daily at 21:00 IST / 9:00 PM IST (15:30 UTC)
-    - cron: "30 15 * * *"
   workflow_dispatch:
     inputs:
       date:

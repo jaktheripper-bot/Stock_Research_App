@@ -108,7 +108,11 @@ class TestRenderCronJobsSetALimit(unittest.TestCase):
     def test_every_render_cron_job_sets_a_limit_under_two_hours(self):
         text = (ROOT / "render.yaml").read_text()
         blocks = re.split(r"(?m)^  - type: ", text)[1:]
-        crons = [b for b in blocks if b.split("\n", 1)[0].strip() == "cron"]
+        # The limit is read by scripts/run_scheduled_pipeline.py, so it applies to the pipeline jobs.
+        crons = [
+            b for b in blocks
+            if b.split("\n", 1)[0].strip() == "cron" and "run_scheduled_pipeline.py" in b
+        ]
         self.assertEqual(len(crons), 6)
         for block in crons:
             name = re.search(r"(?m)^    name: (\S+)", block).group(1)

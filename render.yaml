@@ -1,19 +1,18 @@
-# Render Blueprint for Moatnomics scheduled jobs (Option B).
+# Render Blueprint for Moatnomics scheduled jobs and background workers.
 #
-# What this file manages: ONLY the six cron jobs below. They build from the same Dockerfile and
-# branch as the website and run scripts/run_scheduled_pipeline.py with a mode per job. Render is
-# the only scheduler: GitHub Actions keeps the workflow for manual runs but no longer times any run.
+# What this file manages: the seven cron jobs and one background worker below. They build from the
+# same Dockerfile and branch as the website. Render is the only scheduler: GitHub Actions keeps its
+# workflows for manual runs but no longer times any run.
 #
 # What it deliberately does NOT manage:
 #   - The website ("Moatnomics.com", Docker web service, Singapore). It was created in the Render
 #     dashboard; a new Blueprint would create a second, suffixed copy rather than adopt it, so it
 #     stays dashboard-managed. Its env vars live on that service.
-#   - The paid fund audit worker (scripts/run_paid_fund_audit_worker.py). It is not deployed on
-#     Render today; add it here deliberately if paid deep-dive audits should run off the website.
 #
-# Secrets: the four original jobs use `sync: false` (values entered when the Blueprint was created
-# and kept on later syncs). The two main runs read theirs from the dashboard-managed environment
-# group `moatnomics-pipeline-secrets`, which must exist in the workspace before this file syncs.
+# Secrets: every service reads them from the dashboard-managed environment group
+# `moatnomics-pipeline-secrets` (`fromGroup`), so a key is changed in one place. The only per-job
+# secrets are each sender's own Better Stack heartbeat URL (`sync: false`). A value set directly on
+# a service overrides the group, so per-service copies of group keys must be deleted in the dashboard.
 # Schedules are UTC (IST = UTC + 5:30).
 
 services:
@@ -54,28 +53,7 @@ services:
     schedule: "0 13 * * *"
     dockerCommand: "python3 scripts/run_scheduled_pipeline.py --mode close-backup"
     envVars:
-      - key: SUPABASE_DB_URL
-        sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: PERPLEXITY_API_KEY
-        sync: false
-      - key: SMARTAPI_PROXY_URL
-        sync: false
-      - key: ANGEL_API_KEY
-        sync: false
-      - key: ANGEL_CLIENT_CODE
-        sync: false
-      - key: ANGEL_PIN
-        sync: false
-      - key: ANGEL_TOTP_KEY
-        sync: false
-      - key: BETTER_STACK_SOURCE_TOKEN
-        sync: false
-      - key: BETTER_STACK_HEARTBEAT_URL
-        sync: false
+      - fromGroup: moatnomics-pipeline-secrets
       - key: GOOGLE_GENAI_USE_VERTEXAI
         value: "true"
       - key: ENABLE_BACKGROUND_SCHEDULERS
@@ -90,7 +68,8 @@ services:
       - key: ENABLE_LIVE_EMAIL_DISPATCH
         value: "0"
 
-  # 19:30 IST Mon-Fri: sends the Market Close Wrap once its phases are done (waits up to 60 min; fails closed on empty sections).
+  # 19:30 IST daily: sends the Market Close Wrap once its phases are done (waits up to 60 min; fails
+  # closed on empty sections). Weekends and NSE holidays exit early but still ping the heartbeat.
   - type: cron
     name: market-close-wrap-sender
     runtime: docker
@@ -98,31 +77,10 @@ services:
     branch: main
     plan: starter
     dockerfilePath: ./Dockerfile
-    schedule: "0 14 * * 1-5"
+    schedule: "0 14 * * *"
     dockerCommand: "python3 scripts/run_scheduled_pipeline.py --mode send-close-wrap"
     envVars:
-      - key: SUPABASE_DB_URL
-        sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: PERPLEXITY_API_KEY
-        sync: false
-      - key: SMARTAPI_PROXY_URL
-        sync: false
-      - key: ANGEL_API_KEY
-        sync: false
-      - key: ANGEL_CLIENT_CODE
-        sync: false
-      - key: ANGEL_PIN
-        sync: false
-      - key: ANGEL_TOTP_KEY
-        sync: false
-      - key: BETTER_STACK_SOURCE_TOKEN
-        sync: false
-      - key: BETTER_STACK_HEARTBEAT_URL
-        sync: false
+      - fromGroup: moatnomics-pipeline-secrets
       - key: GOOGLE_GENAI_USE_VERTEXAI
         value: "true"
       - key: ENABLE_BACKGROUND_SCHEDULERS
@@ -134,10 +92,6 @@ services:
         value: "s2808842.us-west-2a.betterstackdata.com"
       - key: CANONICAL_DOMAIN
         value: https://moatnomics.com
-      - key: RESEND_API_KEY
-        sync: false
-      - key: ADMIN_ALERT_EMAIL
-        sync: false
       - key: BETTER_STACK_HEARTBEAT_URL_MARKET_CLOSE
         sync: false
       - key: ENABLE_LIVE_EMAIL_DISPATCH
@@ -182,28 +136,7 @@ services:
     schedule: "30 19 * * *"
     dockerCommand: "python3 scripts/run_scheduled_pipeline.py --mode fund-backup"
     envVars:
-      - key: SUPABASE_DB_URL
-        sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: PERPLEXITY_API_KEY
-        sync: false
-      - key: SMARTAPI_PROXY_URL
-        sync: false
-      - key: ANGEL_API_KEY
-        sync: false
-      - key: ANGEL_CLIENT_CODE
-        sync: false
-      - key: ANGEL_PIN
-        sync: false
-      - key: ANGEL_TOTP_KEY
-        sync: false
-      - key: BETTER_STACK_SOURCE_TOKEN
-        sync: false
-      - key: BETTER_STACK_HEARTBEAT_URL
-        sync: false
+      - fromGroup: moatnomics-pipeline-secrets
       - key: GOOGLE_GENAI_USE_VERTEXAI
         value: "true"
       - key: ENABLE_BACKGROUND_SCHEDULERS
@@ -218,7 +151,8 @@ services:
       - key: ENABLE_LIVE_EMAIL_DISPATCH
         value: "0"
 
-  # 07:30 IST Tue-Sat: sends the Fund NAV Update for the prior trading day (waits up to 45 min; fails closed on empty sections).
+  # 07:30 IST daily: sends the Fund NAV Update for the prior trading day (waits up to 45 min; fails
+  # closed on empty sections). Days after a weekend/NSE holiday exit early but still ping the heartbeat.
   - type: cron
     name: fund-nav-update-sender
     runtime: docker
@@ -226,31 +160,10 @@ services:
     branch: main
     plan: starter
     dockerfilePath: ./Dockerfile
-    schedule: "0 2 * * 2-6"
+    schedule: "0 2 * * *"
     dockerCommand: "python3 scripts/run_scheduled_pipeline.py --mode send-fund-update"
     envVars:
-      - key: SUPABASE_DB_URL
-        sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: PERPLEXITY_API_KEY
-        sync: false
-      - key: SMARTAPI_PROXY_URL
-        sync: false
-      - key: ANGEL_API_KEY
-        sync: false
-      - key: ANGEL_CLIENT_CODE
-        sync: false
-      - key: ANGEL_PIN
-        sync: false
-      - key: ANGEL_TOTP_KEY
-        sync: false
-      - key: BETTER_STACK_SOURCE_TOKEN
-        sync: false
-      - key: BETTER_STACK_HEARTBEAT_URL
-        sync: false
+      - fromGroup: moatnomics-pipeline-secrets
       - key: GOOGLE_GENAI_USE_VERTEXAI
         value: "true"
       - key: ENABLE_BACKGROUND_SCHEDULERS
@@ -262,13 +175,57 @@ services:
         value: "s2808842.us-west-2a.betterstackdata.com"
       - key: CANONICAL_DOMAIN
         value: https://moatnomics.com
-      - key: RESEND_API_KEY
-        sync: false
-      - key: ADMIN_ALERT_EMAIL
-        sync: false
       - key: BETTER_STACK_HEARTBEAT_URL_FUND_NAV
         sync: false
       - key: ENABLE_LIVE_EMAIL_DISPATCH
         value: "1"
       - key: SMTP_FROM
         value: "Moatnomics Service Desk <desk@moatnomics.com>"
+
+  # 21:00 IST daily: owner-only subscription renewal & cost reminder (at most one email per IST date).
+  - type: cron
+    name: subscription-renewal-reminder
+    runtime: docker
+    region: singapore
+    branch: main
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    schedule: "30 15 * * *"
+    dockerCommand: "python3 scripts/send_subscription_reminder.py --send-email"
+    envVars:
+      - fromGroup: moatnomics-pipeline-secrets
+      - key: GOOGLE_GENAI_USE_VERTEXAI
+        value: "true"
+      - key: ENABLE_BACKGROUND_SCHEDULERS
+        value: "0"
+      - key: BETTER_STACK_INGESTING_HOST
+        value: "s2808842.us-west-2a.betterstackdata.com"
+      - key: CANONICAL_DOMAIN
+        value: https://moatnomics.com
+      - key: ENABLE_LIVE_EMAIL_DISPATCH
+        value: "1"
+      - key: SMTP_FROM
+        value: "Moatnomics Service Desk <desk@moatnomics.com>"
+
+  # Always on: claims and runs paid mutual fund deep-dive audits. The website refuses new paid audits
+  # (no credits charged) whenever this worker's heartbeat is older than 30 seconds.
+  - type: worker
+    name: paid-fund-audit-worker
+    runtime: docker
+    region: singapore
+    branch: main
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerCommand: "python3 scripts/run_paid_fund_audit_worker.py"
+    envVars:
+      - fromGroup: moatnomics-pipeline-secrets
+      - key: GOOGLE_GENAI_USE_VERTEXAI
+        value: "true"
+      - key: ENABLE_BACKGROUND_SCHEDULERS
+        value: "0"
+      - key: BETTER_STACK_INGESTING_HOST
+        value: "s2808842.us-west-2a.betterstackdata.com"
+      - key: CANONICAL_DOMAIN
+        value: https://moatnomics.com
+      - key: ENABLE_LIVE_EMAIL_DISPATCH
+        value: "0"
