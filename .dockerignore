@@ -1,0 +1,43 @@
+# Keeps secrets, local databases and personal working files out of Docker images.
+# Render builds from a git clone, where most of these are already absent (git-ignored); this file
+# also protects any local `docker build .`, which would otherwise copy the whole working folder.
+
+# Secrets
+.env
+.env.*
+**/.streamlit/secrets.toml
+
+# Local databases (real user data) and their WAL/SHM side files
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+
+# Backups, scratch work, checkpoints and exports
+backups/
+scratch/
+.checkpoints/
+exports/
+moatnomics_codebase.txt
+Claude outputs/
+
+# Version control, editor, agent and cloud-sync folders
+.git/
+.github/
+.vscode/
+.claude/
+.agents/
+.antigravity/
+.tmp.driveupload/
+.tmp.drivedownload/
+*.code-workspace
+.DS_Store
+
+# Local Python environments and caches
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.cache/

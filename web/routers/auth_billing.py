@@ -281,6 +281,21 @@ async def public_auth_google(request: Request, redirect: Optional[str] = "/"):
     )
 
 
+def _safe_next_path(raw: Optional[str]) -> str:
+    """Same-site relative path only. Rejects absolute URLs, scheme-relative `//host`, the `/\\host`
+    variant browsers treat the same way, and control characters; anything else becomes "/"."""
+    candidate = (raw or "").strip()
+    if (
+        not candidate.startswith("/")
+        or candidate.startswith("//")
+        or candidate.startswith("/\\")
+        or any(ord(ch) < 32 or ord(ch) == 127 for ch in candidate)
+        or len(candidate) > 512
+    ):
+        return "/"
+    return candidate
+
+
 @router.get("/auth/callback")
 async def public_auth_callback(
     request: Request,
@@ -304,8 +319,7 @@ async def public_auth_callback(
 
     current_user = _get_current_web_user(request)
     if current_user and not code and not access_token:
-        raw_next = request.query_params.get("next") or "/"
-        dest_url = raw_next if (raw_next.startswith("/") and not raw_next.startswith("//")) else "/"
+        dest_url = _safe_next_path(request.query_params.get("next"))
         return RedirectResponse(url=dest_url, status_code=303)
 
     cfg = get_supabase_auth_config()
@@ -346,6 +360,9 @@ async def public_auth_callback(
                 url="/?err=Authentication+verification+failed.+Please+try+signing+in+again.",
                 status_code=303,
             )
+        # `next` is attacker-controllable: clean it, then hand it to the script as a JSON string
+        # literal with `</` escaped so it can never close the <script> element or break out of quotes.
+        hash_next_js = json.dumps(_safe_next_path(next)).replace("</", "<\\/")
         return HTMLResponse(f"""
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"><title>Verifying Identity...</title></head>
@@ -360,7 +377,7 @@ async def public_auth_callback(
                 const token = params.get('access_token');
                 const err = params.get('error_description') || params.get('error');
                 if (token) {{
-                    window.location.replace('/auth/callback?access_token=' + encodeURIComponent(token) + '&next=' + encodeURIComponent('{next or "/"}'));
+                    window.location.replace('/auth/callback?access_token=' + encodeURIComponent(token) + '&next=' + encodeURIComponent({hash_next_js}));
                 }} else if (err) {{
                     window.location.replace('/?err=' + encodeURIComponent(err));
                 }} else {{
@@ -381,8 +398,7 @@ async def public_auth_callback(
     token = _generate_user_session_token(user_id, clean_email)
     oauth_next_cookie = (request.cookies.get("oauth_next") or "").strip('"')
     import html as _html
-    raw_next = request.query_params.get("next") or oauth_next_cookie or "/"
-    dest_url = raw_next if (raw_next.startswith("/") and not raw_next.startswith("//")) else "/"
+    dest_url = _safe_next_path(request.query_params.get("next") or oauth_next_cookie or "/")
     safe_name = _html.escape(str(full_name or ""))
     safe_dest_html = _html.escape(dest_url, quote=True)
     safe_dest_js = json.dumps(dest_url).replace("</", "<\\/")
@@ -772,13 +788,11 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
     if payload.days_since_last_visit is not None and "days_since_last_visit" not in evt_details:
         evt_details["days_since_last_visit"] = max(0.0, round(float(payload.days_since_last_visit), 1))
 
-    resolved_user_id = payload.user_id
-    resolved_user_email = payload.user_email
-    if not resolved_user_id or not resolved_user_email:
-        web_user = _get_current_web_user(request)
-        if web_user:
-            resolved_user_id = resolved_user_id or web_user.get("id")
-            resolved_user_email = resolved_user_email or web_user.get("email")
+    # Identity comes only from the signed session cookie. Body user_id / user_email are ignored so
+    # nobody can log events under another user's or an admin's name.
+    web_user = _get_current_web_user(request)
+    resolved_user_id = web_user.get("id") if web_user else None
+    resolved_user_email = web_user.get("email") if web_user else None
 
     resolved_lp = payload.landing_page or payload.path or evt_details.get("landing_page") or ""
     if not resolved_lp and payload.landing_url:

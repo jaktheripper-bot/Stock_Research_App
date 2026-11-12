@@ -1163,7 +1163,14 @@ async def api_countercase(payload: CountercaseRequest, request: Request):
     from core.db.users import save_user_thesis_entry
     canonical = resolve_canonical_symbol(clean_t) or clean_t
     web_user = _get_current_web_user(request)
-    resolved_uid = str(web_user.get("id") if web_user and web_user.get("id") else (payload.user_id or "guest_web_user")).strip()
+    # Identity comes only from the signed session cookie; a body `user_id` is never trusted,
+    # otherwise an anonymous caller could write into any user's private ledger.
+    resolved_uid = str(web_user.get("id")).strip() if web_user and web_user.get("id") else "guest_web_user"
+    claimed_uid = str(payload.user_id or "").strip()
+    if resolved_uid == "guest_web_user" and claimed_uid and claimed_uid != "guest_web_user":
+        # The page thinks someone is signed in but the session cookie is gone: say so rather than
+        # report a save that never happened.
+        raise HTTPException(status_code=401, detail="Your session has expired. Please sign in again to save this to your ledger.")
 
     if resolved_uid and resolved_uid != "guest_web_user":
         save_user_thesis_entry(
@@ -1204,7 +1211,14 @@ async def api_thesis_checkpoint(payload: ThesisCheckpointRequest, request: Reque
     from core.db.users import save_user_thesis_entry
     canonical = resolve_canonical_symbol(clean_t) or clean_t
     web_user = _get_current_web_user(request)
-    resolved_uid = str(web_user.get("id") if web_user and web_user.get("id") else (payload.user_id or "guest_web_user")).strip()
+    # Identity comes only from the signed session cookie; a body `user_id` is never trusted,
+    # otherwise an anonymous caller could write into any user's private ledger.
+    resolved_uid = str(web_user.get("id")).strip() if web_user and web_user.get("id") else "guest_web_user"
+    claimed_uid = str(payload.user_id or "").strip()
+    if resolved_uid == "guest_web_user" and claimed_uid and claimed_uid != "guest_web_user":
+        # The page thinks someone is signed in but the session cookie is gone: say so rather than
+        # report a save that never happened.
+        raise HTTPException(status_code=401, detail="Your session has expired. Please sign in again to save this to your ledger.")
 
     if resolved_uid and resolved_uid != "guest_web_user":
         save_user_thesis_entry(

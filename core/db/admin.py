@@ -226,9 +226,12 @@ def get_admin_user(email: str) -> Optional[Dict[str, Any]]:
             cursor.close()
             conn.close()
     except Exception as e:
-        logger.error(f"Error fetching admin user '{clean_email}': {e}")
+        # Fail closed (AGENTS.md Rule 8): an unreadable admin table must never mint a session,
+        # least of all an owner with 2FA reported as off.
+        logger.error(f"Error fetching admin user '{clean_email}'; refusing admin access: {e}")
+        return None
 
-    # 2. Resilient Owner Auto-Bootstrap Fallback
+    # 2. Owner Auto-Bootstrap (database reachable, owner row not yet created)
     # If the email matches the authorized owner/bootstrap whitelist, ensure the owner is NEVER locked out
     bootstrap_emails = get_authorized_bootstrap_emails()
     if clean_email in bootstrap_emails:
@@ -280,19 +283,10 @@ def get_admin_user(email: str) -> Optional[Dict[str, Any]]:
         except Exception as persist_err:
             logger.warning(f"Could not persist auto-bootstrapped admin '{clean_email}': {persist_err}")
 
-        # Return guaranteed in-memory owner record if DB insert or re-fetch failed
-        return {
-            "id": admin_id,
-            "email": clean_email,
-            "role": "owner",
-            "totp_secret": None,
-            "totp_enabled": 0,
-            "is_active": True,
-            "invited_by": None,
-            "created_at": now_iso,
-            "updated_at": now_iso,
-            "last_login_at": None,
-        }
+        # Fail closed: without a persisted row (which keeps any enrolled totp_secret) there is no
+        # admin record to trust, so no in-memory owner is synthesized.
+        logger.error(f"Owner bootstrap for '{clean_email}' could not be persisted; refusing admin access.")
+        return None
 
     return None
 

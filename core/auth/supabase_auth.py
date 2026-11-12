@@ -158,12 +158,12 @@ def _verify_es256_jwt_with_jwks(access_token: str, header: dict, sb_url: str) ->
 def verify_supabase_access_token(access_token: str) -> Tuple[Optional[str], Optional[str]]:
     """
     Verifies a Supabase OAuth access_token and returns (verified_email, full_name).
-    Uses a 3-tier verification strategy so authentication succeeds even if SUPABASE_ANON_KEY
-    is omitted on Render or set to an sb_secret_ key:
+    Every accepted token is proven to be Supabase-issued:
       1. Cryptographic ES256 verification via public {sb_url}/auth/v1/.well-known/jwks.json
-      2. Supabase REST /auth/v1/user verification
-      3. Supabase Admin /auth/v1/admin/users/{sub} verification (when using sb_secret_ key)
-      4. Synthetic token claim extraction strictly in unit test mode (TESTING=1)
+      2. Supabase REST /auth/v1/user introspection, which sends the caller's own token
+      3. Synthetic token claim extraction strictly in unit test mode (TESTING=1)
+    There is deliberately no admin-API lookup by `sub`: that only proves a user exists, not that
+    the caller holds a valid session for them, so it would let a forged token sign in as anyone.
     """
     if not access_token or not isinstance(access_token, str):
         return None, None
@@ -185,25 +185,31 @@ def verify_supabase_access_token(access_token: str) -> Tuple[Optional[str], Opti
         except Exception as e:
             logger.debug(f"JWT payload decode notice: {e}")
 
-    # Reject expired tokens immediately
+    # Reject expired tokens immediately. Supabase always sets `exp`, so a token without a numeric
+    # one is rejected outside unit tests.
     exp = claims.get("exp")
-    if exp is not None:
-        try:
-            if float(exp) < (time.time() - 60):
-                logger.warning("Rejected expired Supabase OAuth access_token.")
-                return None, None
-        except (TypeError, ValueError) as e:
-            logger.debug(f"JWT exp parse notice: {e}")
+    try:
+        exp_value = float(exp) if exp is not None else None
+    except (TypeError, ValueError):
+        exp_value = None
+    if exp_value is None and os.environ.get("TESTING") != "1":
+        logger.warning("Rejected Supabase OAuth access_token without a valid exp claim.")
+        return None, None
+    if exp_value is not None and exp_value < (time.time() - 60):
+        logger.warning("Rejected expired Supabase OAuth access_token.")
+        return None, None
 
     user_meta = claims.get("user_metadata") or {}
     claim_email = claims.get("email") or user_meta.get("email")
     claim_name = user_meta.get("full_name") or user_meta.get("name") or claims.get("name")
 
-    # Tier 1: Cryptographic ES256 signature verification via Supabase public JWKS (zero API key needed)
-    if claim_email and header.get("alg") == "ES256" and sb_url:
+    # Tier 1: Cryptographic ES256 signature verification via Supabase public JWKS (zero API key needed).
+    # Identity comes only from the signed top-level `email` claim, never user-editable user_metadata.
+    signed_email = claims.get("email")
+    if signed_email and header.get("alg") == "ES256" and sb_url:
         if _verify_es256_jwt_with_jwks(access_token, header, sb_url):
-            logger.info(f"Verified Supabase OAuth token via ES256 JWKS for {claim_email}")
-            return claim_email, claim_name
+            logger.info(f"Verified Supabase OAuth token via ES256 JWKS for {signed_email}")
+            return signed_email, claim_name
 
     # Tier 2: Supabase /auth/v1/user REST endpoint
     if sb_url and os.environ.get("TESTING") != "1":
@@ -224,27 +230,7 @@ def verify_supabase_access_token(access_token: str) -> Tuple[Optional[str], Opti
         except Exception as e:
             logger.warning(f"Notice calling Supabase /auth/v1/user: {e}")
 
-    # Tier 3: Supabase Admin /auth/v1/admin/users/{sub} endpoint when configured with sb_secret_ key
-    sub = claims.get("sub")
-    if sb_url and sub and anon_key.startswith("sb_secret_") and os.environ.get("TESTING") != "1":
-        try:
-            resp = requests.get(
-                f"{sb_url}/auth/v1/admin/users/{sub}",
-                headers={"apikey": anon_key, "Authorization": f"Bearer {anon_key}"},
-                timeout=8,
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                v_email = data.get("email")
-                v_meta = data.get("user_metadata") or {}
-                v_name = v_meta.get("full_name") or v_meta.get("name") or claim_name
-                if v_email:
-                    logger.info(f"Verified Supabase OAuth token via /auth/v1/admin/users for {v_email}")
-                    return v_email, v_name
-        except Exception as e:
-            logger.warning(f"Notice calling Supabase /auth/v1/admin/users: {e}")
-
-    # Tier 4: Unit test synthetic token support (strictly when TESTING=1)
+    # Tier 3: Unit test synthetic token support (strictly when TESTING=1)
     if os.environ.get("TESTING") == "1" and claim_email:
         return claim_email, claim_name
 

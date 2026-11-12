@@ -1147,7 +1147,9 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
             "current_price": 1850.50,
             "user_id": "test_analyst_1"
         }
-        res = self.client.post("/api/thesis-checkpoint", json=payload, headers={"Origin": "http://testserver"})
+        # Identity comes from the session cookie only (a body user_id alone is refused with 401).
+        with patch("web.routers.markets._get_current_web_user", return_value={"id": "test_analyst_1"}):
+            res = self.client.post("/api/thesis-checkpoint", json=payload, headers={"Origin": "http://testserver"})
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertTrue(data.get("success"))
@@ -1171,16 +1173,17 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
 
         # 4. Save Countercase for test_analyst_1 and verify strict login-only visibility
         cc_secret_note = "Confidential client concentration stress test for test_analyst_1 only."
-        res_cc = self.client.post(
-            "/api/countercase",
-            json={
-                "ticker": "INFY",
-                "failure_vector": "Technological Obsolescence / Moat Decay",
-                "anti_thesis_notes": cc_secret_note,
-                "user_id": "test_analyst_1",
-            },
-            headers={"Origin": "http://testserver"},
-        )
+        with patch("web.routers.markets._get_current_web_user", return_value={"id": "test_analyst_1"}):
+            res_cc = self.client.post(
+                "/api/countercase",
+                json={
+                    "ticker": "INFY",
+                    "failure_vector": "Technological Obsolescence / Moat Decay",
+                    "anti_thesis_notes": cc_secret_note,
+                    "user_id": "test_analyst_1",
+                },
+                headers={"Origin": "http://testserver"},
+            )
         self.assertEqual(res_cc.status_code, 200)
         self.assertNotIn(cc_secret_note, self.client.get("/dossier/INFY").text)
 

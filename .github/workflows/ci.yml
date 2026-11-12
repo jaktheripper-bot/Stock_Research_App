@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ "main", "dev" ]
 
+# Least privilege: these jobs only read the repository.
+permissions:
+  contents: read
+
 jobs:
   audit-and-test:
     runs-on: ubuntu-latest

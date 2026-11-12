@@ -1,11 +1,21 @@
 # Platform Roadmap & Pending Tasks Register
 **Moatnomics — Multi-Asset Investment Research Platform**  
 *Document Target:* [`docs/PENDING_TASKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/PENDING_TASKS.md)  
-*Last Updated:* 2026-11-13 00:10:00 IST
+*Last Updated:* 2026-11-13 00:30:00 IST
 
 ---
 
 ## 1. Active, In-Progress & Parked Tasks
+
+### Task 9: Security & Quality Audit Remediation (12 Nov 2026 audit, 65 findings)
+- **Category:** Security, Billing Integrity & Reliability
+- **Status:** `Wave 1 shipped 2026-11-13; Waves 2 and 3 open`
+- **Origin:** Read-only full-codebase audit written 2026-11-12 23:15 IST (14 P0, 20 P1, 19 P2, 12 P3). Spot checks on 2026-11-13 confirmed 13 of the 14 P0s were real and still open; the 14th (P0-01) depended on website config, so it was fixed outright. P2-05 (holiday calendar) was already resolved by the NSE holiday sync.
+- **Details:**
+  1. ~~**Wave 1 (containment):** P0-01 sign-in token fallback removed; P0-02 `/auth/callback` reflected XSS; P0-03 workflow input injection + read-only CI permissions; P0-05 admin lookup fails closed; P0-07 thesis/countercase/telemetry identity from session only; P0-09 `.dockerignore`.~~ Done 2026-11-13.
+  2. **Wave 2 (needs implication preflight, billing):** P0-11 refunds never reach Razorpay, `process_refund` crashes on `tx_...` ids, credit races, Pro access when expiry is missing; P0-12 order intent saved after Razorpay order; P0-13 generation cap counted before credit check; P0-10 test DB isolation (`tests/conftest.py`); P0-14 import-time `TESTING=1` in `scripts/ai_auditor.py` and `check_system.py`.
+  3. **Remaining P0 items from Wave 1's areas:** rest of P0-02 (debt ingest writes to the shared table, Markdown `| safe`, admin console and Opportunity Terminal DOM sinks, `'unsafe-inline'` CSP, CDN SRI); rest of P0-05 (hardcoded `admin@moatnomics.com` owner, rate limit on `/admin/auth/direct-verify`, legacy root `telemetry.py`); P0-04 agent tool policies; P0-06 SQL built from strings in telemetry and admin exclusions; P0-08 PDF `root="."` and white-label field escaping.
+  4. **Wave 3:** P1, P2 and P3 items, including P1-10 (real subscriber's unsubscribe token in `digest_editions.sample_html`; mock sends counted as sent) and P3-06 (website service missing from `render.yaml`).
 
 ### Task 8: Mailer Monitoring Setup (Better Stack Heartbeats & Resend Webhook)
 - **Category:** Monitoring & Email Deliverability
