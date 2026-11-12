@@ -20,7 +20,7 @@
 
 ### Task 7: Research Emails Land in Gmail Promotions
 - **Category:** Email Deliverability
-- **Status:** `In Progress` (2026-11-12: List-Unsubscribe one-click headers + POST handler, dedicated "Moatnomics Research" sender and "move to Primary" footer shipped. Owner declined removing UTM links / CTA button. Remaining: owner sets up Cloudflare Email Routing so `research@` and `desk@moatnomics.com` replies reach Gmail; later move DMARC from `p=none` to `p=quarantine`; judge placement over the next few editions.)
+- **Status:** `In Progress` (2026-11-12: List-Unsubscribe one-click headers + POST handler, dedicated "Moatnomics Research" sender and "move to Primary" footer shipped. Owner declined removing UTM links / CTA button. Cloudflare Email Routing enabled 2026-11-12: root MX `route1-3.mx.cloudflare.net`, SPF `include:_spf.mx.cloudflare.net`, rules `research@` and `desk@moatnomics.com` forward to the owner's inbox (catch-all: drop). Remaining: after a few weeks of clean sending move DMARC from `p=none` to `p=quarantine`; judge Gmail tab placement over the next few editions.)
 - **Origin:** Owner report (2026-11-12). The 2026-11-12 Market Close Wrap was delivered by Resend at 19:58 IST, but Gmail filed it under Promotions rather than Primary.
 - **Details:**
   1. Review what makes Gmail treat the Market Close Wrap and Fund NAV Update as marketing: image and link density, promotional wording in subjects and headers, missing plain-text part, sender-name consistency, and `List-Unsubscribe` / `List-Unsubscribe-Post` headers.
