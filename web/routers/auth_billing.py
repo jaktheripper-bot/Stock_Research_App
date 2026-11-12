@@ -907,19 +907,22 @@ async def api_one_click_unsubscribe(token: Optional[str] = None):
 
 
 @router.get("/api/notifications/unsubscribe")
-async def api_unsubscribe_notifications(request: Request, token: Optional[str] = None, email: Optional[str] = None):
+async def api_unsubscribe_notifications(request: Request, token: Optional[str] = None):
     """
     Statutory 1-Click Unsubscribe Endpoint (IT Rules 2021 & Anti-Spam Compliance).
-    Supports token-based or email-based unsubscribes.
+    Token only: the subscriber's secret token from the email link. An email address is never
+    accepted, so nobody can unsubscribe someone else by knowing their address.
     Returns clean confirmation HTML for browser navigation, or JSON for programmatic requests.
     """
     from core.db.digest import set_user_digest_subscription, get_subscriber_by_token
 
-    param = (token or email or "").strip()
+    param = (token or "").strip()
     if not param:
-        raise HTTPException(status_code=400, detail="Missing unsubscribe token or email parameter.")
+        raise HTTPException(status_code=400, detail="Missing unsubscribe token.")
 
     subscriber = get_subscriber_by_token(param)
+    if not subscriber:
+        raise HTTPException(status_code=404, detail="This unsubscribe link is not valid.")
     success = set_user_digest_subscription(param, subscribe=False)
 
     accept_header = request.headers.get("accept", "")
@@ -980,13 +983,16 @@ async def api_unsubscribe_notifications(request: Request, token: Optional[str] =
 
 
 @router.get("/api/notifications/resubscribe")
-async def api_resubscribe_notifications(request: Request, token: Optional[str] = None, email: Optional[str] = None):
-    """Re-subscribes user to Research Digest."""
-    from core.db.digest import set_user_digest_subscription
+async def api_resubscribe_notifications(request: Request, token: Optional[str] = None):
+    """Re-subscribes a user to the Research Digest. Token only (never an email address), so
+    nobody can sign someone else up by knowing their address."""
+    from core.db.digest import get_subscriber_by_token, set_user_digest_subscription
 
-    param = (token or email or "").strip()
+    param = (token or "").strip()
     if not param:
-        raise HTTPException(status_code=400, detail="Missing token or email parameter.")
+        raise HTTPException(status_code=400, detail="Missing token.")
+    if not get_subscriber_by_token(param):
+        raise HTTPException(status_code=404, detail="This link is not valid.")
 
     success = set_user_digest_subscription(param, subscribe=True)
 

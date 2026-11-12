@@ -147,5 +147,42 @@ class TestOneClickEndpoint(unittest.TestCase):
         self.assertEqual(res.status_code, 500)
 
 
+class TestTokenOnlyLinks(unittest.TestCase):
+    """GET unsubscribe / resubscribe accept only the secret token, never an email address."""
+
+    def _get(self, path, found):
+        from fastapi.testclient import TestClient
+        from web.main import app
+
+        with patch("core.db.digest.get_subscriber_by_token", return_value=found), \
+             patch("core.db.digest.set_user_digest_subscription", return_value=True) as setter:
+            res = TestClient(app).get(path, headers={"Accept": "application/json"})
+        return res, setter
+
+    def test_email_parameter_is_ignored(self):
+        for path in ("/api/notifications/unsubscribe?email=a@example.com",
+                     "/api/notifications/resubscribe?email=a@example.com"):
+            with self.subTest(path=path):
+                res, setter = self._get(path, found={"email": "a@example.com"})
+                self.assertEqual(res.status_code, 400)
+                setter.assert_not_called()
+
+    def test_email_passed_as_token_is_rejected(self):
+        for path in ("/api/notifications/unsubscribe?token=a@example.com",
+                     "/api/notifications/resubscribe?token=a@example.com"):
+            with self.subTest(path=path):
+                res, setter = self._get(path, found=None)
+                self.assertEqual(res.status_code, 404)
+                setter.assert_not_called()
+
+    def test_valid_token_still_works(self):
+        for path, subscribe in (("/api/notifications/unsubscribe?token=tok1", False),
+                                ("/api/notifications/resubscribe?token=tok1", True)):
+            with self.subTest(path=path):
+                res, setter = self._get(path, found={"email": "a@example.com"})
+                self.assertEqual(res.status_code, 200)
+                setter.assert_called_once_with("tok1", subscribe=subscribe)
+
+
 if __name__ == "__main__":
     unittest.main()
