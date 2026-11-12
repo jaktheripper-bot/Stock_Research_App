@@ -23,7 +23,7 @@ import logging
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from core.config import get_secret
 
@@ -893,6 +893,16 @@ def compile_research_bouquet(
     }
 
 
+PRIMARY_TAB_HINT = (
+    "Using Gmail? Drag this email into your Primary tab so future editions arrive there."
+)
+
+
+def build_unsubscribe_url(token: str) -> str:
+    """One-click unsubscribe URL for a subscriber token (body link and List-Unsubscribe header)."""
+    return f"{get_tracking_base_url()}/api/notifications/unsubscribe?token={quote(str(token or ''), safe='')}"
+
+
 def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, Any]] = None) -> str:
     """
     Renders an institutional, responsive 7-asset Day-End Market Wrap HTML email template.
@@ -901,7 +911,7 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
     user_name = subscriber.get("full_name") if subscriber else "Reader"
     edition_date = str(bouquet.get("edition_date") or "").strip()[:10]
     base_url = get_tracking_base_url()
-    unsub_url = f"{base_url}/api/notifications/unsubscribe?token={token}"
+    unsub_url = build_unsubscribe_url(token)
 
     equities_html = ""
     for eq in bouquet.get("equities") or []:
@@ -1197,6 +1207,7 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
         <strong>Regulatory Safe-Harbor Disclosure:</strong> Moatnomics is an independent financial technology analytics software tool. We are not registered anywhere as a corporate entity or broker, and do not provide SEBI-regulated investment advice or recommendations. All data is computed deterministically for educational research and forensic screening only.
       </p>
       <p style="margin: 0; font-size: 11px;">
+        {PRIMARY_TAB_HINT}<br>
         You received this email because your account is subscribed to Moatnomics Research Digest dispatches.<br>
         To opt out immediately with one click: <a href="{unsub_url}" style="color: #0E3D32; font-weight: 700;">Unsubscribe from Research Digest</a>.
       </p>
@@ -1215,7 +1226,7 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
     user_name = subscriber.get("full_name") if subscriber else "Reader"
     edition_date = str(bouquet.get("edition_date") or "").strip()[:10]
     base_url = get_tracking_base_url()
-    unsub_url = f"{base_url}/api/notifications/unsubscribe?token={token}"
+    unsub_url = build_unsubscribe_url(token)
 
     lines = [
         "===============================================================",
@@ -1361,6 +1372,8 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
             "===============================================================",
             "MANDATORY STATUTORY SAFE HARBOR:",
             "Moatnomics is an independent financial technology analytics software tool and is NOT registered anywhere as a corporate entity or broker. We do not provide investment advice under SEBI regulations.",
+            "",
+            PRIMARY_TAB_HINT,
             "",
             "1-Click Unsubscribe Link:",
             unsub_url,

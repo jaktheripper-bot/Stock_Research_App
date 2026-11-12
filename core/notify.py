@@ -138,9 +138,11 @@ def _send_via_resend(
     text: str,
     html: Optional[str] = None,
     tags: Optional[Dict[str, str]] = None,
+    headers: Optional[Dict[str, str]] = None,
 ) -> Optional[str]:
     """Sends via Resend. Returns Resend's message id ("" when the local/test guard blocked a live call),
-    or None when the send failed. `tags` are echoed back in Resend webhook events."""
+    or None when the send failed. `tags` are echoed back in Resend webhook events; `headers` are
+    extra email headers (e.g. List-Unsubscribe)."""
     resend_api_key = _get_cfg("RESEND_API_KEY")
     if not resend_api_key:
         return None
@@ -175,6 +177,8 @@ def _send_via_resend(
         }
         if html:
             payload["html"] = html
+        if headers:
+            payload["headers"] = {str(k): str(v) for k, v in headers.items() if v}
         if tags:
             # Resend tag names/values allow ASCII letters, digits, underscores and dashes only.
             payload["tags"] = [
@@ -456,6 +460,31 @@ Moatnomics Service Desk
     return False
 
 
+# Research emails go out from their own address so mailbox providers treat them as a distinct,
+# consistent stream (support tickets and alerts keep SMTP_FROM / the Service Desk address).
+RESEARCH_FROM_DEFAULT = "Moatnomics Research <research@moatnomics.com>"
+
+
+def research_sender() -> str:
+    return _get_cfg("RESEARCH_FROM") or RESEARCH_FROM_DEFAULT
+
+
+def list_unsubscribe_headers(token: Optional[str]) -> Dict[str, str]:
+    """RFC 2369 + RFC 8058 one-click unsubscribe headers for a subscriber (empty without a token).
+
+    Mailbox providers POST `List-Unsubscribe=One-Click` to the URL; the site handles that POST
+    (`/api/notifications/unsubscribe`) without a confirmation page.
+    """
+    if not token or not str(token).strip():
+        return {}
+    from core.analysis.research_bouquet import build_unsubscribe_url
+
+    return {
+        "List-Unsubscribe": f"<{build_unsubscribe_url(str(token).strip())}>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    }
+
+
 def dispatch_research_bouquet(
     edition_date: Optional[str] = None,
     test_recipient: Optional[str] = None,
@@ -506,7 +535,7 @@ def dispatch_research_bouquet(
         }
 
     bouquet = compile_research_bouquet(edition_date=target_date, require_live_data=True, edition_kind=edition_kind)
-    sender_email = _get_cfg("SMTP_FROM") or _get_cfg("RESEND_FROM") or _get_cfg("SMTP_USER") or "noreply@moatnomics.com"
+    sender_email = research_sender()
 
     if test_recipient:
         # Test dispatch to specific admin email
@@ -591,7 +620,10 @@ def dispatch_research_bouquet(
 
             ok = False
             if _get_cfg("RESEND_API_KEY"):
-                message_id = _send_via_resend(sender_email, sub_email, subj, text, html=html, tags=edition_tags)
+                message_id = _send_via_resend(
+                    sender_email, sub_email, subj, text, html=html, tags=edition_tags,
+                    headers=list_unsubscribe_headers(sub.get("unsubscribe_token")),
+                )
                 ok = message_id is not None
                 if ok:
                     sent_rows.append((sub.get("id"), sub_email, message_id))

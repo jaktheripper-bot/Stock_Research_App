@@ -887,6 +887,25 @@ async def api_resend_webhook(request: Request):
     return JSONResponse(status_code=200, content={"status": outcome})
 
 
+@router.post("/api/notifications/unsubscribe")
+async def api_one_click_unsubscribe(token: Optional[str] = None):
+    """RFC 8058 one-click unsubscribe, called by mailbox providers (Gmail, Yahoo) from the
+    List-Unsubscribe-Post header. Token only: the token is resolved first, so this POST can never
+    unsubscribe someone by email address. No confirmation page; returns 200 on success."""
+    from core.db.digest import get_subscriber_by_token, set_user_digest_subscription
+
+    clean = (token or "").strip()
+    if not clean:
+        raise HTTPException(status_code=400, detail="Missing unsubscribe token.")
+    subscriber = get_subscriber_by_token(clean)
+    if not subscriber:
+        raise HTTPException(status_code=404, detail="Unknown unsubscribe token.")
+    if not set_user_digest_subscription(clean, subscribe=False):
+        logger.error("One-click unsubscribe could not be saved for a valid token.")
+        raise HTTPException(status_code=500, detail="Unsubscribe could not be saved.")
+    return JSONResponse(status_code=200, content={"success": True, "unsubscribed": True})
+
+
 @router.get("/api/notifications/unsubscribe")
 async def api_unsubscribe_notifications(request: Request, token: Optional[str] = None, email: Optional[str] = None):
     """
