@@ -69,8 +69,28 @@ case "$COMMAND" in
         TIMESTAMP=$(TZ=Asia/Kolkata date +"%Y%m%d_%H%M%S")
         BACKUP_DIR="${SCRIPT_DIR}/backups/${TIMESTAMP}"
         mkdir -p "${BACKUP_DIR}"
-        tar -czf "${BACKUP_DIR}/site_assets.tar.gz" web/ reports.db
+        # Snapshot the database with SQLite's online backup so a write in progress can't leave a torn copy.
+        SNAP_DIR="$(mktemp -d)"
+        if command -v sqlite3 >/dev/null 2>&1 && sqlite3 reports.db ".backup '${SNAP_DIR}/reports.db'"; then
+            tar -czf "${BACKUP_DIR}/site_assets.tar.gz" web/ -C "${SNAP_DIR}" reports.db
+        else
+            echo "⚠️  sqlite3 snapshot unavailable; archiving reports.db directly."
+            tar -czf "${BACKUP_DIR}/site_assets.tar.gz" web/ reports.db
+        fi
+        rm -rf "${SNAP_DIR}"
+        if ! gzip -t "${BACKUP_DIR}/site_assets.tar.gz"; then
+            echo "❌ Backup archive failed its integrity check; keeping older backups untouched."
+            exit 1
+        fi
         echo "✅ Backup stored in ${BACKUP_DIR}"
+        # Retention: keep the newest BACKUP_KEEP timestamped backups (default 5). backups/archive/,
+        # conversations/, chat/ and logs are never touched.
+        BACKUP_KEEP="${BACKUP_KEEP:-5}"
+        OLD_BACKUPS=$(ls -1d "${SCRIPT_DIR}"/backups/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9] 2>/dev/null | sort | awk -v keep="${BACKUP_KEEP}" '{ rows[NR] = $0 } END { for (i = 1; i <= NR - keep; i++) print rows[i] }')
+        for OLD in ${OLD_BACKUPS}; do
+            rm -rf "${OLD}"
+            echo "   Removed old backup $(basename "${OLD}")"
+        done
         ;;
     admin)
         echo "--> Admin console is native SSR in FastAPI. Access at http://localhost:8000/admin"
