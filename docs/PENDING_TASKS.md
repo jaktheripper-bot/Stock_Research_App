@@ -1,11 +1,27 @@
 # Platform Roadmap & Pending Tasks Register
 **Moatnomics — Multi-Asset Investment Research Platform**  
 *Document Target:* [`docs/PENDING_TASKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/PENDING_TASKS.md)  
-*Last Updated:* 2026-11-13 08:45:00 IST
+*Last Updated:* 2026-11-13 10:15:00 IST
 
 ---
 
 ## 1. Active, In-Progress & Parked Tasks
+
+### Task 11: Testing Architecture Overhaul
+- **Category:** Verification, CI & Release Safety
+- **Status:** `Plan approved 2026-11-13; Phase 0 done, Phase 1 in progress`
+- **Plan:** [`docs/plans/TESTING_ARCHITECTURE_OVERHAUL.md`](plans/TESTING_ARCHITECTURE_OVERHAUL.md) (source findings: [`reports/Why our audits missed issues.md`](../reports/Why%20our%20audits%20missed%20issues.md)). Related: Task 9 (the fixes themselves).
+- **Goal:** agents keep writing code, but a small protected layer they can't quietly change judges it, production is checked on a schedule, and no result is recorded without evidence.
+- **Owner decisions (13 Nov):** deploys wait for CI; a Claude Code hook blocks edits to protected files and the owner approves changes in chat (CI flags changes from other agents); CI gets a throwaway Postgres; local commands default to SQLite.
+- **Phases:**
+  0. ~~Finish in-flight log masking and worker liveness logging.~~
+  1. **Safety rails:** production database is opt-in on any non-hosted machine (`ALLOW_PRODUCTION_DB=1`); one shared test-runtime check; Render deploys only after CI passes (**owner action in the Render dashboard**); rollback runs tests before force-pushing; CI on Python 3.14.
+  2. **Protected contract suite** (`tests/contracts/`, `TESTING` unset, on Postgres): negative security tests with real signed cookies and tokens, a route-policy inventory, money and race tests, migration parity, and a promise registry. Remove the ~35 security-relevant `TESTING` branches (starts with `implication-preflight`).
+  3. **Fast-suite cleanup:** per-class isolated databases, a controllable clock, a realistic-size fixture with page budgets, a Playwright smoke test, golden LLM outputs.
+  4. **Static scans:** widen the reality gates to the whole repo, add third-party scanners, add a doc-claims check, stop presenting the audit score as a quality claim.
+  5. **Lock it:** Claude Code hook plus a CI protected-paths job, commit trailers per agent, one trimmed rulebook, `ESCAPES.md`.
+  6. **Production checks:** an hourly read-only workflow against the live site, and a monthly audit rotation by access.
+- **Owner-only hygiene:** move the repo out of the Google Drive-synced folder (or exclude `.git/`, `.env`, `*.db`, `backups/`, `.checkpoints/`, `scratch/`), and delete stale agent context files.
 
 ### Task 10: Daily "Why It Moved" Evaluation for the Day's Major Stock Movements
 - **Category:** Research Content / Market Close Wrap
@@ -127,7 +143,7 @@
 
 ### Task 8: Mailer Monitoring Setup (Better Stack Heartbeats & Resend Webhook)
 - **Category:** Monitoring & Email Deliverability
-- **Status:** `Configured 2026-11-12, awaiting first live verification` (Better Stack URL monitor "Moatnomics Mailers" on `/api/health/mailers` every 180 s, Up; Resend webhook enabled for `email.delivered`, `email.delivery_delayed`, `email.bounced`, `email.complained`, `email.opened`; `RESEND_WEBHOOK_SECRET` set on the website; unsigned POST returns 401). Close once step 5 holds after the 2026-11-13 07:30 IST Fund NAV Update.
+- **Status:** `Verified live 2026-11-13; one Render setting for you to fix` (Fund NAV Update for 12 Nov sent 07:30:28 IST to 2 subscribers; Resend webhook recorded 2 `sent` + 2 `delivered` rows in `digest_recipient_events`; Better Stack "Moatnomics Mailers" monitor Up; `/api/health/mailers` 200. The 12 Nov Market Close Wrap went out at 19:58 IST from a pre-tracking build, so it has no per-recipient rows.)
 - **Origin:** Checks run 2026-11-12. Better Stack has only the general "Morning Discovery & Ingestion Pipeline" heartbeat. Resend has no webhook configured, and the website has no `RESEND_WEBHOOK_SECRET`, so `digest_recipient_events` has never recorded a delivery, bounce, complaint or open, and hard-bounce/complaint auto-pause cannot trigger.
 - **Details:**
   1. **Better Stack URL monitor (free, replaces two paid heartbeats):** add an uptime monitor on `https://moatnomics.com/api/health/mailers` (alert when the URL is unavailable / returns non-2xx, check every 3 minutes). The endpoint (`core/mailer_health.py`, shipped 2026-11-12) returns 200 when the latest due Market Close Wrap (by 21:00 IST) and Fund NAV Update (by 08:45 IST next day) went out, counting weekends and NSE holidays as expected skips, and 503 when either is late or the ledger cannot be read.
@@ -135,6 +151,8 @@
   3. **Resend webhook:** in Resend, go to Webhooks → Add endpoint, enter `https://moatnomics.com/api/webhooks/resend`, and select the delivered, bounced, complained and opened events.
   4. Copy the webhook's signing secret into a new `RESEND_WEBHOOK_SECRET` variable on the **Moatnomics.com** website service in Render. The endpoint fails closed (401) without it.
   5. **Verify:** after the next send, `digest_recipient_events` shows `sent` and `delivered` rows and the admin Digest tab shows the delivery funnel; the Better Stack mailer URL monitor shows "Up".
+  6. **Open (owner action in Render):** the 12 Nov Market Close Wrap heartbeat failed with `unknown url type: "https`, so `BETTER_STACK_HEARTBEAT_URL_MARKET_CLOSE` holds a quoted value. Better Stack has no matching heartbeat, and item 2 makes these variables optional, so delete both `BETTER_STACK_HEARTBEAT_URL_MARKET_CLOSE` and `_FUND_NAV` from Render (or remove the quote marks).
+  7. ~~Subscriber addresses were written in full to Render/Better Stack logs, and the paid fund audit worker logged nothing while idle.~~ Fixed 2026-11-13: `core/log_privacy.py` masks every email in log records (`ra***@gmail.com`), and the worker logs start-up, each claimed/finished job and a 5-minute "alive" line.
 
 ### Task 7: Research Emails Land in Gmail Promotions
 - **Category:** Email Deliverability

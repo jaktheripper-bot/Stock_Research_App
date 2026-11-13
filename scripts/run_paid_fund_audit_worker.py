@@ -9,7 +9,7 @@ from pathlib import Path
 import socket
 import sys
 from threading import Event, Thread
-from time import sleep
+from time import monotonic, sleep
 from typing import Any, Dict, Optional
 
 _REPO_ROOT = str(Path(__file__).resolve().parent.parent)
@@ -33,8 +33,13 @@ from core.db.fund_audit_jobs import (
 )
 from core.db.mutual_funds import get_fund_disclosure_snapshot
 from core.db.reports import get_report_by_ticker
+from core.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
+
+# How often an idle worker logs that it is alive and polling (seconds).
+IDLE_LOG_SECONDS = 300
+POLL_SECONDS = 2
 
 
 def _default_worker_id() -> str:
@@ -121,21 +126,37 @@ def main() -> None:
     parser.add_argument("--once", action="store_true", help="Run one claim/reconcile cycle and exit.")
     args = parser.parse_args()
 
+    setup_logging()
     init_db()
     worker_id = _default_worker_id()
     if args.reconcile_only:
         reconcile_expired_fund_audits()
+        logger.info("Paid fund audit reconcile-only run finished.")
         return
+    logger.info("Paid fund audit worker started (worker=%s, polling every %ss).", worker_id, POLL_SECONDS)
+    jobs_done = 0
+    failed_cycles = 0
+    last_status_at = monotonic()
     while True:
         try:
             job = claim_fund_audit(worker_id=worker_id)
             if job:
+                logger.info("Claimed paid fund audit %s.", job.get("job_id"))
                 run_claim_with_heartbeat(job, worker_id=worker_id)
+                jobs_done += 1
+                logger.info("Finished paid fund audit %s.", job.get("job_id"))
             else:
-                sleep(2)
+                sleep(POLL_SECONDS)
         except Exception:
+            failed_cycles += 1
             logger.exception("Paid fund audit worker cycle failed")
             sleep(5)
+        if monotonic() - last_status_at >= IDLE_LOG_SECONDS:
+            logger.info(
+                "Paid fund audit worker alive: %d job(s) done and %d failed cycle(s) since start.",
+                jobs_done, failed_cycles,
+            )
+            last_status_at = monotonic()
         if args.once:
             return
 
