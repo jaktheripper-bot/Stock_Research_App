@@ -1,7 +1,7 @@
-"""Proactive 9 AM Discovery Reel Screening Watcher.
+"""Stock Discovery Reel Screening Watcher (post-close edition).
 
 Executes autonomous screening daily at 08:45 IST, filtering 500+ scrips across 7-pillar quality criteria,
-and publishes the curated morning cohort to the Discovery Reel before market open.
+and publishes the curated cohort to the Discovery Reel after the market close.
 """
 
 import asyncio
@@ -29,7 +29,7 @@ async def _run_screening_for_edition(target_date: str, target_count: int = 15) -
             ticker=None,
             trigger_source="discovery_watcher",
             action_taken="published_edition",
-            summary=f"Published Morning Discovery Reel edition: {target_date} (success={success})",
+            summary=f"Published Stock Discovery edition: {target_date} (success={success})",
             metadata={"edition": target_date, "target_count": target_count, "success": bool(success)},
         )
         logger.info(f"🌅 [Discovery Watcher] Published morning cohort for {target_date}. Event ID: {event_id}")

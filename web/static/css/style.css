@@ -1287,6 +1287,33 @@ html[data-theme="dark"] .dossier-meta-pill {
   line-height: 1.5;
 }
 
+/* Stock Discovery: release timings and the reason for each */
+.release-timing-note {
+  margin-top: 48px;
+  padding: 20px 22px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.release-timing-note h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 10px 0;
+}
+.release-timing-note ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+.release-timing-note strong {
+  color: var(--text-primary);
+}
+
 /* 30-Second Progressive Fill Button Loading State */
 .btn-loading-progress {
   position: relative !important;

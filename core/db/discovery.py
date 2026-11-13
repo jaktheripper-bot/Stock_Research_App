@@ -1,4 +1,4 @@
-"""Morning Discovery Reel repository: under-the-radar equities persistence and retrieval."""
+"""Stock Discovery Reel repository: under-the-radar equities persistence and retrieval."""
 
 import json
 import logging
@@ -166,7 +166,7 @@ def get_active_discovery_reel(
 
         # Fallback to latest available edition if requested edition yielded no rows and allow_fallback is True
         if not rows and allow_fallback:
-            # If before 9 AM IST, select the latest edition strictly prior to today
+            # Before 9 AM IST, select the latest edition strictly prior to today (editions publish after the 16:30 IST close run)
             date_filter = f"AND edition_date <= '{today_str}'" if is_past_9am else f"AND edition_date < '{today_str}'"
             query = f"""
                 SELECT id, edition_date, ticker, company_name, sector, market_cap_tier,
@@ -245,6 +245,7 @@ def get_active_discovery_reel(
                 "catalyst_headline": r[12] or "",
                 "key_metrics": metrics_dict,
                 "formatted_date": _format_timestamp(r[14]),
+                "created_at": str(r[14]) if r[14] is not None else None,
             })
 
         if limit is not None and limit > 0:

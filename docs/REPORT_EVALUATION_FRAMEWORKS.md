@@ -17,7 +17,7 @@
 
 Historically, the platform's evaluation framework was confined strictly to the **7 Pillars of Fundamental Equity Analysis** (evaluating business compounding, economic moats, governance, and cash flow durability).
 
-As the platform evolved into an **Autonomous Multi-Asset Research Platform**, the evaluation methodology expanded across **12 distinct report types** spanning Equities (Institutional Equity Dossier), Curated Discovery (Stock Discovery @9AM), Mutual Funds & ETFs (with Fund Overlap Auditor), Bonds, NCDs & SDIs, Sovereign Curve & T-Bills, SM REITs, InvITs & SGBs, National ETF Matrix, Unlisted MSME & SME Forensic Dossier, Net Real Tax Calculator, Retail Safety Radar, Peer Comparison, and the Forensic Intelligence Desk.
+As the platform evolved into an **Autonomous Multi-Asset Research Platform**, the evaluation methodology expanded across **12 distinct report types** spanning Equities (Institutional Equity Dossier), Curated Discovery (Stock Discovery, post-close edition), Mutual Funds & ETFs (with Fund Overlap Auditor), Bonds, NCDs & SDIs, Sovereign Curve & T-Bills, SM REITs, InvITs & SGBs, National ETF Matrix, Unlisted MSME & SME Forensic Dossier, Net Real Tax Calculator, Retail Safety Radar, Peer Comparison, and the Forensic Intelligence Desk.
 
 This document serves as the **authoritative engineering and audit specification** defining:
 1. **Data Sources & Ingestion Provenance** for every report created on the site.
@@ -336,9 +336,9 @@ Synthesizes a strictly balanced dual-scenario thesis:
 
 ---
 
-### Report 2: Stock Discovery @9AM & Daily 15-Stock Ingestion Report (`/discovery`, `/equities`)
+### Report 2: Stock Discovery & Daily 15-Stock Ingestion Report (`/discovery`, `/equities`)
 
-The Discovery report and institutional equity ingestion pipeline run daily prior to the opening of the Indian capital markets (NSE/BSE).
+The Discovery report and institutional equity ingestion pipeline run in the 16:30 IST close run on trading days, after the 3:30 PM IST NSE/BSE close, so screens use settled closing prices and that day's filings. Editions are usually published that evening (the 18:30 IST backup run finishes any unfinished phase), and the edition date is the trading day screened. Weekends skip the Discovery phase (`SKIPPED_MARKET_CLOSED`).
 
 * **Operational Cadence & Ingestion Timing:**
   * **Dynamic Catch-Up Constituent Ingestion (`25/day` -> `15/day`):** Ingests `25` uncovered mutual fund equity constituents per day while the uncovered backlog exceeds `100`, automatically stepping down to `15` stocks/day once the backlog is `<= 100` (`core/analysis/daily_stock_ingestion.py:resolve_daily_stock_cohort_target`).

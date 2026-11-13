@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Stock Discovery @9AM | Under-the-Radar Indian Equities | Moatnomics{% endblock %}
+{% block title %}Stock Discovery | Post-Close Screen of Under-the-Radar Indian Equities | Moatnomics{% endblock %}
 
 {% block content %}
 <div class="container" data-asset-class="equities" style="padding-top: 40px; padding-bottom: 80px;">
@@ -12,17 +12,17 @@
         <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;">
           {% if is_yesterday_edition %}
           <div class="hero-badge" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; display: inline-flex; align-items: center; gap: 8px;">
-            <span>YESTERDAY'S 9:00 AM EDITION</span>
+            <span>PREVIOUS SESSION'S EDITION</span>
             <span>•</span>
             <span>QUALITY SCREEN</span>
-            {% if not is_past_9am %}
+            {% if next_edition_pending %}
             <span>•</span>
-            <span id="countdownBadge">NEXT EDITION IN {{ "%02d"|format(hours_until_9am) }}H {{ "%02d"|format(mins_until_9am) }}M (09:00 AM IST)</span>
+            <span>NEXT EDITION: AFTER THE NEXT MARKET CLOSE</span>
             {% endif %}
           </div>
           {% elif is_today_edition %}
           <div class="hero-badge" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.4); color: var(--accent-cyan); display: inline-flex; align-items: center; gap: 8px;">
-            <span>TODAY'S 9:00 AM LIVE EDITION</span>
+            <span>TODAY'S POST-CLOSE EDITION</span>
             <span>•</span>
             <span>QUALITY SCREEN</span>
             <span>•</span>
@@ -42,16 +42,16 @@
         </div>
 
         <h1 style="font-size: 32px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px; letter-spacing: -0.02em;">
-          Stock Discovery @9AM
+          Stock Discovery
         </h1>
         <p style="font-size: 15px; color: var(--text-secondary); max-width: 720px; line-height: 1.6; margin: 0;">
-          Curated and released every morning at <strong>9:00 AM IST</strong> from official BSE regulatory disclosures and audited filings. 
+          Screened every trading day <strong>after the market closes at 3:30 PM IST</strong>, from official BSE disclosures and audited filings, and usually published that evening. 
           10–15 under-the-radar Indian companies across diverse sectors commanding high return on capital (ROCE &ge; 15%), conservative solvency (D/E &le; 0.6), and negligible sell-side coverage.
         </p>
 
         <!-- Evaluated Metadata Strip & Provenance Info -->
         <div class="dossier-meta-strip" style="margin-top: 18px; margin-bottom: 0;">
-          <span><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-doc"></use></svg>Evaluated: {{ formatted_current_edition|default(current_edition) }}, 09:00 IST • Verified BSE Statutory Filings • Grounded Financial Ratios</span>
+          <span><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-doc"></use></svg>Edition: {{ formatted_current_edition|default(current_edition) }}{% if edition_published_label %} • Published {{ edition_published_label }}{% endif %} • Verified BSE Statutory Filings • Grounded Financial Ratios</span>
         </div>
         <p class="dossier-provenance-subline">All equities filtered through ROCE &ge; 15% hurdle rates and conservative solvency sieves from audited financial statements.</p>
       </div>
@@ -82,7 +82,7 @@
     <div style="display: flex; align-items: center; gap: 10px;">
       <span style="font-size: 20px; color: #38bdf8; display: inline-flex;"><svg class="glyph"><use href="#icon-radar"></use></svg></span>
       <div>
-        <strong style="color: var(--text-primary); font-size: 14px;">Today's 9:00 AM Edition is Live!</strong>
+        <strong style="color: var(--text-primary); font-size: 14px;">Today's edition is live</strong>
         <span style="color: var(--text-secondary); font-size: 13px; margin-left: 6px;">Exclusively reserved for Pro Subscribed Members with 12 fresh high-ROCE equities.</span>
       </div>
     </div>
@@ -98,14 +98,14 @@
   <div style="background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: 16px; padding: 26px 20px; margin-bottom: 30px; text-align: center;">
     <div style="display: inline-block; font-size: 32px; margin-bottom: 8px; color: #fbbf24;"><svg class="glyph" style="width: 32px; height: 32px;"><use href="#icon-lock"></use></svg></div>
     <h2 style="font-size: 22px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px;">
-      Today's 9:00 AM Edition is Reserved for Subscribed Members
+      Today's Edition is Reserved for Subscribed Members
     </h2>
     <p style="font-size: 14px; color: var(--text-secondary); max-width: 620px; margin: 0 auto 18px auto; line-height: 1.5;">
       Get access to today's 12 screened high-ROCE BSE equities, along with their investment theses and the latest regulatory filings.
     </p>
     <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
       <a href="/pricing" class="btn btn-primary" style="font-weight: 700; padding: 10px 24px;">Subscribe to Pro (₹999/mo) →</a>
-      <a href="/discovery?edition={{ yesterday_date }}" class="btn btn-secondary" style="font-weight: 600; padding: 10px 20px;">View Yesterday's 9:00 AM Archive (Free)</a>
+      <a href="/discovery?edition={{ yesterday_date }}" class="btn btn-secondary" style="font-weight: 600; padding: 10px 20px;">View the Previous Edition (Free)</a>
     </div>
   </div>
   {% endif %}
@@ -129,9 +129,9 @@
   {% if not discovery_stocks %}
   <div style="background: rgba(30, 41, 59, 0.4); border: 1px dashed var(--border-color); border-radius: 16px; padding: 60px 20px; text-align: center;">
     <div style="font-size: 40px; margin-bottom: 16px; color: var(--accent-cyan);"><svg class="glyph" style="width: 36px; height: 36px;"><use href="#icon-radar"></use></svg></div>
-    <h3 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">Stock Discovery @9AM Generating...</h3>
+    <h3 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">The Next Edition Is Being Prepared</h3>
     <p style="font-size: 14px; color: var(--text-muted); max-width: 500px; margin: 0 auto 24px auto;">
-      Today's cohort is undergoing screening across live exchange disclosures and unlocks at 09:00 AM IST. Check back at 9:00 AM or explore our existing public research repository.
+      Each edition is screened after the 3:30 PM IST market close, using that day's closing prices and exchange filings, and is usually published in the evening. Check back this evening, or explore our existing research reports.
     </p>
     <a href="/" class="btn btn-primary btn-sm">Explore Existing Dossiers</a>
   </div>
@@ -153,7 +153,7 @@
           {{ item.ticker }}
         </div>
         <p style="font-size: 12px; color: var(--text-secondary); max-width: 260px; margin-bottom: 14px; line-height: 1.4;">
-          Today's 9:00 AM cohort is exclusively available to Pro Subscribed Members.
+          Today's edition is available to Pro subscribers.
         </p>
         <a href="/pricing" class="btn btn-primary btn-sm" style="font-size: 12px; font-weight: 700; padding: 8px 16px;">
           Subscribe to Unlock →
@@ -272,6 +272,16 @@
   </div>
   {% endif %}
 
+  <!-- Release timings and why we chose them -->
+  <section class="release-timing-note" aria-labelledby="releaseTimingTitle">
+    <h2 id="releaseTimingTitle">When our research is released, and why</h2>
+    <ul>
+      <li><strong>Stock Discovery: after the 3:30 PM IST close, usually published in the evening.</strong> We screen once the trading day is over, so every ratio uses settled closing prices and includes the filings companies make during the day, many of which arrive late in the session. You get the evening to read before the next session opens at 9:15 AM.</li>
+      <li><strong>Market Close Wrap email: 7:30 PM IST on trading days.</strong> It goes out only after the post-close screens have finished, so it summarises the complete day rather than a moving market.</li>
+      <li><strong>Fund NAV Update email: 7:30 AM IST.</strong> Mutual funds publish each day's official NAVs late in the evening (SEBI requires most schemes to do so by 11 PM). We collect them overnight and send the update before the market opens, so you start the day with the previous day's final fund values.</li>
+    </ul>
+  </section>
+
   <!-- SEBI Safe Harbor Mandatory Disclosure -->
   <div style="margin-top: 60px; padding: 20px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md); font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
     <strong style="color: var(--accent-cyan); display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
@@ -340,22 +350,5 @@
     });
   }
 
-  // Live countdown to 09:00 AM IST
-  const isCountdownActive = "{{ '1' if (not is_past_9am and is_yesterday_edition) else '0' }}" === "1";
-  let remainingSec = Number("{{ seconds_until_9am or 0 }}");
-  const cdElem = document.getElementById('countdownBadge');
-  if (isCountdownActive && cdElem && remainingSec > 0) {
-    setInterval(() => {
-      if (remainingSec > 0) {
-        remainingSec--;
-        const h = String(Math.floor(remainingSec / 3600)).padStart(2, '0');
-        const m = String(Math.floor((remainingSec % 3600) / 60)).padStart(2, '0');
-        const s = String(remainingSec % 60).padStart(2, '0');
-        cdElem.textContent = `NEXT EDITION IN ${h}H ${m}M ${s}S (09:00 AM IST)`;
-      } else {
-        cdElem.textContent = `TODAY'S 9:00 AM EDITION DROPPING NOW`;
-      }
-    }, 1000);
-  }
 </script>
 {% endblock %}

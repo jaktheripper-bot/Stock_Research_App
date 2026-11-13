@@ -232,7 +232,7 @@ def scan_dom_integrity() -> List[Dict[str, Any]]:
         ("/reits", "REITs & InVITs Terminal"),
         ("/safety-radar", "Safety Radar Feed"),
         ("/pricing", "Pricing & Plans"),
-        ("/discovery", "Morning Discovery Reel"),
+        ("/discovery", "Stock Discovery"),
     ]
 
     for route, name in probe_routes:

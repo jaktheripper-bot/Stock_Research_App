@@ -307,7 +307,10 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
     def test_discovery_page(self):
         res = self.client.get("/discovery")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("Stock Discovery @9AM", res.text)
+        self.assertIn("Stock Discovery", res.text)
+        self.assertNotIn("9:00 AM", res.text)
+        self.assertIn("after the market closes at 3:30 PM IST", res.text)
+        self.assertIn("When our research is released, and why", res.text)
         self.assertIn("QUALITY SCREEN", res.text)
         self.assertIn("Mandatory SEBI Safe-Harbor Disclosure", res.text)
 
@@ -349,7 +352,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         """Verifies primary public SSR view routes respond 200 with required keyword integrity."""
         primary_routes = [
             ("/", "Less noise,"),
-            ("/discovery", "Stock Discovery @9AM"),
+            ("/discovery", "Stock Discovery"),
             ("/equities", "Equities Directory"),
             ("/funds", "Mutual Fund Look-Through"),
             ("/debt", "Corporate Debt"),
@@ -1109,7 +1112,8 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Stock Reports & Equities", html)
         self.assertIn("Mutual Funds", html)
         self.assertIn("Bonds, NCDs & SDIs", html)
-        self.assertIn("Morning Discovery @9AM", html)
+        self.assertIn("Stock Discovery", html)
+        self.assertNotIn("@9AM", html)
         self.assertIn("Peer Comparison", html)
         self.assertIn("Support & Grievances", html)
         self.assertIn("SEBI Safe Harbor", html)

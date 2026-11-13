@@ -1,6 +1,6 @@
 """Canonical institutional metric, sentinel, and timestamp formatters (Feedback #4 & #10).
 
-Enforces uniform conventions across Homepage, Stock Discovery @9AM, Equities Directory,
+Enforces uniform conventions across Homepage, Stock Discovery, Equities Directory,
 Omni-Search, and Research Dossiers:
 - Multiples (P/E, EV/EBITDA, P/B): 1 decimal + 'x' (e.g. '22.2x'); negative EPS -> 'NM'
   (Not Meaningful); missing/qualitative leaks ('N/A', 'Fair', None) -> '—' with reason tooltip.

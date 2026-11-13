@@ -2163,7 +2163,7 @@ async def api_run_discovery(
     count: int = 12,
     force: bool = False
 ):
-    """Triggers the Morning Discovery Reel screening and dossier synthesis worker."""
+    """Triggers the Stock Discovery screening and dossier synthesis worker."""
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
@@ -2176,7 +2176,7 @@ async def api_run_discovery(
     background_tasks.add_task(run_discovery_pipeline, target_count=count, force_synthesis=force)
     return json_response_with_cache({
         "status": "initiated",
-        "message": f"Morning Discovery Reel worker dispatched for {count} equities (force={force})."
+        "message": f"Stock Discovery worker dispatched for {count} equities (force={force})."
     })
 
 

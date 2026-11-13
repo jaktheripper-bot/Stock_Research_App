@@ -636,7 +636,7 @@ def api_search_products(
 
 @app.get("/discovery", response_class=HTMLResponse)
 def discovery_page(request: Request, edition: Optional[str] = Query(None)):
-    """The Morning Discovery Reel: nightly screening of under-the-radar equities."""
+    """Stock Discovery: post-close (16:30 IST) screening of under-the-radar equities."""
     user = _get_current_web_user(request)
     can_access_today = _can_access_today_discovery(request, user)
 
@@ -644,14 +644,6 @@ def discovery_page(request: Request, edition: Optional[str] = Query(None)):
     today_str = now.strftime("%Y-%m-%d")
     yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
     is_past_9am = now.hour >= 9
-
-    # Calculate countdown until next 09:00 AM IST drop
-    target_9am = now.replace(hour=9, minute=0, second=0, microsecond=0)
-    if now >= target_9am:
-        target_9am += timedelta(days=1)
-    seconds_until_9am = int((target_9am - now).total_seconds())
-    hours_until_9am = seconds_until_9am // 3600
-    mins_until_9am = (seconds_until_9am % 3600) // 60
 
     try:
         available_editions = get_available_discovery_editions(exclude_tests=True)
@@ -663,14 +655,14 @@ def discovery_page(request: Request, edition: Optional[str] = Query(None)):
         selected_edition = edition
     else:
         # Default edition selection:
-        # If user is subscribed and today's edition exists past 9:00 AM, show today's edition!
+        # Subscribers see today's edition once the post-close run has published it.
         if can_access_today and is_past_9am and today_str in available_editions:
             selected_edition = today_str
         elif today_str in available_editions and is_past_9am:
             # Free user visiting /discovery: default to yesterday's archive so they can read in full with yesterday's badge, while seeing the top banner pointing to today's live Pro edition!
             selected_edition = yesterday_str if yesterday_str in available_editions else (available_editions[1] if len(available_editions) > 1 else today_str)
         else:
-            # Before 9:00 AM or today not yet in DB: show yesterday's edition
+            # Today's edition not published yet: show the previous edition
             selected_edition = yesterday_str if yesterday_str in available_editions else (available_editions[0] if available_editions else today_str)
 
     try:
@@ -679,8 +671,12 @@ def discovery_page(request: Request, edition: Optional[str] = Query(None)):
         logger.error(f"Error fetching discovery reel: {e}")
         discovery_stocks = []
 
-    from core.presentation.formatters import format_standard_date
+    from core.presentation.formatters import format_standard_date, format_standard_timestamp
     actual_edition = discovery_stocks[0]["edition_date"] if discovery_stocks else selected_edition
+    # Editions are screened in the 16:30 IST close run, so show when this one was actually published.
+    published_raw = max((str(s.get("created_at")) for s in discovery_stocks if s.get("created_at")), default=None)
+    edition_published_label = format_standard_timestamp(published_raw, fallback="") if published_raw else ""
+    next_edition_pending = today_str not in available_editions
     is_today_edition = (actual_edition == today_str and is_past_9am)
     is_yesterday_edition = (actual_edition == yesterday_str) or (not is_past_9am) or (actual_edition < today_str)
     is_locked_for_user = (is_today_edition and not can_access_today)
@@ -704,9 +700,8 @@ def discovery_page(request: Request, edition: Optional[str] = Query(None)):
             "is_locked_for_user": is_locked_for_user,
             "can_access_today": can_access_today,
             "is_past_9am": is_past_9am,
-            "seconds_until_9am": seconds_until_9am,
-            "hours_until_9am": hours_until_9am,
-            "mins_until_9am": mins_until_9am,
+            "edition_published_label": edition_published_label,
+            "next_edition_pending": next_edition_pending,
         }
     )
 

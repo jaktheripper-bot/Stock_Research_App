@@ -218,7 +218,7 @@ def get_latest_schema_migration_version() -> str:
 MONITORED_ROUTES = [
     # Core & Multi-Asset Views (24 HTML views)
     ("/", "GET", "Home / Terminal"),
-    ("/discovery", "GET", "9 AM Morning Discovery Reel"),
+    ("/discovery", "GET", "Stock Discovery (post-close edition)"),
     ("/equities", "GET", "Institutional Equities Directory"),
     ("/dossier/INFY", "GET", "7-Pillar Equity Dossier"),
     ("/compare", "GET", "Peer Comparison Matrix"),

@@ -169,7 +169,7 @@
   </div>
 </section>
 
-<!-- Section 4: Stock Discovery @ 9:00 AM IST Section -->
+<!-- Section 4: Stock Discovery (post-close edition) -->
 {% if discovery_stocks %}
 <section style="padding: 48px 0; background: linear-gradient(180deg, rgba(15, 23, 42, 0.7) 0%, rgba(11, 17, 32, 0.9) 100%); border-top: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
   <div class="container">
@@ -181,16 +181,16 @@
         <div class="hero-badge" style="margin-bottom: 10px; display: inline-flex; align-items: center; gap: 8px;">
         {% endif %}
           {% if is_yesterday_edition %}
-          <span><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> YESTERDAY'S 9:00 AM EDITION</span>
+          <span><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> PREVIOUS SESSION'S EDITION</span>
           {% else %}
-          <span><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> DAILY EXCHANGE DISCOVERY @ 9:00 AM IST</span>
+          <span><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> TODAY'S POST-CLOSE EDITION</span>
           {% endif %}
           <span>•</span>
           <span>QUALITY SCREEN</span>
         </div>
-        <h2 class="section-title" style="margin-bottom: 6px;">Stock Discovery @9AM</h2>
+        <h2 class="section-title" style="margin-bottom: 6px;">Stock Discovery</h2>
         <p class="section-sub" style="margin: 0; max-width: 640px;">
-          Curated and released daily at 9:00 AM IST from statutory BSE exchange filings. High-ROCE, conservative leverage companies across varied sectors that analysts already follow.
+          Screened every trading day after the 3:30 PM IST market close, so each ratio uses settled closing prices and that day's BSE filings. Usually published in the evening, giving you time to read before the next session. High-ROCE, low-debt companies across varied sectors that few analysts cover.
         </p>
       </div>
       <div>
@@ -872,7 +872,7 @@
     selectHomeSector('ALL', allBtn);
   }
 
-  // Discovery @9AM grid: same single-row cap, with a pointer to the full edition.
+  // Stock Discovery grid: same single-row cap, with a pointer to the full edition.
   function capDiscoveryGridToOneRow() {
     const grid = document.getElementById('discoveryHighlightsGrid');
     if (!grid) return;
@@ -934,7 +934,7 @@
               </li>
               <li>
                 <svg class="glyph"><use href="#glyph-check"></use></svg>
-                <span><strong>Stock Discovery @9AM:</strong> Daily curated exchange screens released every market morning.</span>
+                <span><strong>Stock Discovery:</strong> A daily quality screen of BSE companies, run after each market close and usually published that evening.</span>
               </li>
               <li>
                 <svg class="glyph"><use href="#glyph-check"></use></svg>

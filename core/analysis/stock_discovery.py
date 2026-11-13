@@ -1,5 +1,5 @@
 """
-Morning Discovery Reel: Screening & Selection Engine for Under-the-Radar Equities.
+Stock Discovery Reel: Post-Close Screening & Selection Engine for Under-the-Radar Equities.
 
 Identifies, filters, and curates 10-15 high-quality, overlooked Indian equities across
 varied sectors for investors and research analysts.

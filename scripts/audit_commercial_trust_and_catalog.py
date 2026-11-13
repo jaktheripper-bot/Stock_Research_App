@@ -12,7 +12,7 @@ information architecture across SQLite and PostgreSQL:
    - Verifies persona-guided callouts ("Best for...") across all 4 plans.
 3. Homepage IA & Flagship Sample Dossier Verification:
    - Verifies that Homepage Flagship Sample Card (`INFY`) aligns with audited database fundamentals (ROCE 38.4%, 0.00x D/E, 0/8 flags).
-   - Verifies that Stock Discovery @9AM reel rows are active, valid, and free of qualitative `"Fair"` leaks or Mega-Cap contamination.
+   - Verifies that Stock Discovery reel rows are active, valid, and free of qualitative `"Fair"` leaks or Mega-Cap contamination.
 4. Non-Registered Entity & AST Hygiene Guard:
    - Verifies zero personal name leaks (`Lyndon Pinto`), zero unregistered company claims, and zero backslash-escaped quotes in template attributes.
 

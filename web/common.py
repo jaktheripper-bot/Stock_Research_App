@@ -419,7 +419,7 @@ def _is_user_subscribed(user: Optional[Dict[str, Any]]) -> bool:
 
 
 def _can_access_today_discovery(request: Request, user: Optional[Dict[str, Any]]) -> bool:
-    """Returns True if the request has entitlement to view today's live 9:00 AM Discovery Reel."""
+    """Returns True if the request has entitlement to view today's post-close Stock Discovery edition."""
     if os.environ.get("TESTING") == "1":
         if request.headers.get("x-admin-key") or request.query_params.get("test_access") == "1":
             return True

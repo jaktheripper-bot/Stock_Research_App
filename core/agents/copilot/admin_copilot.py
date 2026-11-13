@@ -377,7 +377,7 @@ def tool_generate_data_driven_optimization_tips(kpis: Dict[str, Any]) -> str:
         tips.append(
             f"1. **Reduce Bounce Rate (`{bounce:.1f}%`) & Deepen Session Depth (`{actions_per_session} actions/session` across `{sessions:,}` sessions):**\n"
             f"   - **Observed Data:** Top entry routes are {route_str} and top researched securities are {ticker_str}.\n"
-            f"   - **Actionable Playbook:** Pin the top 3 researched tickers ({ticker_str}) directly in the homepage *Morning Discovery @9AM* preview strip and add 1-click *'Compare with Sector Peer'* pills inside `/dossier/{{ticker}}` headers. Moving interactive tools (`#reverseDcfSandbox`, `#mfFeeDragSimulator`, `#reitSec56Simulator`) above the fold converts single-page bounces into multi-action analytical sessions."
+            f"   - **Actionable Playbook:** Pin the top 3 researched tickers ({ticker_str}) directly in the homepage *Stock Discovery* preview strip and add 1-click *'Compare with Sector Peer'* pills inside `/dossier/{{ticker}}` headers. Moving interactive tools (`#reverseDcfSandbox`, `#mfFeeDragSimulator`, `#reitSec56Simulator`) above the fold converts single-page bounces into multi-action analytical sessions."
         )
     else:
         tips.append(

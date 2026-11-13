@@ -1,11 +1,33 @@
 # Platform Roadmap & Pending Tasks Register
 **Moatnomics — Multi-Asset Investment Research Platform**  
 *Document Target:* [`docs/PENDING_TASKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/PENDING_TASKS.md)  
-*Last Updated:* 2026-11-13 01:00:00 IST
+*Last Updated:* 2026-11-13 08:45:00 IST
 
 ---
 
 ## 1. Active, In-Progress & Parked Tasks
+
+### Task 10: Daily "Why It Moved" Evaluation for the Day's Major Stock Movements
+- **Category:** Research Content / Market Close Wrap
+- **Status:** `Not started — needs an implication-preflight brief before any code` (added 2026-11-13)
+- **Goal:** For each trading day, explain the major price moves in the stocks we cover, citing the public evidence behind each one, so readers learn what drove the move rather than just seeing the number.
+- **Open questions to settle in the preflight interview:**
+  1. **What counts as a major move:** a fixed threshold (for example ±5% on the day), the top N gainers and losers in our coverage, or a move that's large relative to the stock's own typical daily swing. Should volume spikes qualify too?
+  2. **Universe:** only stocks with a published report, or every listed stock we hold prices for.
+  3. **Where it appears:** a new Market Close Wrap section (19:30 IST), a dated "Why it moved" note on each stock's report page, a `/discovery` panel, or a combination.
+- **Evidence to check for each move (fail closed when nothing is found):**
+  - the company's own exchange filings that day (results, board outcomes, orders, rating changes, pledges, management changes);
+  - bulk and block deals;
+  - index and sector moves, to separate a stock-specific move from a market or sector one;
+  - ex-dividend, split or bonus dates, which move the price mechanically;
+  - news, cited only from reliable sources and never presented as a filing.
+  - When no public cause is found, say so: "No company-specific disclosure found; the move tracked its sector." Never infer a reason without evidence (AGENTS.md "Pending Over Potemkin").
+- **Risks to cover in the brief:**
+  - **SEBI:** wording must explain what happened and must not read as a buy or sell call, or as a forecast.
+  - **Timing:** some filings land after the 3:30 PM close, so the 16:30 IST close run may miss them. Decide whether a late-filing re-check is needed before the 19:30 send.
+  - **Cost:** model calls per mover per day.
+  - **Prose uniqueness and number parity:** move percentages must match closing prices (AGENTS.md Rule 8).
+- **Done when:** a dated record per mover is saved with its cited sources and generation time, shown in the chosen places with a provenance badge, covered by tests (including the "no cause found" path and an upstream outage), and the living docs are updated.
 
 ### Task 9: Security, Data & UX Remediation (merged patch list from three audits)
 - **Category:** Security, Billing Integrity, Data Operations, Promise-vs-Execution & UX
