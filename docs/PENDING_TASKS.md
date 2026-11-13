@@ -1,21 +1,107 @@
 # Platform Roadmap & Pending Tasks Register
 **Moatnomics — Multi-Asset Investment Research Platform**  
 *Document Target:* [`docs/PENDING_TASKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/PENDING_TASKS.md)  
-*Last Updated:* 2026-11-13 00:30:00 IST
+*Last Updated:* 2026-11-13 01:00:00 IST
 
 ---
 
 ## 1. Active, In-Progress & Parked Tasks
 
-### Task 9: Security & Quality Audit Remediation (12 Nov 2026 audit, 65 findings)
-- **Category:** Security, Billing Integrity & Reliability
-- **Status:** `Wave 1 shipped 2026-11-13; Waves 2 and 3 open`
-- **Origin:** Read-only full-codebase audit written 2026-11-12 23:15 IST (14 P0, 20 P1, 19 P2, 12 P3). Spot checks on 2026-11-13 confirmed 13 of the 14 P0s were real and still open; the 14th (P0-01) depended on website config, so it was fixed outright. P2-05 (holiday calendar) was already resolved by the NSE holiday sync.
-- **Details:**
-  1. ~~**Wave 1 (containment):** P0-01 sign-in token fallback removed; P0-02 `/auth/callback` reflected XSS; P0-03 workflow input injection + read-only CI permissions; P0-05 admin lookup fails closed; P0-07 thesis/countercase/telemetry identity from session only; P0-09 `.dockerignore`.~~ Done 2026-11-13.
-  2. **Wave 2 (needs implication preflight, billing):** P0-11 refunds never reach Razorpay, `process_refund` crashes on `tx_...` ids, credit races, Pro access when expiry is missing; P0-12 order intent saved after Razorpay order; P0-13 generation cap counted before credit check; P0-10 test DB isolation (`tests/conftest.py`); P0-14 import-time `TESTING=1` in `scripts/ai_auditor.py` and `check_system.py`.
-  3. **Remaining P0 items from Wave 1's areas:** rest of P0-02 (debt ingest writes to the shared table, Markdown `| safe`, admin console and Opportunity Terminal DOM sinks, `'unsafe-inline'` CSP, CDN SRI); rest of P0-05 (hardcoded `admin@moatnomics.com` owner, rate limit on `/admin/auth/direct-verify`, legacy root `telemetry.py`); P0-04 agent tool policies; P0-06 SQL built from strings in telemetry and admin exclusions; P0-08 PDF `root="."` and white-label field escaping.
-  4. **Wave 3:** P1, P2 and P3 items, including P1-10 (real subscriber's unsubscribe token in `digest_editions.sample_html`; mock sends counted as sent) and P3-06 (website service missing from `render.yaml`).
+### Task 9: Security, Data & UX Remediation (merged patch list from three audits)
+- **Category:** Security, Billing Integrity, Data Operations, Promise-vs-Execution & UX
+- **Status:** `Wave 1 shipped and verified live 2026-11-13 (b316739); everything else open`
+- **Sources** (tag after each item):
+  - **[A]** full-codebase audit, 2026-11-12 23:15 (14 P0, 20 P1, 19 P2, 12 P3), ids such as `A:P0-11`;
+  - **[B]** database audit at `0914737`, 2026-11-13 (live read-only catalog, statistics and grants);
+  - **[C]** live audit, 2026-11-13 (production logs, read-only DB timestamps, live crawl and real-browser checks at desktop and 375 px).
+- Overlapping findings are merged into one line with every source listed. Spot checks confirmed 13 of A's 14 P0s; A's line numbers have drifted, and A:P0-06 is overstated (only admins can reach it). A sample of 12 of A's lower-priority claims found 6 accurate, 3 overstated (P1-13, P1-14, P0-06) and 3 wrong (P2-01, P2-05, P1-20's cause), so confirm each A item in code before fixing it.
+
+**1. ~~Wave 1: containment~~ (done 2026-11-13, verified live)**
+- ~~Sign-in token fallback removed and `exp` required [A:P0-01]~~
+- ~~`/auth/callback` reflected XSS [A:P0-02 part]~~
+- ~~Workflow input shell injection, read-only CI permissions [A:P0-03]~~
+- ~~Admin lookup fails closed [A:P0-05 part]~~
+- ~~Thesis, countercase and telemetry identity from the session only [A:P0-07]~~
+- ~~`.dockerignore` [A:P0-09 part]~~
+
+**2. Wave 2: money and identity** (run the implication-preflight skill first; these touch billing and auth)
+- **Refunds never reach Razorpay.** No code calls the refund API. The Admin Copilot "refund" only flips `status`. `process_refund` does `int(target_ref)` on `tx_...` ids and crashes on Postgres. There is no row lock, Pro and unlocked reports aren't revoked, refunds aren't idempotent, and the balance comes from a separate read. [A:P0-11, B]
+- **Credit races.** `add_user_credits` reads, changes and writes the balance; the unlock spans three connections; gateway order/payment ids have no unique constraint; welcome credits aren't idempotent. [A:P0-11, B]
+- **Free Pro access** when `subscription_expires_at` is missing or can't be parsed. [A:P0-11]
+- **Order intent saved after the Razorpay order is created.** A database error at that moment leaves a customer charged with no credits. [A:P0-12]
+- **Daily generation cap counted before the credit check.** Zero-credit users can use up everyone's quota, and there's no per-ticker lock (duplicate paid calls). [A:P0-13]
+- **Account identity.** The lookup matches `id = ? OR email = ?`, and `usr_` ids are built lossily (`a.b@x` and `a_b@x` collide), so one person can be served another person's profile. [B]
+- **One-time codes.** Verify and delete run in separate transactions (a code can be used twice); the resend throttle isn't atomic; codes are hashed without a salt; the attempt counter can race; expired rows are never purged. [B, A:P1-05]
+- **Research Desk guest chats.** Readable and appendable by conversation id; guest ids come from IP addresses (shared IPs collide); turn positions use `COUNT(*)` with no unique key or foreign key; the model gets the oldest turns instead of the latest. 26 of 44 live conversations are ownerless. [B, A:P1-02]
+
+**3. Wave 2: test and tooling safety**
+- **Test database isolation.** Add `tests/conftest.py` with a temporary database. `verify_reality_audit.py`, `check_system.py` and `remediation_squad.py` can touch live data. [A:P0-10]
+- **Test mode switched on by imports.** `scripts/ai_auditor.py` and `check_system.py` set `TESTING=1` at import time, and `ai_auditor` writes `.py` files into `tests/`. [A:P0-14]
+- **Admin test-data purge.** `LIKE` patterns with unescaped `_` can delete real accounts and transactions. Purge only rows with explicit test provenance, and preview row counts first. [A:P1-09, B]
+
+**4. Remaining P0 work in Wave 1's areas** [A]
+- **P0-02:** debt ingest writes to the shared table; Markdown rendered with `| safe`; admin console and Opportunity Terminal DOM sinks; `'unsafe-inline'` CSP; no CDN SRI.
+- **P0-05:** hardcoded `admin@moatnomics.com` owner; no rate limit on `/admin/auth/direct-verify`; legacy root `telemetry.py` admin with the `admin2026` default password. Production still imports this file, see section 7.
+- **P0-04:** agent tool policies (substring `pytest` command approval, workspace file reads, SSRF).
+- **P0-06:** SQL built from strings in telemetry time filters and admin email exclusions.
+- **P0-08:** PDF `root="."`, white-label fields not escaped, watermark fails open.
+
+**5. Promise vs execution and UX** [C unless noted]
+- **Stock Discovery @9AM** is promised daily at 9:00 AM IST (homepage, Pro perk on `/pricing`, nav, live countdown). The edition is built in the 16:30 IST run, and live `discovery_reel.created_at` shows creation between 19:55 the same day and the next afternoon. `discovery.html:54` shows a hardcoded "Evaluated: … 09:00 IST" (AGENTS.md Rule 7). After 9 AM the page still says "check back at 9:00 AM". **Decision pending:** change the wording to the real release time, or produce the edition by 9 AM.
+- **Page weight.** The homepage sends 608 cards (3.5 MB, 27k elements) and shows 1; `/funds` renders 973 cards (3.8 MB, 30k elements) with no paging; `/etfs` is 3.4 MB. Add paging or lazy loading and a page-size budget. [C, A:P1-16]
+- **404 page** returns raw `{"detail":"Not Found"}`. Needs a branded not-found page with navigation.
+- **Sitemap** has 3 unescaped `&` (936 URLs; a sample of 38 all return 200). [A:P2-06, confirmed live]
+- **Unverifiable claims in the manual.** It cites a non-existent `scripts/chrome_interactive_audit.py` ("43/43 checks"), and its audit scores have no reproducible artifacts.
+
+**6. Database and data operations** [B unless noted]
+- **Supabase client roles** (`anon`, `authenticated`) have broad grants on all 65 tables and 33 sequences (including `TRUNCATE`) plus default grants. The app runs as `postgres` and does DDL at runtime. Revoke unneeded grants and move schema changes to a deploy step.
+- **Backups.**
+  - The SQLite file is copied while in WAL mode, so copies can be incomplete. Use `sqlite3 .backup`.
+  - Files are mode `0644`, and admin TOTP seeds are stored in plain text.
+  - There has been no restore drill, and the uploader targets a bucket that doesn't exist.
+  - The local `backups/` folder is 28 GB with no retention. Keep the last 5 automatically. [B, A:script inventory, C]
+- **Foreign keys.** A:P1-20's stated cause (an `INTEGER` id at `users.py:58`) is wrong, but B's measured findings stand: SQLite runs with foreign keys off; `fund_audit_jobs.user_id` has no foreign key in Postgres; `mf_current_disclosures.snapshot_id` has no index. [B, A:P1-20]
+- **Query cost** (measured since 25 Oct). Measure before and after each change. [B, A:P1-16]
+  - Report revisions: about 2,125 s over 41k calls.
+  - BSE resolution routine: about 765 s; the predicates don't use indexes (267k sequential scans).
+  - Telemetry: about 100 MB, 65 MB of it indexes. One 7.8 MB index has zero scans, and the top-users query does N+1 profile lookups.
+  - Fund holdings: about 11k dead rows.
+  - 10 duplicate indexes.
+- **Sync scripts.** A 55 MB report preload is unused on Postgres; push and pull list different tables (26 vs 22); the REST pull overwrites newer local rows; partial failures are reported as success; the sequence reset can race. [B, A:script inventory]
+- **Schema work at runtime.** The savings reconciliation runs three times; `support_canned_responses` is missing on a fresh database; `init_db()` runs on every typeahead keystroke. [B, A:P2-03]
+- **Digest subscription helper** still accepts an email address. That path can't be reached (routes check the token first), but narrow it to token-only. [B]
+
+**7. Wave 3: rest of audit A** (open unless marked)
+- **P1:**
+  - P1-01 viewer role escalation and Copilot prompt injection
+  - P1-03 pool and SQLite deadlocks
+  - P1-04 `Cache-Control: public` without `Vary: Cookie`
+  - P1-05 OAuth token in the GET query, no state/PKCE, predictable secret fallback, cookie `Secure` flags, CSRF passes when headers are missing
+  - P1-06 brokerage credentials in plain text
+  - P1-07 quota drain, 5-minute BSE re-synthesis loop, alias poisoning
+  - P1-08 fabricated financial figures
+  - P1-10 email HTML injection; the admin sample email stores a real subscriber's unsubscribe token (`notify.py:609`); mock sends counted as sent
+  - P1-11 archive bombs and `defusedxml`
+  - P1-12 `pytest` inside the admin audit
+  - P1-13 fuzzy `LIKE` primary keys
+  - P1-14 global watchlist
+  - P1-15 SSE duplication
+  - P1-17 `-A trust` Postgres in tests
+  - P1-18 secrets and PII in `scratch/`
+  - P1-19 reality audit blind spots
+- **P2:** P2-01 to P2-19. P2-06 is listed in section 5. Not real or already done: P2-01 (only one scan-runs route exists, `admin.py:2266`) and P2-05 (the holiday calendar fetches NSE live; there is no hardcoded 2026 list).
+- **P3:**
+  - P3-01 SAC `998314` default (`connection.py:1048`)
+  - P3-02 personal name in source and tests
+  - P3-03 vendor metadata in `data/`
+  - P3-04 orphan `.pyc` files
+  - P3-05 `backups/` in git hygiene
+  - P3-06 website service missing from `render.yaml`
+  - P3-07 to P3-09
+  - P3-10 legacy root modules: confirmed that production imports them (`web/main.py` and `web/routers/dossier.py` import root `telemetry.py`; `core/reporting/pdf.py` imports root `db.py` and `analyzer.py`; synthesis imports `screener.py` and `checker.py`) [A, C]
+  - P3-11 and P3-12
+
+**Not yet audited by anyone:** pricing copy vs what billing grants, paid unlock and checkout flows end to end (needs a signed-in test account), accessibility, email rendering across clients, restore drills.
 
 ### Task 8: Mailer Monitoring Setup (Better Stack Heartbeats & Resend Webhook)
 - **Category:** Monitoring & Email Deliverability
