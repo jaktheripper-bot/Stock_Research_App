@@ -13,7 +13,7 @@ Features:
   3. Git Release Tagging & Remote Sync: Stamps an annotated git tag and
      pushes it to origin (GitHub) for cloud resilience.
   4. 1-Command Live Emergency Rollback: Instantly rolls back local and
-     origin/main (Streamlit Community Cloud) to a verified working state.
+     origin/main (Render redeploys after CI checks pass) to a verified working state.
   5. Ledger Tracking: Maintains both machine-readable JSON and
      CHECKPOINTS.md markdown ledgers in IST.
 ==============================================================================
@@ -299,10 +299,41 @@ def list_checkpoints():
     return checkpoints
 
 
+def verify_commit_passes_tests(target_sha: str, timeout_seconds: int = 1800) -> bool:
+    """Runs the regression suite on `target_sha` in a throwaway git worktree (local SQLite, test mode).
+
+    A rollback force-pushes `main`, so the commit being restored must itself be shown to pass
+    before it replaces what is live. The working folder is not touched.
+    """
+    import tempfile
+
+    worktree = Path(tempfile.mkdtemp(prefix="rollback_verify_"))
+    env = dict(os.environ, TESTING="1", FORCE_LOCAL_SQLITE="1", SUPABASE_DB_URL="")
+    env.pop("ALLOW_PRODUCTION_DB", None)
+    try:
+        run_cmd(["git", "worktree", "add", "--detach", str(worktree), target_sha])
+        res = subprocess.run(
+            [sys.executable, "-m", "unittest", "discover", "-s", "tests"],
+            cwd=str(worktree), env=env, capture_output=True, text=True, timeout=timeout_seconds,
+        )
+        tail = "\n".join((res.stderr or res.stdout or "").strip().splitlines()[-4:])
+        print(f"   Test run on {target_sha[:7]} exited with code {res.returncode}:\n{tail}")
+        return res.returncode == 0
+    except subprocess.TimeoutExpired:
+        print(f"   ❌ Test run on {target_sha[:7]} did not finish within {timeout_seconds}s.")
+        return False
+    except subprocess.CalledProcessError as err:
+        print(f"   ❌ Could not prepare a worktree for {target_sha[:7]}: {err.stderr or err}")
+        return False
+    finally:
+        run_cmd(["git", "worktree", "remove", "--force", str(worktree)], check=False)
+        shutil.rmtree(worktree, ignore_errors=True)
+
+
 def rollback_to_checkpoint(target_tag: str = "", force: bool = False, restore_db: bool = True):
     """
     Execute emergency rollback of production to target checkpoint.
-    Restores code and pushes to origin/main so Streamlit Cloud redeploys immediately.
+    Restores code and force-pushes origin/main; Render redeploys once the CI checks pass.
     """
     checkpoints = load_ledger()
     if not target_tag:
@@ -335,16 +366,33 @@ def rollback_to_checkpoint(target_tag: str = "", force: bool = False, restore_db
     print(f"   • Current Branch:     {curr_branch} ({curr_sha[:7]})")
     print("=" * 65)
 
-    if not force:
-        print("\n⚠️ This action will:")
-        print(f"   1. Hard reset '{curr_branch}' to commit {target_sha[:7]} ({target_tag}).")
-        print("   2. Update 'main' and force-push to 'origin/main' (triggering Streamlit Cloud redeploy).")
-        if restore_db and target_cp.get("database", {}).get("filename"):
-            print(f"   3. Restore database from '{target_cp['database']['filename']}'.")
-        print("\nType 'yes' or 'y' to confirm emergency rollback: ", end="", flush=True)
-        conf = input().strip().lower()
-        if conf not in ("yes", "y"):
-            print("Rollback cancelled by user.")
+    if force:
+        print("\nℹ️ --force no longer skips confirmation: a rollback force-pushes production and must be confirmed by a person.")
+    if curr_status:
+        print("\n❌ Uncommitted changes are present. A rollback hard-resets this folder and would destroy them.")
+        print("   Commit or stash them first.")
+        sys.exit(1)
+    if not sys.stdin.isatty():
+        print("\n❌ Rollback needs an interactive terminal so a person can confirm it. Nothing was changed.")
+        sys.exit(1)
+
+    print("\n⚠️ This action will:")
+    print(f"   1. Run the regression suite on commit {target_sha[:7]} in a temporary copy.")
+    print(f"   2. Hard reset '{curr_branch}' to commit {target_sha[:7]} ({target_tag}).")
+    print("   3. Update 'main' and force-push to 'origin/main' (Render redeploys once CI checks pass).")
+    if restore_db and target_cp.get("database", {}).get("filename"):
+        print(f"   4. Restore the local database from '{target_cp['database']['filename']}'.")
+    print(f"\nType the checkpoint tag ({target_tag}) to confirm: ", end="", flush=True)
+    if input().strip() != target_tag:
+        print("Confirmation did not match. Rollback cancelled; nothing was changed.")
+        return
+
+    print(f"\n🧪 Verifying that {target_tag} passes the regression suite before it replaces production...")
+    if not verify_commit_passes_tests(target_sha):
+        print("\n❌ The target commit does not pass its own tests.")
+        print("   Type 'ROLLBACK ANYWAY' to continue regardless, or anything else to cancel: ", end="", flush=True)
+        if input().strip() != "ROLLBACK ANYWAY":
+            print("Rollback cancelled; nothing was changed.")
             return
 
     # 1. Safety backup of current reports.db
@@ -353,23 +401,23 @@ def rollback_to_checkpoint(target_tag: str = "", force: bool = False, restore_db
         safety_path = CHECKPOINTS_DIR / safety_name
         try:
             shutil.copy2(DB_FILE, safety_path)
-            print(f"\n🛡️ Step 1/5: Saved safety backup of current DB to: .checkpoints/{safety_name}")
+            print(f"\n🛡️ Step 1/4: Saved safety backup of current DB to: .checkpoints/{safety_name}")
         except Exception as e:
             print(f"⚠️ Warning: Could not create pre-rollback DB backup: {e}")
 
     # 2. Reset code to target checkpoint
-    print(f"\n🔄 Step 2/5: Resetting branch '{curr_branch}' to {target_tag} ({target_sha[:7]})...")
+    print(f"\n🔄 Step 2/4: Resetting branch '{curr_branch}' to {target_tag} ({target_sha[:7]})...")
     run_cmd(["git", "reset", "--hard", target_sha])
     print(f"   ✅ Working directory reset to {target_sha[:7]}.")
 
-    # 3. Synchronize with main and push to origin/main (Live Streamlit Cloud)
-    print("\n🌐 Step 3/5: Deploying Rollback to Live Production (origin/main)...")
+    # 3. Synchronize with main and push to origin/main (live production on Render)
+    print("\n🌐 Step 3/4: Deploying Rollback to Live Production (origin/main)...")
     try:
         run_cmd(["git", "checkout", "main"])
         run_cmd(["git", "reset", "--hard", target_sha])
         run_cmd(["git", "push", "origin", "main", "--force"])
         print("   ✅ Live 'main' updated and force-pushed to origin/main.")
-        print("   📡 Streamlit Community Cloud will automatically detect and reboot with this verified release.")
+        print("   📡 Render redeploys this commit once its GitHub checks pass.")
     except Exception as e:
         print(f"   ⚠️ Could not push to origin/main: {e}")
     finally:
@@ -382,7 +430,7 @@ def rollback_to_checkpoint(target_tag: str = "", force: bool = False, restore_db
     if restore_db and db_meta and db_meta.get("filename"):
         snap_file = CHECKPOINTS_DIR / db_meta["filename"]
         if snap_file.exists():
-            print(f"\n💾 Step 4/5: Restoring database from .checkpoints/{db_meta['filename']}...")
+            print(f"\n💾 Step 4/4: Restoring database from .checkpoints/{db_meta['filename']}...")
             src = sqlite3.connect(str(snap_file))
             dst = sqlite3.connect(str(DB_FILE))
             with dst:
@@ -393,21 +441,13 @@ def rollback_to_checkpoint(target_tag: str = "", force: bool = False, restore_db
         else:
             print(f"   ℹ️ Snapshot file {db_meta['filename']} not found locally. Database untouched.")
     else:
-        print("\n💾 Step 4/5: Database restore skipped.")
-
-    # 5. Local verification smoke test
-    print("\n🔍 Step 5/5: Executing Post-Rollback Smoke Verification...")
-    res = run_cmd([sys.executable, "test_ui_headless.py"], check=False)
-    if res.returncode == 0:
-        print("   ✅ Headless UI simulation passed cleanly on restored code.")
-    else:
-        print("   ⚠️ Headless UI test completed with warnings (check output).")
+        print("\n💾 Step 4/4: Database restore skipped.")
 
     print("\n" + "=" * 65)
     print("🎉 EMERGENCY ROLLBACK COMPLETED SUCCESSFULLY!")
     print(f"   • Active Release:  {target_tag}")
     print(f"   • Active Commit:   {target_sha[:7]}")
-    print("   • Live Cloud:      Streamlit Community Cloud is rebooting now.")
+    print("   • Live Cloud:      Render redeploys after the GitHub checks pass.")
     print("=" * 65 + "\n")
 
 
@@ -424,7 +464,7 @@ def main():
     # rollback
     rollback_p = subparsers.add_parser("rollback", help="Rollback production to a verified checkpoint")
     rollback_p.add_argument("tag", nargs="?", default="", help="Checkpoint tag name to restore (defaults to latest)")
-    rollback_p.add_argument("--force", "-f", action="store_true", help="Bypass confirmation prompt")
+    rollback_p.add_argument("--force", "-f", action="store_true", help="Deprecated: confirmation can no longer be bypassed")
     rollback_p.add_argument("--no-db", action="store_true", help="Do not restore database snapshot")
 
     # list

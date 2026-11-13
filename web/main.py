@@ -44,6 +44,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from core.logging_config import setup_logging, flush_betterstack_logs
+from core.runtime import is_test_runtime
 
 setup_logging()
 logger = logging.getLogger("equity_research.web")
@@ -353,7 +354,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Initial Safety Radar bootstrap seed skipped: {e}")
 
-    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
+    is_testing = is_test_runtime()
     enable_schedulers = os.environ.get("ENABLE_BACKGROUND_SCHEDULERS", "").strip() == "1"
     scheduler = None
     audit_task = None

@@ -30,10 +30,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python 3.14
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.14"
           cache: "pip"
 
       - name: Install Dependencies
@@ -46,6 +46,8 @@ jobs:
           TZ: Asia/Kolkata
           PYTHONPATH: ${{ github.workspace }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          # A manual run here is meant to act on production; non-hosted machines must opt in.
+          ALLOW_PRODUCTION_DB: "1"
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

@@ -1,7 +1,7 @@
 # Platform Roadmap & Pending Tasks Register
 **Moatnomics — Multi-Asset Investment Research Platform**  
 *Document Target:* [`docs/PENDING_TASKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/PENDING_TASKS.md)  
-*Last Updated:* 2026-11-13 10:15:00 IST
+*Last Updated:* 2026-11-13 10:45:00 IST
 
 ---
 
@@ -9,13 +9,13 @@
 
 ### Task 11: Testing Architecture Overhaul
 - **Category:** Verification, CI & Release Safety
-- **Status:** `Plan approved 2026-11-13; Phase 0 done, Phase 1 in progress`
+- **Status:** `Plan approved 2026-11-13; Phases 0 and 1 done; next is the protected-paths lock, then Phase 2`
 - **Plan:** [`docs/plans/TESTING_ARCHITECTURE_OVERHAUL.md`](plans/TESTING_ARCHITECTURE_OVERHAUL.md) (source findings: [`reports/Why our audits missed issues.md`](../reports/Why%20our%20audits%20missed%20issues.md)). Related: Task 9 (the fixes themselves).
 - **Goal:** agents keep writing code, but a small protected layer they can't quietly change judges it, production is checked on a schedule, and no result is recorded without evidence.
 - **Owner decisions (13 Nov):** deploys wait for CI; a Claude Code hook blocks edits to protected files and the owner approves changes in chat (CI flags changes from other agents); CI gets a throwaway Postgres; local commands default to SQLite.
 - **Phases:**
   0. ~~Finish in-flight log masking and worker liveness logging.~~
-  1. **Safety rails:** production database is opt-in on any non-hosted machine (`ALLOW_PRODUCTION_DB=1`); one shared test-runtime check; Render deploys only after CI passes (**owner action in the Render dashboard**); rollback runs tests before force-pushing; CI on Python 3.14.
+  1. ~~**Safety rails:** production database is opt-in on any non-hosted machine (`ALLOW_PRODUCTION_DB=1`); one shared test-runtime check; rollback runs tests before force-pushing; CI on Python 3.14; `render.yaml` deploy gate for the crons and worker.~~ Done 2026-11-13. **Open (owner action in the Render dashboard):** on the **Moatnomics.com** web service set Settings → Build & Deploy → Auto-Deploy to "After CI Checks Pass", and confirm the Blueprint sync applied the same to the 7 crons and the worker.
   2. **Protected contract suite** (`tests/contracts/`, `TESTING` unset, on Postgres): negative security tests with real signed cookies and tokens, a route-policy inventory, money and race tests, migration parity, and a promise registry. Remove the ~35 security-relevant `TESTING` branches (starts with `implication-preflight`).
   3. **Fast-suite cleanup:** per-class isolated databases, a controllable clock, a realistic-size fixture with page budgets, a Playwright smoke test, golden LLM outputs.
   4. **Static scans:** widen the reality gates to the whole repo, add third-party scanners, add a doc-claims check, stop presenting the audit score as a quality claim.

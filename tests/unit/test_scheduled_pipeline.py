@@ -148,7 +148,8 @@ class TestScheduledPipeline(unittest.TestCase):
         with patch.dict(os.environ, {"TESTING": "0", "ENABLE_BACKGROUND_SCHEDULERS": "0"}, clear=False), \
              patch.dict(sys.modules):
             sys.modules.pop("pytest", None)
-            with patch("web.main.AsyncIOScheduler") as mock_sched, \
+            with patch("web.main.is_test_runtime", return_value=False), \
+                 patch("web.main.AsyncIOScheduler") as mock_sched, \
                  patch("web.main.warmup_task", side_effect=_noop), \
                  patch("web.main.run_daily_project_audit_scheduler", side_effect=_noop) as mock_audit:
 
@@ -164,7 +165,8 @@ class TestScheduledPipeline(unittest.TestCase):
         with patch.dict(os.environ, {"TESTING": "0", "ENABLE_BACKGROUND_SCHEDULERS": "1"}, clear=False), \
              patch.dict(sys.modules):
             sys.modules.pop("pytest", None)
-            with patch("web.main.AsyncIOScheduler") as mock_sched, \
+            with patch("web.main.is_test_runtime", return_value=False), \
+                 patch("web.main.AsyncIOScheduler") as mock_sched, \
                  patch("web.main.warmup_task", side_effect=_noop), \
                  patch("web.main.run_daily_project_audit_scheduler", side_effect=_noop), \
                  patch("core.agents.watchers.bse_watcher.run_bse_watcher_loop", side_effect=_noop):

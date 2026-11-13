@@ -29,6 +29,7 @@
   2. *Downstream Chain:* Every caller, screening gate, `except` handler, persisted column **AND serialized prose/JSON blob** (`report_text`, `dossier_text`, `pillar_breakdown_json`), and UI template consuming that data.
 - **Fail-Closed Domain Integrity ("Pending Over Potemkin"):** NEVER write fallback templates, proxy portfolio clones, or default financial metrics (`price=100`, `roce=22.4`, `revenue_cr=100`) when live data or LLM synthesis fails. Fail closed to an explicit `PENDING` / unarchived state and retry next cycle; never emit `[VERIFIED FACT]` or `[CALCULATED METRIC]` on fallback values.
 - **Process & Environment Isolation:** Background ingestion/mutation schedulers must NEVER auto-fire on local web server boot or test runs without an explicit `ENABLE_BACKGROUND_SCHEDULERS=1` opt-in guard.
+- **Production Database Is Opt-In Locally:** On any non-hosted machine the app uses local SQLite even when `.env` holds the production address. A command that must reach production sets `ALLOW_PRODUCTION_DB=1` for that one command; never export it in a shell profile or `.env`, and say so in your summary whenever you used it.
 
 ## 5. Mandatory Sandbox Simulation & Empirical Verification Protocol
 **Work out edge cases in `<appDataDir>/brain/<conversation-id>/scratch/` against cloned data BEFORE mutating workspace databases or committing.**

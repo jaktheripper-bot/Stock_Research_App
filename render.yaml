@@ -14,6 +14,11 @@
 # secrets are each sender's own Better Stack heartbeat URL (`sync: false`). A value set directly on
 # a service overrides the group, so per-service copies of group keys must be deleted in the dashboard.
 # Schedules are UTC (IST = UTC + 5:30).
+#
+# Deploy gate: `autoDeployTrigger: checksPass` makes every service below rebuild only after the GitHub
+# checks on that commit pass, so a failing test can't reach a cron that emails subscribers. The website
+# needs the same setting made by hand in the dashboard (Settings -> Build & Deploy -> Auto-Deploy ->
+# "After CI Checks Pass").
 
 services:
   # 16:30 IST: main close run (asset refresh, discovery reel, MSME, stock reports, monthly SEBI MF sync). No email.
@@ -22,6 +27,7 @@ services:
     runtime: docker
     region: singapore
     branch: main
+    autoDeployTrigger: checksPass
     plan: standard
     dockerfilePath: ./Dockerfile
     schedule: "0 11 * * *"
@@ -48,6 +54,7 @@ services:
     runtime: docker
     region: singapore
     branch: main
+    autoDeployTrigger: checksPass
     plan: standard
     dockerfilePath: ./Dockerfile
     schedule: "0 13 * * *"
@@ -75,6 +82,7 @@ services:
     runtime: docker
     region: singapore
     branch: main
+    autoDeployTrigger: checksPass
     plan: starter
     dockerfilePath: ./Dockerfile
     schedule: "0 14 * * *"
@@ -105,6 +113,7 @@ services:
     runtime: docker
     region: singapore
     branch: main
+    autoDeployTrigger: checksPass
     plan: standard
     dockerfilePath: ./Dockerfile
     schedule: "45 17 * * *"
@@ -131,6 +140,7 @@ services:
     runtime: docker
     region: singapore
     branch: main
+    autoDeployTrigger: checksPass
     plan: standard
     dockerfilePath: ./Dockerfile
     schedule: "30 19 * * *"
@@ -158,6 +168,7 @@ services:
     runtime: docker
     region: singapore
     branch: main
+    autoDeployTrigger: checksPass
     plan: starter
     dockerfilePath: ./Dockerfile
     schedule: "0 2 * * *"
@@ -188,6 +199,7 @@ services:
     runtime: docker
     region: singapore
     branch: main
+    autoDeployTrigger: checksPass
     plan: starter
     dockerfilePath: ./Dockerfile
     schedule: "30 15 * * *"
@@ -214,6 +226,7 @@ services:
     runtime: docker
     region: singapore
     branch: main
+    autoDeployTrigger: checksPass
     plan: starter
     dockerfilePath: ./Dockerfile
     dockerCommand: "python3 scripts/run_paid_fund_audit_worker.py"

@@ -21,19 +21,13 @@ logger = logging.getLogger("equity_research.core.notify")
 
 
 def _is_test_runtime() -> bool:
-    """Detects whether the current process is executing unit/integration/audit tests."""
+    """Detects unit/integration/audit test runs. Audits count as tests here so they never send mail."""
     import sys
+    from core.runtime import is_test_runtime
+
     argv0 = sys.argv[0] if sys.argv else ""
-    is_test_entrypoint = any(runner in argv0 for runner in ("unittest", "pytest", "run_project_audit", "verify_reality_audit"))
-    return (
-        os.environ.get("TESTING") == "1"
-        or os.environ.get("ENVIRONMENT") == "testing"
-        or os.environ.get("SKIP_DOTENV_IN_SUBPROCESS") == "1"
-        or os.environ.get("AUDIT_RECURSION_GUARD") == "1"
-        or bool(os.environ.get("PYTEST_CURRENT_TEST"))
-        or "pytest" in sys.modules
-        or is_test_entrypoint
-    )
+    is_audit_entrypoint = any(name in argv0 for name in ("run_project_audit", "verify_reality_audit"))
+    return is_test_runtime() or os.environ.get("AUDIT_RECURSION_GUARD") == "1" or is_audit_entrypoint
 
 
 def _is_live_email_dispatch_allowed() -> bool:

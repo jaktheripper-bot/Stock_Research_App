@@ -43,21 +43,43 @@ def is_hosted_production_runtime() -> bool:
 
 
 def _is_unit_test_runtime() -> bool:
-    """Detects active unittest/pytest runners or isolated audit test subprocesses."""
-    import sys
-    argv0 = sys.argv[0] if sys.argv else ""
-    is_test_entrypoint = any(runner in argv0 for runner in ("unittest", "pytest"))
-    return (
-        os.environ.get("TESTING") == "1"
-        or os.environ.get("ENVIRONMENT") == "testing"
-        or os.environ.get("SKIP_DOTENV_IN_SUBPROCESS") == "1"
-        or bool(os.environ.get("PYTEST_CURRENT_TEST"))
-        or is_test_entrypoint
-    )
+    """Detects active unittest/pytest runners or isolated audit test subprocesses (shared definition)."""
+    from core.runtime import is_test_runtime
+
+    return is_test_runtime()
+
+
+_LOCAL_DSN_MARKERS = ("127.0.0.1", "localhost", "[::1]")
+_PRODUCTION_DB_BLOCK_WARNED = False
+
+
+def _remote_db_permitted(url: str | None, hosted_prod: bool) -> str | None:
+    """Returns `url` only where this process may use a remote (production) database.
+
+    A laptop holds the production DSN in `.env`, so without this guard any local command (a dev
+    server, a script, a test file run directly) would connect to production and run migrations.
+    Hosted services always may; local databases always may; anything else must opt in with
+    `ALLOW_PRODUCTION_DB=1`, and otherwise falls back to local SQLite.
+    """
+    global _PRODUCTION_DB_BLOCK_WARNED
+    if not url:
+        return None
+    if hosted_prod or any(marker in url for marker in _LOCAL_DSN_MARKERS):
+        return url
+    if os.environ.get("ALLOW_PRODUCTION_DB") == "1":
+        return url
+    if not _PRODUCTION_DB_BLOCK_WARNED:
+        _PRODUCTION_DB_BLOCK_WARNED = True
+        logger.warning(
+            "A production database address is configured, but this is not a hosted service, so local "
+            "SQLite is used instead. Set ALLOW_PRODUCTION_DB=1 for a command that must reach production."
+        )
+    return None
 
 
 def get_configured_supabase_url() -> str | None:
-    """Returns configured Supabase DB URL from secrets or environment, or None in unit tests / explicit local-only mode."""
+    """Returns configured Supabase DB URL from secrets or environment, or None in unit tests, explicit
+    local-only mode, or on a non-hosted machine that has not opted in with ALLOW_PRODUCTION_DB=1."""
     hosted_prod = is_hosted_production_runtime()
     if not hosted_prod and os.environ.get("FORCE_LOCAL_SQLITE") == "1":
         return None
@@ -69,7 +91,7 @@ def get_configured_supabase_url() -> str | None:
             if "127.0.0.1" in explicit_url or "localhost" in explicit_url:
                 return explicit_url
             return None
-        return explicit_url
+        return _remote_db_permitted(explicit_url, hosted_prod)
     if _is_unit_test_runtime() and os.environ.get("TEST_SUPABASE") != "1":
         return None
     if not hosted_prod and os.environ.get("TESTING") == "1" and os.environ.get("TEST_SUPABASE") != "1":
@@ -79,7 +101,7 @@ def get_configured_supabase_url() -> str | None:
         url = get_secret("SUPABASE_DB_URL")
         _CACHED_SUPABASE_URL = url
         _SUPABASE_URL_RESOLVED = True
-    return _CACHED_SUPABASE_URL
+    return _remote_db_permitted(_CACHED_SUPABASE_URL, hosted_prod)
 
 def is_postgres_active() -> bool:
     """Returns True if PostgreSQL is configured and active, False if fallen back to SQLite."""

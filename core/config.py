@@ -50,17 +50,10 @@ _TEST_GUARDED_SECRET_KEYS = frozenset({
 
 
 def _is_test_runtime() -> bool:
-    """Detects active unittest/pytest runners or isolated test subprocesses."""
-    argv0 = sys.argv[0] if sys.argv else ""
-    is_test_entrypoint = any(runner in argv0 for runner in ("unittest", "pytest"))
-    return (
-        os.environ.get("TESTING") == "1"
-        or os.environ.get("ENVIRONMENT") == "testing"
-        or os.environ.get("SKIP_DOTENV_IN_SUBPROCESS") == "1"
-        or bool(os.environ.get("PYTEST_CURRENT_TEST"))
-        or "pytest" in sys.modules
-        or is_test_entrypoint
-    )
+    """Detects active unittest/pytest runners or isolated test subprocesses (shared definition)."""
+    from core.runtime import is_test_runtime
+
+    return is_test_runtime()
 
 
 def _load_local_secrets() -> dict:

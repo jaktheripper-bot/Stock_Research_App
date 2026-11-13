@@ -18,10 +18,11 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.12
+    # Same Python as production (Dockerfile: python:3.14-slim).
+    - name: Set up Python 3.14
       uses: actions/setup-python@v5
       with:
-        python-version: "3.12"
+        python-version: "3.14"
         cache: "pip"
 
     - name: Install Dependencies
@@ -36,7 +37,7 @@ jobs:
         python check_system.py
         python scripts/verify_reality_audit.py
 
-    - name: Run P0 Containment & Regression Test Suite
+    - name: Run P0 Containment Test Suite
       env:
         TESTING: "1"
         FORCE_LOCAL_SQLITE: "1"
@@ -44,4 +45,4 @@ jobs:
         RAZORPAY_WEBHOOK_SECRET: "ci_test_webhook_secret"
       run: |
         python -m pytest -q tests/unit/test_p0_credit_and_db_containment.py
-        python -m unittest discover -s tests
+        # The full regression suite runs once, in ci.yml ("Pre-Flight CI & Contract Audit").
