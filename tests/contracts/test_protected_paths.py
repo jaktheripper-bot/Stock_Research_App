@@ -81,6 +81,21 @@ class TestClaudeHook(unittest.TestCase):
         self.assertIsNotNone(self._decide("Write", unlocked=True, file_path=".claude/protected-unlock"))
         self.assertIsNotNone(self._decide("Bash", unlocked=True, command="./run.sh unlock-protected 30"))
         self.assertIsNotNone(self._decide("Bash", command="echo 9999999999 > .claude/protected-unlock"))
+        for command in ("touch .claude/protected-unlock", "rm -f .claude/protected-unlock",
+                        "python3 -c \"open('.claude/protected-unlock','w').write('9')\"",
+                        "ls && bash run.sh unlock-protected 5"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(self._decide("Bash", unlocked=True, command=command))
+
+    def test_reading_the_unlock_marker_and_naming_it_in_text_is_allowed(self):
+        self.assertIsNone(self._decide("Bash", command="cat .claude/protected-unlock"))
+        self.assertIsNone(self._decide("Bash", command="git commit -m 'owner unlocks with unlock-protected'"))
+
+    def test_write_in_one_step_and_protected_read_in_another_is_allowed(self):
+        """Escape 2026-11-15: a protected script run plus an unrelated restore was refused."""
+        self.assertIsNone(self._decide("Bash", command=(
+            "python scripts/verify_reality_audit.py | tail -3; git checkout -q PROJECT_STATUS.md")))
+        self.assertIsNotNone(self._decide("Bash", command="ls; git checkout -- render.yaml"))
 
     def test_shell_writes_to_protected_files_are_refused(self):
         for command in ('sed -i "" s/a/b/ render.yaml', "echo x >> .github/workflows/ci.yml",

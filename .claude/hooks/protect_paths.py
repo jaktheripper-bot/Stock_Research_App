@@ -19,12 +19,19 @@ ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().par
 sys.path.insert(0, str(ROOT / "scripts"))
 
 UNLOCK_FILE = ROOT / ".claude" / "protected-unlock"
-UNLOCK_NAMES = ("protected-unlock", "unlock-protected")
-WRITE_HINTS = re.compile(
+_WRITE_HINTS_SRC = (
     r"\btee\b|\bsed\b[^|;&]*\s-i|\bperl\b[^|;&]*\s-i|\brm\b|\bmv\b|\bcp\b|\btruncate\b|\bchmod\b|"
     r"\bln\b|\bdd\b|\bpatch\b|\bgit\s+(?:checkout|restore|rm|mv|apply|am|stash|reset|clean)\b|"
-    r"write_text|write_bytes|\.write\(|open\([^)]*['\"][wax+]"
+    r"write_text|write_bytes|\.write\(|open\([^)]*['\"][wax+]|unlink|os\.remove"
 )
+WRITE_HINTS = re.compile(_WRITE_HINTS_SRC)
+# The unlock marker may be read (to show its expiry) but never created, changed or removed by an agent.
+UNLOCK_WRITE_HINTS = re.compile(_WRITE_HINTS_SRC + r"|\btouch\b|\becho\b|\bprintf\b")
+# Running the owner's unlock command is refused anywhere in a command.
+RUN_UNLOCK = re.compile(r"run\.sh['\"]?\s+unlock-protected\b")
+# A shell command is checked one step at a time, so a protected file named in one step and a write
+# in another unrelated step don't add up to a refusal.
+SEGMENT_SPLIT = re.compile(r"&&|\|\||[;|\n]")
 REDIRECT = re.compile(r"(?<![0-9&])>>?\s*(['\"]?)([^\s;&|'\"]+)\1")
 
 ASK_OWNER = (
@@ -82,15 +89,24 @@ def decide(payload: dict, patterns, unlocked: bool):
 
     if tool == "Bash":
         command = tool_input.get("command") or ""
-        if any(name in command for name in UNLOCK_NAMES):
+        segments = SEGMENT_SPLIT.split(command)
+        if RUN_UNLOCK.search(command):
             return SELF_UNLOCK
+        for segment in segments:
+            if UNLOCK_FILE.name in segment and (
+                UNLOCK_WRITE_HINTS.search(segment)
+                or any(UNLOCK_FILE.name in m.group(2) for m in REDIRECT.finditer(segment))
+            ):
+                return SELF_UNLOCK
         if unlocked:
             return None
         for match in REDIRECT.finditer(command):
             if is_protected(match.group(2), patterns):
                 return ASK_OWNER
-        if WRITE_HINTS.search(command) and any(lit in command for lit in _protected_literals(patterns)):
-            return ASK_OWNER
+        literals = _protected_literals(patterns)
+        for segment in segments:
+            if WRITE_HINTS.search(segment) and any(lit in segment for lit in literals):
+                return ASK_OWNER
     return None
 
 
