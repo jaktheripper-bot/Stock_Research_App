@@ -45,3 +45,22 @@ jobs:
     - name: Run Python Regression Test Suite
       run: |
         python -m unittest discover -s tests
+
+  # Any change to a protected file (ci/protected_paths.txt: contract tests, gate scripts, CI and deploy
+  # config) needs a "Protected-Change-Approved:" trailer, whichever agent or person made it. The job
+  # summary lists every protected change so the owner can review them.
+  protected-files:
+    name: Protected files
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check changes to protected files
+      env:
+        BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      run: |
+        python3 scripts/check_protected_paths.py --range "${BASE_SHA}..${HEAD_SHA}"

@@ -1,7 +1,7 @@
 # Platform Roadmap & Pending Tasks Register
 **Moatnomics — Multi-Asset Investment Research Platform**  
 *Document Target:* [`docs/PENDING_TASKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/PENDING_TASKS.md)  
-*Last Updated:* 2026-11-13 10:45:00 IST
+*Last Updated:* 2026-11-15 10:00:00 IST
 
 ---
 
@@ -9,7 +9,7 @@
 
 ### Task 11: Testing Architecture Overhaul
 - **Category:** Verification, CI & Release Safety
-- **Status:** `Plan approved 2026-11-13; Phases 0 and 1 done; next is the protected-paths lock, then Phase 2`
+- **Status:** `Plan approved 2026-11-13; Phases 0 and 1 done; protected-files lock done 2026-11-15; next is Phase 2 (starts with the implication-preflight interview)`
 - **Plan:** [`docs/plans/TESTING_ARCHITECTURE_OVERHAUL.md`](plans/TESTING_ARCHITECTURE_OVERHAUL.md) (source findings: [`reports/Why our audits missed issues.md`](../reports/Why%20our%20audits%20missed%20issues.md)). Related: Task 9 (the fixes themselves).
 - **Goal:** agents keep writing code, but a small protected layer they can't quietly change judges it, production is checked on a schedule, and no result is recorded without evidence.
 - **Owner decisions (13 Nov):** deploys wait for CI; a Claude Code hook blocks edits to protected files and the owner approves changes in chat (CI flags changes from other agents); CI gets a throwaway Postgres; local commands default to SQLite.
@@ -19,7 +19,7 @@
   2. **Protected contract suite** (`tests/contracts/`, `TESTING` unset, on Postgres): negative security tests with real signed cookies and tokens, a route-policy inventory, money and race tests, migration parity, and a promise registry. Remove the ~35 security-relevant `TESTING` branches (starts with `implication-preflight`).
   3. **Fast-suite cleanup:** per-class isolated databases, a controllable clock, a realistic-size fixture with page budgets, a Playwright smoke test, golden LLM outputs.
   4. **Static scans:** widen the reality gates to the whole repo, add third-party scanners, add a doc-claims check, stop presenting the audit score as a quality claim.
-  5. **Lock it:** Claude Code hook plus a CI protected-paths job, commit trailers per agent, one trimmed rulebook, `ESCAPES.md`.
+  5. **Lock it:** ~~Claude Code hook plus a CI protected-paths job~~ (done 2026-11-15: `ci/protected_paths.txt`, `.claude/hooks/protect_paths.py`, CI job "Protected files"; owner unlocks with `./run.sh unlock-protected 30`). Still open: commit trailers per agent, one trimmed rulebook, `ESCAPES.md`, a Stop hook that runs the fast suite.
   6. **Production checks:** an hourly read-only workflow against the live site, and a monthly audit rotation by access.
 - **Owner-only hygiene:** move the repo out of the Google Drive-synced folder (or exclude `.git/`, `.env`, `*.db`, `backups/`, `.checkpoints/`, `scratch/`), and delete stale agent context files.
 

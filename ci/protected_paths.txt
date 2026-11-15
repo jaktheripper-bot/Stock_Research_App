@@ -1,0 +1,24 @@
+# Files that judge the agents' work, so agents may not change them on their own.
+#
+# Enforced in two places, both reading this list through scripts/check_protected_paths.py:
+#   1. Claude Code: .claude/hooks/protect_paths.py blocks edits until the owner unlocks with
+#      `./run.sh unlock-protected <minutes>` in their own terminal.
+#   2. CI (every push, every agent): a commit that changes any of these must carry the trailer
+#      `Protected-Change-Approved: <who approved, where, date>`, or the "Protected files" job fails.
+#
+# One glob per line; `**` matches any depth. Blank lines and # comments are ignored.
+
+# The protected contract suite (negative security, money, promises).
+tests/contracts/**
+tests/security/test_wave1_hardening.py
+
+# The gate scripts and this lock itself.
+scripts/verify_reality_audit.py
+scripts/check_protected_paths.py
+ci/protected_paths.txt
+
+# CI, deploy and agent configuration.
+.github/workflows/**
+render.yaml
+.claude/settings.json
+.claude/hooks/**

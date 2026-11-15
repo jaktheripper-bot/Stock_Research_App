@@ -92,6 +92,32 @@ case "$COMMAND" in
             echo "   Removed old backup $(basename "${OLD}")"
         done
         ;;
+    unlock-protected)
+        # Owner only, from your own terminal: lets Claude Code edit the protected files listed in
+        # ci/protected_paths.txt for a limited time (default 30 minutes, at most 120). Commits that
+        # change them still need a "Protected-Change-Approved: <who, where, date>" line for CI.
+        MINUTES="${2:-30}"
+        if ! [[ "$MINUTES" =~ ^[0-9]+$ ]] || [ "$MINUTES" -lt 1 ] || [ "$MINUTES" -gt 120 ]; then
+            echo "Usage: ./run.sh unlock-protected [minutes 1-120]"
+            exit 1
+        fi
+        if [ ! -t 0 ]; then
+            echo "Run this yourself in an interactive terminal; it can't be run by a script or an agent."
+            exit 1
+        fi
+        printf "Unlock protected files for %s minutes? Type 'unlock' to confirm: " "$MINUTES"
+        read -r CONFIRM
+        if [ "$CONFIRM" != "unlock" ]; then
+            echo "Not unlocked."
+            exit 1
+        fi
+        echo $(( $(date +%s) + MINUTES * 60 )) > "${SCRIPT_DIR}/.claude/protected-unlock"
+        echo "✅ Protected files unlocked until $(date -r $(( $(date +%s) + MINUTES * 60 )) '+%H:%M'). Lock early with ./run.sh lock-protected"
+        ;;
+    lock-protected)
+        rm -f "${SCRIPT_DIR}/.claude/protected-unlock"
+        echo "🔒 Protected files locked."
+        ;;
     admin)
         echo "--> Admin console is native SSR in FastAPI. Access at http://localhost:8000/admin"
         echo "--> Starting server..."

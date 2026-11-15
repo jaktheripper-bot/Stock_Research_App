@@ -31,6 +31,11 @@
 - **Process & Environment Isolation:** Background ingestion/mutation schedulers must NEVER auto-fire on local web server boot or test runs without an explicit `ENABLE_BACKGROUND_SCHEDULERS=1` opt-in guard.
 - **Production Database Is Opt-In Locally:** On any non-hosted machine the app uses local SQLite even when `.env` holds the production address. A command that must reach production sets `ALLOW_PRODUCTION_DB=1` for that one command; never export it in a shell profile or `.env`, and say so in your summary whenever you used it.
 
+## 4a. Protected Files (Enforced by Hook and CI)
+- Files listed in `ci/protected_paths.txt` (the contract tests in `tests/contracts/`, the gate scripts, CI workflows, `render.yaml`, Claude Code settings and hooks) judge agent work, so agents may not change them on their own.
+- When one of them looks wrong, say so in chat with the exact change and the reason, then wait for the owner. The owner unlocks editing from their own terminal (`./run.sh unlock-protected 30`); never try to unlock, bypass or work around the lock yourself.
+- Every commit that changes a protected file must include `Protected-Change-Approved: <who approved, where, date>`; CI fails the push otherwise, whichever agent made it.
+
 ## 5. Mandatory Sandbox Simulation & Empirical Verification Protocol
 **Work out edge cases in `<appDataDir>/brain/<conversation-id>/scratch/` against cloned data BEFORE mutating workspace databases or committing.**
 - **Phase 0 (Compliance Check):** Re-read brief line-by-line; construct requirement vs file:line matrix.
