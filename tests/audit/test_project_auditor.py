@@ -167,6 +167,9 @@ class TestProjectAuditor(unittest.TestCase):
 
     def test_web_admin_audit_routes(self):
         """Verifies /admin/audit and audit API endpoints."""
+        # The admin endpoints require a real admin session; sign one with the app's own signer.
+        from web.common import ADMIN_COOKIE_NAME, _generate_admin_token
+        self.client.cookies.set(ADMIN_COOKIE_NAME, _generate_admin_token("admin.sample@example.com"))
         # 1. Health endpoint alias
         resp_health = self.client.get("/health")
         self.assertEqual(resp_health.status_code, 200)

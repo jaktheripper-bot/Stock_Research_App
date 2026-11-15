@@ -14,7 +14,6 @@ Provides:
 
 import hashlib
 import os
-import sys
 import io
 import csv
 import json
@@ -588,9 +587,8 @@ async def api_admin_run_project_audit(
     init_db()
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
-    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
     admin_session = _is_admin_authenticated(request)
-    if not (is_testing or admin_session or _verify_admin_api_key(x_admin_key)):
+    if not (admin_session or _verify_admin_api_key(x_admin_key)):
         raise HTTPException(status_code=403, detail="Unauthorized: Admin access required.")
 
     from core.audit.project_auditor import audit_project_full
@@ -651,9 +649,8 @@ def api_admin_project_audit_status(
 ):
     """Returns real-time progress and completion status for an asynchronous project audit."""
     init_db()
-    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
     admin_session = _is_admin_authenticated(request)
-    if not (is_testing or admin_session or _verify_admin_api_key(x_admin_key)):
+    if not (admin_session or _verify_admin_api_key(x_admin_key)):
         raise HTTPException(status_code=403, detail="Unauthorized: Admin access required.")
 
     task = _ACTIVE_PROJECT_AUDITS.get(audit_id)
@@ -689,9 +686,8 @@ def api_admin_get_audit_logs(
 ):
     """Retrieves past project audit run logs for executive telemetry."""
     init_db()
-    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
     admin_session = _is_admin_authenticated(request)
-    if not (is_testing or admin_session or _verify_admin_api_key(x_admin_key)):
+    if not (admin_session or _verify_admin_api_key(x_admin_key)):
         raise HTTPException(status_code=403, detail="Unauthorized: Admin access required.")
 
     from core.db.audit_logs import get_project_audit_history
@@ -2166,8 +2162,7 @@ async def api_run_discovery(
     """Triggers the Stock Discovery screening and dossier synthesis worker."""
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
-    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
-    is_authed = is_testing or _verify_admin_api_key(x_admin_key) or bool(_is_admin_authenticated(request))
+    is_authed = _verify_admin_api_key(x_admin_key) or bool(_is_admin_authenticated(request))
 
     if not is_authed:
         raise HTTPException(status_code=403, detail="Unauthorized admin access.")

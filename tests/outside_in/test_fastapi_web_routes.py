@@ -369,11 +369,20 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
 
     def test_admin_run_discovery_api(self):
         from unittest.mock import patch
-        with patch("scripts.run_discovery_worker.run_discovery_pipeline", return_value=True):
-            res = self.client.post("/api/admin/run-discovery?count=10")
-            self.assertEqual(res.status_code, 200)
-            data = res.json()
-            self.assertEqual(data.get("status"), "initiated")
+        from web.common import ADMIN_COOKIE_NAME, _generate_admin_token
+        try:
+            # Real admin session signed by the app's own signer; anonymous callers are refused.
+            self.client.cookies.clear()
+            with patch("scripts.run_discovery_worker.run_discovery_pipeline", return_value=True):
+                refused = self.client.post("/api/admin/run-discovery?count=10")
+                self.assertEqual(refused.status_code, 403)
+                self.client.cookies.set(ADMIN_COOKIE_NAME, _generate_admin_token("admin.sample@example.com"))
+                res = self.client.post("/api/admin/run-discovery?count=10")
+                self.assertEqual(res.status_code, 200)
+                data = res.json()
+                self.assertEqual(data.get("status"), "initiated")
+        finally:
+            self.client.cookies.clear()
 
     def test_contact_page_get_and_post(self):
         import re as _re

@@ -13,12 +13,28 @@ permissions:
 jobs:
   audit-and-test:
     runs-on: ubuntu-latest
+    # A free throwaway PostgreSQL for the contract tests (tests/contracts), which run the real app with
+    # TESTING unset. It lives only for this job and holds no real data.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci_test_only
+          POSTGRES_DB: moatnomics_contract_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       # Same isolated test environment as p0_release_gate.yml: local SQLite, test-only secrets.
       TESTING: "1"
       FORCE_LOCAL_SQLITE: "1"
       ADMIN_PASSWORD: ci_test_admin_pwd_default
       RAZORPAY_WEBHOOK_SECRET: ci_test_webhook_secret
+      MOATNOMICS_TEST_POSTGRES_DSN: postgresql://postgres:ci_test_only@127.0.0.1:5432/moatnomics_contract_test
 
     steps:
     - name: Checkout Code
