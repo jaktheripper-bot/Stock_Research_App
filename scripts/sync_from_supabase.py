@@ -207,6 +207,18 @@ def should_apply_incoming_row(
         )
         return bool(needs_eff_to or needs_superseded or needs_sup_by or needs_status_upgrade)
 
+    # Provenance guard: an unverified (seeded / assumed / fallback) sovereign row must never
+    # replace a verified one, even with force. Unverified rows may only fill an empty slot.
+    if table_name in ("sovereign_benchmarks", "sovereign_macro_rates") and existing is not None:
+        from core.db.sovereign import _is_verified_source_label
+
+        if _is_verified_source_label(existing.get("source")) and not _is_verified_source_label(incoming.get("source")):
+            logger.warning(
+                "Rejected unverified incoming %s row over verified existing row (source=%r).",
+                table_name, incoming.get("source"),
+            )
+            return False
+
     if existing is None:
         return True
 

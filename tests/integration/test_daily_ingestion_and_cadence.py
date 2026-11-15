@@ -491,17 +491,16 @@ class TestDailyCadenceAndRotation(unittest.TestCase):
         self.assertEqual(summary.get("status"), "SUCCESS")
         self.assertEqual(summary.get("edition_date"), test_date)
         self.assertEqual(summary.get("benchmarks_updated"), 16)
-        self.assertEqual(summary.get("sdl_spreads_updated"), 10)
+        # SDL seeds are no longer written (no provenance column until schema v052).
+        self.assertEqual(summary.get("sdl_spreads_updated"), 0)
 
         curve = get_sovereign_yield_curve()
         self.assertEqual(len(curve), 16)
         for item in curve:
             self.assertTrue(bool(item.get("auction_date")))
 
-        sdls = get_sovereign_sdl_matrix()
-        self.assertEqual(len(sdls), 10)
-        for item in sdls:
-            self.assertTrue(bool(item.get("auction_date")))
+        # Reading never seeds: an empty SDL table stays empty rather than returning invented spreads.
+        self.assertIsInstance(get_sovereign_sdl_matrix(), list)
 
         # Outside-in Admin API contract
         client = TestClient(app)

@@ -13,6 +13,8 @@
 
 ---
 
+> **Provenance rule (2026-11-15):** sovereign/macro rows labelled `STATIC_BASELINE_REFERENCE (Unverified Offline Seed)` are never shown as official figures, never snapshotted into curve history, and never pushed by the offline sync; pages and email lines fall back to Pending/withheld until a verified observation exists.
+
 ## Executive Summary & System Philosophy
 
 Historically, the platform's evaluation framework was confined strictly to the **7 Pillars of Fundamental Equity Analysis** (evaluating business compounding, economic moats, governance, and cash flow durability).

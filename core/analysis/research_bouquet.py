@@ -191,74 +191,42 @@ def _load_live_equities(date_str: str, limit: int = 3) -> List[Dict[str, Any]]:
 def _load_live_sovereign_posture(date_str: str) -> Dict[str, Any]:
     """Query live sovereign yield curve, RBI monetary corridor, and SDL fiscal spreads from the database."""
     try:
-        from core.db.connection import get_db_connection, init_db
+        from core.db.connection import init_db
         from core.db.sovereign import (
+            _is_verified_source_label,
             get_macro_monetary_corridor,
-            get_sovereign_curve_analytics,
+            get_sovereign_yield_curve,
         )
 
         init_db()
-        curve_analytics = get_sovereign_curve_analytics() or {}
+        # Fail closed ("Pending over Potemkin"): only verified, persisted observations are used.
+        # Seeded / assumed / fallback rows never reach the email, and nothing is invented to fill a gap.
+        bench_map = {
+            str(pt["tenor_label"]): float(pt["cut_off_yield"])
+            for pt in get_sovereign_yield_curve()
+            if pt.get("cut_off_yield") is not None and _is_verified_source_label(pt.get("source"))
+        }
+        ten_raw = bench_map.get("10Y_GSEC")
+        one_raw = bench_map.get("364D_TBILL")
+
         corridor = get_macro_monetary_corridor() or {}
+        repo_entry = corridor.get("repo_rate")
+        repo_raw = None
+        if isinstance(repo_entry, dict) and not repo_entry.get("is_fallback") and _is_verified_source_label(repo_entry.get("source")):
+            repo_raw = repo_entry.get("value")
 
-        ten_raw = curve_analytics.get("benchmark_10y_gsec") or curve_analytics.get("ten_year_yield")
-        one_raw = curve_analytics.get("risk_free_short_tbill") or curve_analytics.get("one_year_yield")
-
-        repo_val = corridor.get("repo_rate")
-        repo_raw = repo_val.get("value") if isinstance(repo_val, dict) else repo_val
-
+        # SDL yields carry no provenance column until schema v052, so they are not quoted here.
         sdl_highlight = None
-        conn = get_db_connection()
-        cur = conn.cursor()
-        try:
-            if ten_raw is None or one_raw is None:
-                cur.execute(
-                    "SELECT tenor_label, cut_off_yield FROM sovereign_benchmarks WHERE tenor_label IN ('10Y_GSEC', '364D_TBILL')"
-                )
-                bench_map = {str(r[0]): float(r[1]) for r in cur.fetchall() if r and r[1] is not None}
-                if ten_raw is None:
-                    ten_raw = bench_map.get("10Y_GSEC")
-                if one_raw is None:
-                    one_raw = bench_map.get("364D_TBILL")
 
-            if repo_raw is None:
-                cur.execute(
-                    "SELECT rate_pct FROM sovereign_macro_rates WHERE rate_key IN ('REPO', 'repo_rate') LIMIT 1"
-                )
-                r_row = cur.fetchone()
-                if r_row and r_row[0] is not None:
-                    repo_raw = float(r_row[0])
-
-            cur.execute(
-                """
-                SELECT state_name, cut_off_yield, spread_over_gsec_bps, fiscal_tier
-                FROM sovereign_sdl_spreads
-                WHERE cut_off_yield IS NOT NULL
-                ORDER BY spread_over_gsec_bps ASC, state_name ASC
-                """
-            )
-            sdl_rows = cur.fetchall()
-            if sdl_rows:
-                idx = _date_index("sdl", date_str, len(sdl_rows))
-                s_row = sdl_rows[idx]
-                sdl_highlight = {
-                    "state_name": str(s_row[0]),
-                    "cut_off_yield": round(float(s_row[1]), 2),
-                    "spread_bps": int(round(float(s_row[2] or 0.0))),
-                    "fiscal_tier": str(s_row[3] or "AUDITED"),
-                }
-        finally:
-            cur.close()
-            conn.close()
-
-        if ten_raw is None or one_raw is None:
+        if ten_raw is None or one_raw is None or repo_raw is None:
+            logger.info("Bouquet sovereign posture withheld: verified 10Y/364D/repo observations unavailable.")
             return {}
 
         ten_yr = float(ten_raw)
         one_yr = float(one_raw)
-        repo_rate = float(repo_raw) if repo_raw is not None else round(one_yr - 0.25, 2)
+        repo_rate = float(repo_raw)
         spread_bps = int(round((ten_yr - one_yr) * 100))
-        curve_shape = str(curve_analytics.get("curve_shape") or "Normal (Upward Sloping)")
+        curve_shape = "Normal (Upward Sloping)" if spread_bps > 15 else ("Flat" if spread_bps >= -10 else "Inverted")
 
         sdl_clause = ""
         if sdl_highlight:

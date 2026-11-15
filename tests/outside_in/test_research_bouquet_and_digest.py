@@ -41,10 +41,36 @@ from core.analysis.research_bouquet import (
 from core.notify import dispatch_research_bouquet
 
 
+def _seed_verified_sovereign_fixture():
+    """Test fixture: verified (officially labelled) 10Y G-Sec, 364D T-bill and repo rows.
+
+    The production seeds are unverified by design, so the bouquet sovereign line would be withheld.
+    """
+    from core.db.connection import get_db_connection, get_placeholder
+    from core.db.sovereign import save_sovereign_benchmark
+
+    for tenor, itype, yrs, y in (("10Y_GSEC", "G_SEC", 10.0, 7.31), ("364D_TBILL", "T_BILL", 1.0, 6.9)):
+        save_sovereign_benchmark({"tenor_label": tenor, "instrument_type": itype, "maturity_years": yrs,
+                                  "cut_off_yield": y, "auction_date": "2026-10-30", "source": "RBI_AUCTION_CUTOFF"})
+    conn = get_db_connection()
+    cur = conn.cursor()
+    p = get_placeholder()
+    cur.execute(f"DELETE FROM sovereign_macro_rates WHERE metric_key = {p}", ("repo_rate",))
+    cur.execute(
+        f"INSERT INTO sovereign_macro_rates (metric_key, metric_name, metric_value, unit, period_label, source) "
+        f"VALUES ({p},{p},{p},{p},{p},{p})",
+        ("repo_rate", "Policy Repo Rate", 5.5, "%", "test fixture", "RBI Monetary Policy Committee (MPC)"),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
 class TestResearchBouquetAndDigest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         init_db()
+        _seed_verified_sovereign_fixture()
         cls.client = TestClient(app)
         cls.admin_token = _generate_admin_token("test_admin@moatnomics.com", "super_admin")
 

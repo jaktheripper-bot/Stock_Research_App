@@ -15,7 +15,12 @@ from core.db.mutual_funds import get_active_mutual_funds
 from core.db.reits import get_all_reits_and_invits, get_all_sgb_tranches
 from core.db.reports import get_archived_reports
 from core.db.savings import get_active_savings_instruments
-from core.db.sovereign import get_etf_matrix, get_live_macro_anchors, get_sovereign_yield_curve
+from core.db.sovereign import (
+    _is_verified_source_label,
+    get_etf_matrix,
+    get_live_macro_anchors,
+    get_sovereign_yield_curve,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -534,7 +539,7 @@ def get_normalized_opportunity_universe(
             )
             if is_canonical:
                 inst_id = f"GOI_{tenor}"
-                if b.get("source") in ("RBI_AUCTION_CUTOFF", "FBIL_LIVE") and not b.get("is_fallback"):
+                if _is_verified_source_label(b.get("source")) and not b.get("is_fallback"):
                     metric = _observation(
                         "AUCTION_CUTOFF_YIELD",
                         b.get("cut_off_yield"),

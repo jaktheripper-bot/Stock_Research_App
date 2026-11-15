@@ -852,6 +852,23 @@ class TestSavingsUniverseAndDicgc(unittest.TestCase):
         scss_upd["next_review_date"] = "2027-01-31"
         upsert_savings_instrument(scss_upd)
 
+        # Seeds are unverified by design, so give the bouquet verified observations to quote.
+        from core.db.sovereign import save_sovereign_benchmark
+        for tenor, itype, yrs, y in (("10Y_GSEC", "G_SEC", 10.0, 7.31), ("364D_TBILL", "T_BILL", 1.0, 6.9)):
+            save_sovereign_benchmark({"tenor_label": tenor, "instrument_type": itype, "maturity_years": yrs,
+                                      "cut_off_yield": y, "auction_date": "2026-10-30", "source": "RBI_AUCTION_CUTOFF"})
+        _vconn = db_conn.get_db_connection()
+        _vcur = _vconn.cursor()
+        _vp = db_conn.get_placeholder()
+        _vcur.execute(f"DELETE FROM sovereign_macro_rates WHERE metric_key = {_vp}", ("repo_rate",))
+        _vcur.execute(
+            f"INSERT INTO sovereign_macro_rates (metric_key, metric_name, metric_value, unit, period_label, source) "
+            f"VALUES ({_vp},{_vp},{_vp},{_vp},{_vp},{_vp})",
+            ("repo_rate", "Policy Repo Rate", 5.5, "%", "test fixture", "RBI Monetary Policy Committee (MPC)"),
+        )
+        _vconn.commit()
+        _vcur.close()
+        _vconn.close()
         sov_posture = _load_live_sovereign_posture("2026-11-05")
         self.assertIn("PPF EEE 7.50%", sov_posture["tax_free_highlight"])
         self.assertIn("SCSS 8.40%", sov_posture["tax_free_highlight"])

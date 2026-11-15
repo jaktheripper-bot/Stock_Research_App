@@ -13,6 +13,8 @@ from core.db.connection import get_db_connection, get_supabase_url, get_placehol
 logger = logging.getLogger("equity_research.core.db.sovereign")
 
 # Curated, authoritative baseline sovereign yield curve based on latest RBI auction cut-offs
+UNVERIFIED_SEED_SOURCE = "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
+
 DEFAULT_SOVEREIGN_BENCHMARKS = [
     {
         "tenor_label": "91D_TBILL",
@@ -20,7 +22,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 0.25,
         "cut_off_yield": 6.84,
         "auction_date": "2026-10-01",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "182D_TBILL",
@@ -28,7 +30,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 0.50,
         "cut_off_yield": 6.92,
         "auction_date": "2026-10-01",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "364D_TBILL",
@@ -36,7 +38,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 1.00,
         "cut_off_yield": 6.96,
         "auction_date": "2026-10-01",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "2Y_GSEC",
@@ -44,7 +46,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 2.00,
         "cut_off_yield": 7.02,
         "auction_date": "2026-09-26",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "3Y_GSEC",
@@ -52,7 +54,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 3.00,
         "cut_off_yield": 7.05,
         "auction_date": "2026-09-26",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "5Y_GSEC",
@@ -60,7 +62,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 5.00,
         "cut_off_yield": 7.08,
         "auction_date": "2026-09-26",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "5Y_SGRB",
@@ -68,7 +70,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 5.00,
         "cut_off_yield": 7.05,
         "auction_date": "2026-09-26",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "7Y_GSEC",
@@ -76,7 +78,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 7.00,
         "cut_off_yield": 7.10,
         "auction_date": "2026-09-26",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "10Y_GSEC",
@@ -84,7 +86,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 10.00,
         "cut_off_yield": 7.12,
         "auction_date": "2026-10-03",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "10Y_SGRB",
@@ -92,7 +94,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 10.00,
         "cut_off_yield": 7.08,
         "auction_date": "2026-10-03",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "10Y_SDL",
@@ -100,7 +102,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 10.00,
         "cut_off_yield": 7.45,
         "auction_date": "2026-09-30",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "14Y_GSEC",
@@ -108,7 +110,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 14.00,
         "cut_off_yield": 7.18,
         "auction_date": "2026-09-19",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "20Y_GSEC",
@@ -116,7 +118,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 20.00,
         "cut_off_yield": 7.21,
         "auction_date": "2026-09-19",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "30Y_GSEC",
@@ -124,7 +126,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 30.00,
         "cut_off_yield": 7.24,
         "auction_date": "2026-09-19",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "40Y_GSEC",
@@ -132,7 +134,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 40.00,
         "cut_off_yield": 7.32,
         "auction_date": "2026-09-19",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     },
     {
         "tenor_label": "50Y_GSEC",
@@ -140,7 +142,7 @@ DEFAULT_SOVEREIGN_BENCHMARKS = [
         "maturity_years": 50.00,
         "cut_off_yield": 7.46,
         "auction_date": "2026-09-12",
-        "source": "RBI_AUCTION_CUTOFF"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     }
 ]
 
@@ -302,7 +304,7 @@ DEFAULT_MACRO_RATES = [
         "metric_value": 3.47,
         "unit": "%",
         "period_label": "Nominal 10Y (7.12%) minus Headline CPI (3.65%)",
-        "source": "Moatnomics Calculation (Baseline Reference)"
+        "source": "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
     }
 ]
 
@@ -414,8 +416,10 @@ def save_sovereign_benchmark(bench: Dict[str, Any]) -> bool:
             bench["instrument_type"],
             float(bench["maturity_years"]),
             float(bench["cut_off_yield"]),
-            str(bench.get("auction_date", datetime.now(IST).strftime("%Y-%m-%d"))),
-            str(bench.get("source", "RBI_AUCTION_CUTOFF")),
+            # Never stamp "today" as an auction date: a missing date stays blank (column is NOT NULL until v052).
+            (str(bench["auction_date"]) if bench.get("auction_date") else ""),
+            # Anything saved without an explicit source is an unverified seed, never an official cut-off.
+            str(bench.get("source") or UNVERIFIED_SEED_SOURCE),
         )
         cursor.execute(query, params)
         conn.commit()
@@ -429,11 +433,12 @@ def save_sovereign_benchmark(bench: Dict[str, Any]) -> bool:
         conn.close()
 
 
-def get_sovereign_yield_curve(auto_seed: bool = True) -> List[Dict[str, Any]]:
-    """Returns the sovereign yield curve sorted in ascending order by maturity.
+def get_sovereign_yield_curve(auto_seed: bool = False) -> List[Dict[str, Any]]:
+    """Returns the persisted sovereign yield curve sorted ascending by maturity.
 
-    When `auto_seed=False`, strictly returns only persisted DB rows without inserting
-    or substituting baseline assumptions.
+    Read-only: it never inserts seed rows and never substitutes assumed values when the table
+    is empty or the database is unreachable (returns []). `auto_seed` is accepted only so older
+    callers keep working; it has no effect.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -446,22 +451,6 @@ def get_sovereign_yield_curve(auto_seed: bool = True) -> List[Dict[str, Any]]:
             ORDER BY maturity_years ASC, instrument_type ASC;
         """)
         rows = cursor.fetchall()
-
-        if not rows and auto_seed:
-            # Seed baseline curve only when table is completely empty and caller opted in
-            logger.info("Synchronizing baseline suite of sovereign benchmarks...")
-            for b in DEFAULT_SOVEREIGN_BENCHMARKS:
-                b_seed = dict(b)
-                b_seed["source"] = "STATIC_BASELINE_REFERENCE (Unverified Offline Seed)"
-                save_sovereign_benchmark(b_seed)
-            cursor.execute("""
-                SELECT id, tenor_label, instrument_type, maturity_years, cut_off_yield,
-                       auction_date, source, updated_at
-                FROM sovereign_benchmarks
-                ORDER BY maturity_years ASC, instrument_type ASC;
-            """)
-            rows = cursor.fetchall()
-
         results = []
         for r in rows:
             results.append({
@@ -477,17 +466,7 @@ def get_sovereign_yield_curve(auto_seed: bool = True) -> List[Dict[str, Any]]:
         return results
     except Exception as e:
         logger.error(f"Error fetching sovereign yield curve: {e}")
-        if not auto_seed:
-            return []
-        return [
-            {
-                **b,
-                "auction_date": None,
-                "source": "ASSUMED_FALLBACK (DB_UNAVAILABLE)",
-                "is_fallback": True,
-            }
-            for b in DEFAULT_SOVEREIGN_BENCHMARKS
-        ]
+        return []
     finally:
         cursor.close()
         conn.close()
@@ -542,8 +521,10 @@ def save_sovereign_curve_snapshot(edition_date: Optional[str] = None) -> int:
     if not edition_date:
         edition_date = datetime.now(IST).strftime("%Y-%m-%d")
 
-    curve = get_sovereign_yield_curve()
+    # Only verified observations are recorded in history; seeds would draw a flat fake time series.
+    curve = [pt for pt in get_sovereign_yield_curve() if _is_verified_source_label(pt.get("source"))]
     if not curve:
+        logger.info("No verified sovereign curve points; skipping history snapshot.")
         return 0
 
     conn = get_db_connection()
@@ -665,13 +646,8 @@ def refresh_daily_sovereign_benchmarks(edition_date: Optional[str] = None) -> Di
             if save_sovereign_benchmark(b_copy):
                 benchmarks_updated += 1
 
+    # SDL rows have no provenance column until schema v052, so seeds are never written here.
     sdl_updated = 0
-    for sdl in DEFAULT_SDL_MATRIX:
-        s_copy = dict(sdl)
-        if is_live and live_feed.get("live_benchmarks"):
-            s_copy["auction_date"] = str(live_feed.get("auction_date") or edition_date)
-        if save_sovereign_sdl_item(s_copy):
-            sdl_updated += 1
 
     # Synchronize macro monetary corridor rates without restamping updated_at or reverting live updates
     macro_updated = 0
@@ -868,12 +844,6 @@ def get_sovereign_sdl_matrix() -> List[Dict[str, Any]]:
         """)
         rows = cursor.fetchall()
 
-        if not rows:
-            logger.info("SDL spreads table empty. Initializing baseline SDL benchmarks...")
-            for s in DEFAULT_SDL_MATRIX:
-                save_sovereign_sdl_item(s)
-            return sorted(DEFAULT_SDL_MATRIX, key=lambda x: x["spread_over_gsec_bps"])
-
         results = []
         for r in rows:
             results.append({
@@ -891,7 +861,7 @@ def get_sovereign_sdl_matrix() -> List[Dict[str, Any]]:
         return results
     except Exception as e:
         logger.error(f"Error fetching SDL matrix: {e}")
-        return sorted(DEFAULT_SDL_MATRIX, key=lambda x: x["spread_over_gsec_bps"])
+        return []
     finally:
         cursor.close()
         conn.close()
@@ -901,11 +871,11 @@ get_sdl_state_spreads = get_sovereign_sdl_matrix
 
 
 
-def get_macro_monetary_corridor(auto_seed: bool = True) -> Dict[str, Any]:
+def get_macro_monetary_corridor(auto_seed: bool = False) -> Dict[str, Any]:
     """Returns policy rates (Repo, SDF, MSF), CPI inflation, and real yield metrics.
 
-    When `auto_seed=False`, returns strictly persisted DB rows without auto-inserting
-    baseline reference figures.
+    Read-only: never inserts baseline figures nor substitutes assumed values on error.
+    `auto_seed` is accepted for backward compatibility and ignored.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -916,18 +886,6 @@ def get_macro_monetary_corridor(auto_seed: bool = True) -> Dict[str, Any]:
             FROM sovereign_macro_rates;
         """)
         rows = cursor.fetchall()
-
-        if not rows and auto_seed:
-            p = get_placeholder()
-            for m in DEFAULT_MACRO_RATES:
-                metric_name_val = m.get("metric_name") or m.get("indicator_name", "")
-                q = f"""INSERT INTO sovereign_macro_rates
-                       (metric_key, metric_name, metric_value, unit, period_label, source)
-                       VALUES ({p},{p},{p},{p},{p},{p}) ON CONFLICT (metric_key) DO NOTHING;"""
-                cursor.execute(q, (m["metric_key"], metric_name_val, m["metric_value"], m["unit"], m["period_label"], m["source"]))
-            conn.commit()
-            cursor.execute("SELECT metric_key, metric_name, metric_value, unit, period_label, source FROM sovereign_macro_rates;")
-            rows = cursor.fetchall()
 
         result_dict = {}
         for r in rows:
@@ -953,22 +911,7 @@ def get_macro_monetary_corridor(auto_seed: bool = True) -> Dict[str, Any]:
         return result_dict
     except Exception as e:
         logger.error(f"Error fetching macro rates: {e}")
-        if not auto_seed:
-            return {}
-        return {
-            m["metric_key"]: {
-                "key": m["metric_key"],
-                "name": m.get("metric_name", m.get("indicator_name", "")),
-                "indicator_name": m.get("indicator_name", m.get("metric_name", "")),
-                "value": m["metric_value"],
-                "unit": m["unit"],
-                "period": "Fallback Assumption (DB Unavailable)",
-                "period_label": "Fallback Assumption (DB Unavailable)",
-                "source": "ASSUMED_FALLBACK (DB_UNAVAILABLE)",
-                "is_fallback": True,
-            }
-            for m in DEFAULT_MACRO_RATES
-        }
+        return {}
     finally:
         cursor.close()
         conn.close()

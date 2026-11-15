@@ -158,23 +158,55 @@ class TestFindingsRemediations(unittest.TestCase):
 
 
     def test_finding_4_sovereign_curve_snapshot_ingestion(self):
-        """Finding 4: Sovereign curve daily snapshot records term structure points into sovereign_curve_history."""
-        test_edition = "2026-10-24"
+        """Finding 4: only VERIFIED curve points are recorded in sovereign_curve_history; unverified seeds never are."""
+        from core.db.sovereign import (
+            DEFAULT_SOVEREIGN_BENCHMARKS,
+            UNVERIFIED_SEED_SOURCE,
+            save_sovereign_benchmark,
+        )
+
+        test_edition = "2099-12-31"  # unused edition key: other tests/clone data cannot collide
+        # Every seed constant is labelled unverified.
+        for b in DEFAULT_SOVEREIGN_BENCHMARKS:
+            self.assertEqual(b["source"], UNVERIFIED_SEED_SOURCE)
+
+        # Whatever the table holds (other tests may add verified rows), a snapshot records exactly
+        # the verified points and never an unverified seed.
+        verified = dict(DEFAULT_SOVEREIGN_BENCHMARKS[0], source="RBI_AUCTION_CUTOFF", auction_date="2026-10-22")
+        self.assertTrue(save_sovereign_benchmark(verified))
+        from core.db.sovereign import _is_verified_source_label, get_sovereign_yield_curve
+
+        expected = {p["tenor_label"] for p in get_sovereign_yield_curve() if _is_verified_source_label(p["source"])}
+        self.assertIn(verified["tenor_label"], expected)
         saved_count = save_sovereign_curve_snapshot(test_edition)
-        self.assertGreaterEqual(saved_count, 16)
-
+        self.assertEqual(saved_count, len(expected))
         history_pts = get_sovereign_curve_history(test_edition)
-        self.assertEqual(len(history_pts), saved_count)
+        self.assertEqual({p["tenor_label"] for p in history_pts}, expected)
 
-        tenor_labels = [p["tenor_label"] for p in history_pts]
-        self.assertIn("10Y_GSEC", tenor_labels)
-        self.assertIn("91D_TBILL", tenor_labels)
-        self.assertIn("40Y_GSEC", tenor_labels)
-
-        # Refresh daily benchmarks summary contract check
         summary = refresh_daily_sovereign_benchmarks(edition_date=test_edition)
         self.assertEqual(summary.get("status"), "SUCCESS")
         self.assertEqual(summary.get("curve_snapshots_saved"), saved_count)
+
+    def test_missing_source_is_never_stored_as_official(self):
+        """A benchmark saved without a source is stored unverified, with no invented auction date."""
+        from core.db.sovereign import UNVERIFIED_SEED_SOURCE, get_sovereign_yield_curve, save_sovereign_benchmark
+
+        self.assertTrue(save_sovereign_benchmark({
+            "tenor_label": "TEST_NOSRC", "instrument_type": "G_SEC", "maturity_years": 3.3, "cut_off_yield": 6.5,
+        }))
+        try:
+            row = next(r for r in get_sovereign_yield_curve() if r["tenor_label"] == "TEST_NOSRC")
+            self.assertEqual(row["source"], UNVERIFIED_SEED_SOURCE)
+            self.assertFalse(row["auction_date"])
+        finally:
+            from core.db.connection import get_db_connection
+
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("DELETE FROM sovereign_benchmarks WHERE tenor_label = 'TEST_NOSRC'")
+            conn.commit()
+            cur.close()
+            conn.close()
 
     def test_ind_as_108_segment_and_order_book_extractor(self):
         """Ind AS 108 extractor enforces [VERIFIED FACT] period attribution, Pillar 01/02 scoping, word-boundary safety, and entity-match guards."""

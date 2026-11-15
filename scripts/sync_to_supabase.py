@@ -226,6 +226,21 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
         try:
             sqlite_cur.execute(f"SELECT * FROM {table_name}")
             rows = sqlite_cur.fetchall()
+            if table_name in ("sovereign_benchmarks", "sovereign_macro_rates"):
+                # Provenance guard: unverified (seeded / assumed / fallback) rows are never pushed
+                # to production, where they could overwrite verified observations.
+                from core.db.sovereign import _is_verified_source_label
+
+                kept = [r for r in rows if _is_verified_source_label(r["source"])]
+                if len(kept) != len(rows):
+                    logger.warning(
+                        "Skipped %d unverified %s row(s) from push to PostgreSQL.", len(rows) - len(kept), table_name
+                    )
+                rows = kept
+            elif table_name in ("sovereign_sdl_spreads", "sovereign_curve_history"):
+                # No provenance column until schema v052: never push possibly-seeded rows to production.
+                logger.warning("Skipped push of %s (no provenance column until schema v052).", table_name)
+                continue
             if not rows:
                 continue
 
